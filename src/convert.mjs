@@ -134,11 +134,14 @@ async function loadProxyUtils() {
     
     const { window } = dom;
     
-    // 将浏览器API暴露到global，让ES模块可以使用
+    // 使用Node.js原生的Blob（Node.js 18+支持）
+    const Blob = globalThis.Blob || (await import('buffer')).Blob;
+    
+    // 将浏览器API暴露到global
     global.window = window;
     global.document = window.document;
-    global.Blob = window.Blob;
-    global.URL = window.URL;
+    global.Blob = Blob;
+    global.URL = globalThis.URL;
     global.URLSearchParams = window.URLSearchParams;
     global.TextEncoder = window.TextEncoder;
     global.TextDecoder = window.TextDecoder;
@@ -152,9 +155,9 @@ async function loadProxyUtils() {
     // 读取ESM文件内容
     const source = fs.readFileSync(PROXY_UTILS_FILE, 'utf8');
     
-    // 创建一个Blob URL来加载模块（模拟浏览器行为）
-    const blob = new window.Blob([source], { type: 'text/javascript' });
-    const blobUrl = window.URL.createObjectURL(blob);
+    // 创建Blob并生成URL（使用Node.js原生API）
+    const blob = new Blob([source], { type: 'text/javascript' });
+    const blobUrl = URL.createObjectURL(blob);
     
     try {
         // 使用动态import加载Blob URL
@@ -162,11 +165,11 @@ async function loadProxyUtils() {
         console.log('[Convert] 模块加载成功');
         
         // 清理
-        window.URL.revokeObjectURL(blobUrl);
+        URL.revokeObjectURL(blobUrl);
         
         return mod;
     } catch (e) {
-        window.URL.revokeObjectURL(blobUrl);
+        URL.revokeObjectURL(blobUrl);
         throw new Error(`加载模块失败: ${e.message}`);
     }
 }
