@@ -22,7 +22,7 @@
 
 | Secret 名称 | 必需 | 说明 |
 |------------|------|------|
-| `GITHUB_TOKEN` | ✅ | GitHub Personal Access Token，需要 `gist` 权限 |
+| `GH_TOKEN` | ✅ | GitHub Personal Access Token，需要 `gist` 权限 |
 | `SUB_URL` | ✅ | 订阅链接（见下方配置方法） |
 | `GIST_ID` | ❌ | 现有 Gist ID（首次运行可不设置，会自动创建） |
 | `USER_AGENT` | ❌ | 自定义 User-Agent（默认: `clash-verge/v2.4.4`） |
@@ -32,7 +32,7 @@
 1. 访问 [GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)](https://github.com/settings/tokens)
 2. 点击 "Generate new token (classic)"
 3. 勾选 `gist` 权限
-4. 生成后复制 token，添加到仓库 Secrets 中作为 `GITHUB_TOKEN`
+4. 生成后复制 token，添加到仓库 Secrets 中作为 `GH_TOKEN`
 
 ### 4. 配置订阅链接
 

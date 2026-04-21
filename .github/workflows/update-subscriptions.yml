@@ -26,7 +26,7 @@ jobs:
         
     - name: Update subscriptions
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.GH_TOKEN }}
         GIST_ID: ${{ secrets.GIST_ID }}
         USER_AGENT: ${{ secrets.USER_AGENT || 'clash-verge/v2.4.4' }}
         SUB_URL: ${{ secrets.SUB_URL }}

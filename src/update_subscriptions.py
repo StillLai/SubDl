@@ -185,7 +185,7 @@ def main():
     
     try:
         # 获取配置
-        github_token = get_env_var("GITHUB_TOKEN", required=True)
+        github_token = get_env_var("GH_TOKEN", required=True)
         gist_id = get_env_var("GIST_ID", default="")
         user_agent = get_env_var("USER_AGENT", default="clash-verge/v2.4.4")
         
