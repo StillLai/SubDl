@@ -11,6 +11,8 @@ import json
 import base64
 import re
 import time
+import gzip
+import io
 from urllib.parse import urlparse
 from datetime import datetime
 
@@ -71,6 +73,37 @@ def decode_base64_content(content):
         return content
 
 
+def try_decode_content(data):
+    """尝试解码内容（处理 gzip 和 base64）"""
+    # 首先尝试解压 gzip
+    if isinstance(data, bytes) and len(data) > 2 and data[:2] == b'\x1f\x8b':
+        print(f"  检测到 gzip 压缩，正在解压...")
+        try:
+            data = gzip.decompress(data)
+            print(f"  ✓ gzip 解压成功")
+        except Exception as e:
+            print(f"  ✗ gzip 解压失败: {e}")
+    
+    # 转换为字符串
+    if isinstance(data, bytes):
+        # 尝试 UTF-8
+        try:
+            text = data.decode('utf-8')
+        except UnicodeDecodeError:
+            # 尝试其他编码
+            try:
+                text = data.decode('utf-8-sig')
+            except UnicodeDecodeError:
+                text = data.decode('latin-1')  # 最后的尝试
+    else:
+        text = data
+    
+    # 尝试 base64 解码
+    text = decode_base64_content(text)
+    
+    return text
+
+
 def download_subscription(url, user_agent, timeout=30000):
     """下载订阅内容"""
     print(f"正在下载订阅: {url[:60]}...")
@@ -91,14 +124,15 @@ def download_subscription(url, user_agent, timeout=30000):
         )
         response.raise_for_status()
         
-        content = response.text
+        # 获取原始二进制内容
+        raw_content = response.content
+        
+        # 尝试解码（处理 gzip 和 base64）
+        content = try_decode_content(raw_content)
         
         # 检查内容是否为空
         if not content or len(content.strip()) == 0:
             raise ValueError("订阅内容为空")
-        
-        # 尝试解码 base64
-        content = decode_base64_content(content)
         
         # 检查内容是否有效
         content_stripped = content.replace(" ", "").replace("\n", "").replace("\r", "")
