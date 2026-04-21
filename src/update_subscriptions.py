@@ -11,12 +11,17 @@ import json
 import base64
 import re
 import time
-import gzip
-import io
 from urllib.parse import urlparse
 from datetime import datetime
 
 import requests
+
+
+# 确保 requests 能自动解压 brotli
+try:
+    import brotli
+except ImportError:
+    pass  # 如果没有 brotli，requests 会回退到不处理 brotli
 
 
 def get_env_var(name, default=None, required=False):
