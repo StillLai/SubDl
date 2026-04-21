@@ -12,7 +12,7 @@ import json
 import subprocess
 import tempfile
 from urllib.parse import urlparse
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 import requests
 
@@ -190,7 +190,7 @@ def generate_readme(subscription_info):
     lines = [
         "# SubDl",
         "",
-        f"> 最后更新: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}",
+        f"> 最后更新: {datetime.now(timezone(timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S CST')}",
         "",
         "## 订阅状态",
         "",
@@ -460,7 +460,7 @@ def main():
                 print(f"  ✓ 合并成功 ({len(files['sing-box-config.json'])} 字节, {len(final_nodes)} 个节点)")
     
     # 添加时间戳
-    files[".last_update"] = f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}\n"
+    files[".last_update"] = f"Last updated: {datetime.now(timezone(timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S CST')}\n"
     
     # 生成并保存 README
     readme_content = generate_readme(subscription_info)
