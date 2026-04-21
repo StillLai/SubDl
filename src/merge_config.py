@@ -146,20 +146,21 @@ def load_jsonc(filepath):
     with open(filepath, 'r', encoding='utf-8') as f:
         content = f.read()
     
-    # 移除 JSONC 注释
+    # 移除 JSONC 注释（但要避免误删 URL 中的 //）
     lines = []
     for line in content.split('\n'):
-        # 移除 // 注释
-        if '//' in line:
-            idx = line.index('//')
-            before_comment = line[:idx].strip()
-            if before_comment:
-                lines.append(before_comment)
+        # 移除行首的 // 注释（允许前面有空格）
+        stripped = line.lstrip()
+        if stripped.startswith('//'):
+            # 整行都是注释
+            indent = line[:len(line) - len(line.lstrip())]
+            lines.append(indent)
         else:
             lines.append(line)
     
     content = '\n'.join(lines)
     return json.loads(content)
+
 
 
 def main():
