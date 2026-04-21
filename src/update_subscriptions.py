@@ -185,8 +185,32 @@ def upload_to_gist(github_token, gist_id, files):
     return gist_id
 
 
-def generate_readme(subscription_info, auto_update_interval="6"):
+def parse_cron_interval():
+    """从 workflow 文件解析 cron 间隔"""
+    import os
+    workflow_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.github', 'workflows', 'update-subscriptions.yml')
+    try:
+        with open(workflow_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            # 匹配 cron: '55 * * * *'
+            match = re.search(r"cron:\s*['\"](\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)['\"]", content)
+            if match:
+                minute, hour, day, month, weekday = match.groups()
+                if minute != '*' and hour == '*':
+                    return "每小时"
+                elif minute == '*' and hour == '*':
+                    return "每分钟"
+                elif hour.startswith('*/'):
+                    interval = hour[2:]
+                    return f"每 {interval} 小时"
+    except:
+        pass
+    return "每小时"
+
+
+def generate_readme(subscription_info):
     """生成 README 内容"""
+    interval = parse_cron_interval()
     lines = [
         "# SubDl",
         "",
@@ -218,12 +242,11 @@ def generate_readme(subscription_info, auto_update_interval="6"):
         "   - `SUB_URL`: 订阅链接 (`名称|URL` 格式)",
         "   - `SUB_URL_1`, `SUB_URL_2`...: 更多订阅（可选）",
         "   - `SINGBOX_CONFIG_SUBS`: 用于生成sing-box配置的订阅，设为 `all` 使用全部订阅，或用逗号分隔订阅名称，如 `sub1,sub2`",
-        "   - `AUTO_UPDATE_INTERVAL`: 自动更新间隔（小时），默认 6 小时",
         "3. 在 Actions → Update Subscriptions 中点击 Run workflow",
         "",
         "## 说明",
         "",
-        f"- 每 {auto_update_interval} 小时自动更新订阅",
+        f"- {interval}自动更新订阅",
         "- 订阅内容上传到 Gist，不保存在仓库",
         "- `sing-box-config.json` 是可直接使用的完整sing-box配置文件",
         "- 参考 [sub-store](https://github.com/sub-store-org/Sub-Store) 实现",
@@ -361,7 +384,6 @@ def main():
     user_agent = get_env_var("USER_AGENT", default="clash-verge/v2.4.4")
     enable_convert = get_env_var("ENABLE_SINGBOX_CONVERT", default="true").lower() == "true"
     singbox_subs_setting = get_env_var("SINGBOX_CONFIG_SUBS", default="all")
-    auto_update_interval = get_env_var("AUTO_UPDATE_INTERVAL", default="6")
     
     # 获取脚本所在目录
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -465,7 +487,7 @@ def main():
     files[".last_update"] = f"Last updated: {datetime.now(timezone(timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S CST')}\n"
     
     # 生成并保存 README
-    readme_content = generate_readme(subscription_info, auto_update_interval)
+    readme_content = generate_readme(subscription_info)
     with open("README.md", "w", encoding="utf-8") as f:
         f.write(readme_content)
     print("\n✓ README 已更新")
