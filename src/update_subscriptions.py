@@ -59,12 +59,12 @@ def format_bytes(bytes_val):
 def format_expire(timestamp):
     """格式化到期时间"""
     if not timestamp:
-        return "未知"
+        return "无"
     try:
         dt = datetime.fromtimestamp(timestamp)
         return dt.strftime("%Y-%m-%d")
     except:
-        return "未知"
+        return "无"
 
 
 def get_status(flow_info):
