@@ -27,12 +27,19 @@ def get_env_var(name, default=None, required=False):
 
 def decode_base64_content(content):
     """尝试解码 base64 编码的内容"""
+    # 保存原始内容前100字符用于调试
+    preview = content[:100].replace("\n", "\\n")
+    print(f"  原始内容前100字符: {preview}")
+    
     # 移除空白字符
     cleaned = content.strip().replace(" ", "").replace("\n", "").replace("\r", "")
     
-    # 检查是否像 base64（只包含 base64 字符且长度是4的倍数）
+    # 检查是否像 base64（只包含 base64 字符）
     if not re.match(r'^[A-Za-z0-9+/=]+$', cleaned):
-        return content  # 不像 base64，直接返回原内容
+        print(f"  内容不像 Base64，直接返回")
+        return content
+    
+    print(f"  检测到 Base64 编码，尝试解码...")
     
     # 尝试解码
     try:
@@ -41,11 +48,26 @@ def decode_base64_content(content):
         if padding_needed != 4:
             cleaned += "=" * padding_needed
         
-        decoded = base64.b64decode(cleaned).decode("utf-8")
-        print(f"  ✓ 内容已 Base64 解码")
-        return decoded
-    except Exception:
-        # 解码失败，返回原内容
+        decoded_bytes = base64.b64decode(cleaned)
+        
+        # 尝试 UTF-8 解码
+        try:
+            decoded = decoded_bytes.decode("utf-8")
+            print(f"  ✓ Base64 解码成功 (UTF-8)")
+            return decoded
+        except UnicodeDecodeError:
+            # 可能包含二进制数据，尝试其他编码
+            try:
+                decoded = decoded_bytes.decode("utf-8-sig")
+                print(f"  ✓ Base64 解码成功 (UTF-8-SIG)")
+                return decoded
+            except:
+                # 可能是二进制内容，返回原始 base64 并记录警告
+                print(f"  ⚠ 解码后的内容不是纯文本，返回原始内容")
+                return content
+                
+    except Exception as e:
+        print(f"  ✗ Base64 解码失败: {e}")
         return content
 
 
