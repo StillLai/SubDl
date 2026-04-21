@@ -120,29 +120,43 @@ async function checkAndUpdateDeps(githubToken) {
  * 从bundle中提取ProxyUtils
  */
 function loadProxyUtils() {
-    // sub-store.bundle.js 是一个完整的后端bundle
-    // 我们需要从中提取parse和produce函数
-    
     // 清空require缓存
     delete require.cache[require.resolve(SUBSTORE_BUNDLE)];
     
     // 加载bundle
     const SubStore = require(SUBSTORE_BUNDLE);
     
-    // 尝试找到ProxyUtils
-    // 根据Sub-Store源码，ProxyUtils在全局或导出中
-    if (SubStore.ProxyUtils) {
+    console.log('[Convert] Bundle类型:', typeof SubStore);
+    console.log('[Convert] Bundle导出:', Object.keys(SubStore || {}));
+    
+    // 尝试各种可能的位置
+    if (SubStore && SubStore.ProxyUtils) {
         return SubStore.ProxyUtils;
     }
     
-    // 尝试从global获取
     if (global.ProxyUtils) {
         return global.ProxyUtils;
     }
     
-    // 如果找不到，说明bundle结构不同，需要检查
-    console.log('[Convert] Bundle导出:', Object.keys(SubStore));
-    throw new Error('无法在bundle中找到ProxyUtils');
+    // 检查是否是默认导出
+    if (SubStore && SubStore.default && SubStore.default.ProxyUtils) {
+        return SubStore.default.ProxyUtils;
+    }
+    
+    // 检查parse和produce是否直接在导出上
+    if (SubStore && SubStore.parse && SubStore.produce) {
+        return SubStore;
+    }
+    
+    // 尝试从global找其他可能的位置
+    const possibleNames = ['ProxyUtils', 'proxyUtils', 'parse', 'produce'];
+    for (const name of possibleNames) {
+        if (global[name]) {
+            console.log(`[Convert] 在global找到: ${name}`);
+        }
+    }
+    
+    throw new Error('无法在bundle中找到ProxyUtils。可用导出: ' + Object.keys(SubStore || {}).join(', '));
 }
 
 /**
