@@ -4,6 +4,9 @@ on:
   schedule:
     - cron: '55 * * * *'
   workflow_dispatch:
+  push:
+    paths:
+      - 'src/sing-box_config.jsonc'
 
 permissions:
   contents: write
