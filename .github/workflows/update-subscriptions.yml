@@ -25,6 +25,8 @@ jobs:
         
     - run: pip install requests brotli
         
+    - run: npm install jsdom
+        
     - name: Update subscriptions
       env:
         GH_TOKEN: ${{ secrets.GH_TOKEN }}

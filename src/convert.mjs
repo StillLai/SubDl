@@ -1,20 +1,25 @@
 #!/usr/bin/env node
 /**
  * Clash to Sing-box 转换脚本
- * 使用 Sub-Store 的 sub-store.bundle.js (CJS格式)
+ * 使用 Sub-Store 的 proxy-utils.esm.mjs 作为依赖
+ * 使用jsdom模拟浏览器环境
  */
 
-const fs = require('fs');
-const path = require('path');
-const https = require('https');
-const { execSync } = require('child_process');
+import fs from 'fs';
+import path from 'path';
+import https from 'https';
+import { fileURLToPath } from 'url';
+import { JSDOM } from 'jsdom';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const DEPS_DIR = path.join(__dirname, 'deps');
-const SUBSTORE_BUNDLE = path.join(DEPS_DIR, 'sub-store.bundle.js');
+const PROXY_UTILS_FILE = path.join(DEPS_DIR, 'proxy-utils.esm.mjs');
 const VERSION_FILE = path.join(DEPS_DIR, '.version');
 
 const RELEASES_API = 'https://api.github.com/repos/sub-store-org/Sub-Store/releases/latest';
-const BUNDLE_NAME = 'sub-store.bundle.js';
+const PROXY_UTILS_NAME = 'proxy-utils.esm.mjs';
 
 /**
  * 下载文件
@@ -25,13 +30,13 @@ function downloadFile(url, dest, headers = {}) {
         https.get(url, { headers }, (response) => {
             if (response.statusCode === 302 || response.statusCode === 301) {
                 file.close();
-                fs.unlinkSync(dest);
+                if (fs.existsSync(dest)) fs.unlinkSync(dest);
                 downloadFile(response.headers.location, dest, headers).then(resolve).catch(reject);
                 return;
             }
             if (response.statusCode !== 200) {
                 file.close();
-                fs.unlinkSync(dest);
+                if (fs.existsSync(dest)) fs.unlinkSync(dest);
                 reject(new Error(`下载失败: ${response.statusCode}`));
                 return;
             }
@@ -84,7 +89,7 @@ async function checkAndUpdateDeps(githubToken) {
         
         let currentVersion = fs.existsSync(VERSION_FILE) ? fs.readFileSync(VERSION_FILE, 'utf8').trim() : '';
 
-        if (currentVersion === tagName && fs.existsSync(SUBSTORE_BUNDLE)) {
+        if (currentVersion === tagName && fs.existsSync(PROXY_UTILS_FILE)) {
             console.log(`[Convert] 已是最新版本: ${tagName}`);
             return;
         }
@@ -93,77 +98,84 @@ async function checkAndUpdateDeps(githubToken) {
 
         const asset = release.assets.find(a => 
             a.uploader?.login === 'github-actions[bot]' && 
-            a.name === BUNDLE_NAME
+            a.name === PROXY_UTILS_NAME
         );
 
         if (!asset) {
-            if (!fs.existsSync(SUBSTORE_BUNDLE)) throw new Error('未找到依赖文件');
+            if (!fs.existsSync(PROXY_UTILS_FILE)) throw new Error('未找到依赖文件');
             console.log('[Convert] 使用本地缓存版本');
             return;
         }
 
         console.log('[Convert] 下载依赖...');
-        await downloadFile(asset.browser_download_url, SUBSTORE_BUNDLE + '.tmp');
-        if (fs.existsSync(SUBSTORE_BUNDLE)) fs.unlinkSync(SUBSTORE_BUNDLE);
-        fs.renameSync(SUBSTORE_BUNDLE + '.tmp', SUBSTORE_BUNDLE);
+        await downloadFile(asset.browser_download_url, PROXY_UTILS_FILE + '.tmp');
+        if (fs.existsSync(PROXY_UTILS_FILE)) fs.unlinkSync(PROXY_UTILS_FILE);
+        fs.renameSync(PROXY_UTILS_FILE + '.tmp', PROXY_UTILS_FILE);
         fs.writeFileSync(VERSION_FILE, tagName);
         console.log('[Convert] 依赖更新成功');
 
     } catch (err) {
         console.error('[Convert] 检查更新失败:', err.message);
-        if (!fs.existsSync(SUBSTORE_BUNDLE)) throw new Error('依赖检查失败且本地无缓存');
+        if (!fs.existsSync(PROXY_UTILS_FILE)) throw new Error('依赖检查失败且本地无缓存');
         console.log('[Convert] 使用本地缓存版本');
     }
 }
 
 /**
- * 从bundle中提取ProxyUtils
+ * 使用jsdom创建浏览器环境并加载模块
  */
-function loadProxyUtils() {
-    // 清空require缓存
-    delete require.cache[require.resolve(SUBSTORE_BUNDLE)];
+async function loadProxyUtils() {
+    // 创建jsdom实例
+    const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
+        url: 'https://localhost',
+        pretendToBeVisual: true,
+        resources: 'usable'
+    });
     
-    // 加载bundle
-    const SubStore = require(SUBSTORE_BUNDLE);
+    const { window } = dom;
     
-    console.log('[Convert] Bundle类型:', typeof SubStore);
-    console.log('[Convert] Bundle导出:', Object.keys(SubStore || {}));
+    // 将浏览器API暴露到global，让ES模块可以使用
+    global.window = window;
+    global.document = window.document;
+    global.Blob = window.Blob;
+    global.URL = window.URL;
+    global.URLSearchParams = window.URLSearchParams;
+    global.TextEncoder = window.TextEncoder;
+    global.TextDecoder = window.TextDecoder;
+    global.fetch = window.fetch;
+    global.navigator = window.navigator;
+    global.location = window.location;
+    global.self = window;
+    global.top = window;
+    global.parent = window;
     
-    // 尝试各种可能的位置
-    if (SubStore && SubStore.ProxyUtils) {
-        return SubStore.ProxyUtils;
+    // 读取ESM文件内容
+    const source = fs.readFileSync(PROXY_UTILS_FILE, 'utf8');
+    
+    // 创建一个Blob URL来加载模块（模拟浏览器行为）
+    const blob = new window.Blob([source], { type: 'text/javascript' });
+    const blobUrl = window.URL.createObjectURL(blob);
+    
+    try {
+        // 使用动态import加载Blob URL
+        const mod = await import(blobUrl);
+        console.log('[Convert] 模块加载成功');
+        
+        // 清理
+        window.URL.revokeObjectURL(blobUrl);
+        
+        return mod;
+    } catch (e) {
+        window.URL.revokeObjectURL(blobUrl);
+        throw new Error(`加载模块失败: ${e.message}`);
     }
-    
-    if (global.ProxyUtils) {
-        return global.ProxyUtils;
-    }
-    
-    // 检查是否是默认导出
-    if (SubStore && SubStore.default && SubStore.default.ProxyUtils) {
-        return SubStore.default.ProxyUtils;
-    }
-    
-    // 检查parse和produce是否直接在导出上
-    if (SubStore && SubStore.parse && SubStore.produce) {
-        return SubStore;
-    }
-    
-    // 尝试从global找其他可能的位置
-    const possibleNames = ['ProxyUtils', 'proxyUtils', 'parse', 'produce'];
-    for (const name of possibleNames) {
-        if (global[name]) {
-            console.log(`[Convert] 在global找到: ${name}`);
-        }
-    }
-    
-    throw new Error('无法在bundle中找到ProxyUtils。可用导出: ' + Object.keys(SubStore || {}).join(', '));
 }
 
 /**
  * 转换Clash配置到Sing-box格式
  */
-function convertClashToSingbox(clashContent) {
-    const { parse, produce } = loadProxyUtils();
+async function convertClashToSingbox(clashContent) {
+    const { parse, produce } = await loadProxyUtils();
     const proxies = parse(clashContent);
     return produce(proxies, 'singbox', 'internal');
 }
@@ -183,15 +195,15 @@ async function main() {
         if (command === 'convert') {
             const inputFile = args[1];
             if (!inputFile) {
-                console.error('用法: node convert.cjs convert <input-file>');
+                console.error('用法: node convert.mjs convert <input-file>');
                 process.exit(1);
             }
 
             const clashContent = fs.readFileSync(inputFile, 'utf8');
-            const singboxConfig = convertClashToSingbox(clashContent);
+            const singboxConfig = await convertClashToSingbox(clashContent);
             console.log(JSON.stringify(singboxConfig, null, 2));
         } else {
-            console.log('用法: node convert.cjs convert <input-file>');
+            console.log('用法: node convert.mjs convert <input-file>');
             process.exit(1);
         }
     } catch (err) {
