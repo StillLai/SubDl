@@ -217,12 +217,14 @@ def generate_readme(subscription_info):
         "   - `GH_TOKEN`: GitHub Token (需要 gist 权限)",
         "   - `SUB_URL`: 订阅链接 (`名称|URL` 格式)",
         "   - `SUB_URL_1`, `SUB_URL_2`...: 更多订阅（可选）",
+        "   - `SINGBOX_CONFIG_SUBS`: 用于生成sing-box配置的订阅，设为 `all` 使用全部订阅，或用逗号分隔订阅名称，如 `sub1,sub2`",
         "3. 在 Actions → Update Subscriptions 中点击 Run workflow",
         "",
         "## 说明",
         "",
         "- 每 6 小时自动更新订阅",
         "- 订阅内容上传到 Gist，不保存在仓库",
+        "- `sing-box-config.json` 是可直接使用的完整sing-box配置文件",
         "- 参考 [sub-store](https://github.com/sub-store-org/Sub-Store) 实现",
         "",
     ])
@@ -265,6 +267,82 @@ def convert_to_singbox(clash_content, script_dir):
         return None
 
 
+def merge_singbox_config(singbox_nodes_list, script_dir):
+    """
+    将多个sing-box订阅节点合并到配置模板
+    
+    Args:
+        singbox_nodes_list: sing-box格式的代理节点列表（来自多个订阅的合并）
+        script_dir: 脚本所在目录
+    
+    Returns:
+        合并后的完整配置JSON，或None表示失败
+    """
+    try:
+        template_path = os.path.join(script_dir, 'sing-box_config.jsonc')
+        if not os.path.exists(template_path):
+            print(f"  ✗ 配置模板不存在: {template_path}")
+            return None
+        
+        # 创建临时文件存储订阅节点
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
+            json.dump(singbox_nodes_list, f)
+            sub_temp_file = f.name
+        
+        try:
+            # 调用Python合并脚本
+            merge_script = os.path.join(script_dir, 'merge_config.py')
+            result = subprocess.run(
+                ['python', merge_script, template_path, sub_temp_file],
+                capture_output=True,
+                text=True,
+                encoding='utf-8'
+            )
+            
+            if result.returncode != 0:
+                print(f"  ✗ 合并失败: {result.stderr}")
+                return None
+            
+            # 解析输出为JSON
+            merged_config = json.loads(result.stdout)
+            return merged_config
+            
+        finally:
+            # 清理临时文件
+            os.unlink(sub_temp_file)
+            
+    except Exception as e:
+        print(f"  ✗ 合并异常: {e}")
+        return None
+
+
+def get_subs_for_singbox_config(subscription_names, singbox_subs_setting):
+    """
+    根据设置获取用于生成sing-box配置的订阅列表
+    
+    Args:
+        subscription_names: 所有订阅名称列表
+        singbox_subs_setting: 环境变量 SINGBOX_CONFIG_SUBS 的值
+    
+    Returns:
+        选中的订阅名称列表
+    """
+    if not singbox_subs_setting or singbox_subs_setting.lower() == 'all':
+        return subscription_names
+    
+    # 解析逗号分隔的订阅名称
+    selected = [s.strip() for s in singbox_subs_setting.split(',') if s.strip()]
+    
+    # 过滤出存在的订阅
+    valid_subs = [s for s in selected if s in subscription_names]
+    
+    if not valid_subs:
+        print(f"  ⚠️ 没有找到匹配的订阅，使用全部订阅")
+        return subscription_names
+    
+    return valid_subs
+
+
 def main():
     print("=" * 60)
     print("SubDl - Subscription Downloader")
@@ -275,6 +353,7 @@ def main():
     gist_id = get_env_var("GIST_ID", default="")
     user_agent = get_env_var("USER_AGENT", default="clash-verge/v2.4.4")
     enable_convert = get_env_var("ENABLE_SINGBOX_CONVERT", default="true").lower() == "true"
+    singbox_subs_setting = get_env_var("SINGBOX_CONFIG_SUBS", default="all")
     
     # 获取脚本所在目录
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -287,6 +366,7 @@ def main():
     print(f"\n找到 {len(subscriptions)} 个订阅")
     if enable_convert:
         print("Sing-box转换: 已启用")
+        print(f"用于生成配置的订阅: {singbox_subs_setting}")
     else:
         print("Sing-box转换: 已禁用")
     print()
@@ -294,6 +374,11 @@ def main():
     files = {}
     subscription_info = []
     failed = []
+    
+    # 存储所有sing-box节点（用于生成最终配置）
+    all_singbox_nodes = []
+    # 记录哪些订阅需要包含在sing-box配置中
+    all_subscription_names = [sub['name'] for sub in subscriptions]
     
     for sub in subscriptions:
         print(f"下载: {sub['name']}")
@@ -311,9 +396,16 @@ def main():
                 print(f"  → 转换为Sing-box格式...")
                 singbox_config = convert_to_singbox(content, script_dir)
                 if singbox_config:
+                    # 获取节点列表（可能是完整配置或直接是节点数组）
+                    singbox_nodes = singbox_config if isinstance(singbox_config, list) else singbox_config.get('outbounds', [])
+                    
+                    # 保存原始sing-box订阅（不含模板）
                     singbox_filename = f"{sub['name']}-singbox.json"
                     files[singbox_filename] = json.dumps(singbox_config, indent=2, ensure_ascii=False)
-                    print(f"  ✓ 转换成功 ({len(files[singbox_filename])} 字节)")
+                    print(f"  ✓ 转换成功 ({len(files[singbox_filename])} 字节, {len(singbox_nodes)} 个节点)")
+                    
+                    # 收集节点用于最终配置合并
+                    all_singbox_nodes.extend(singbox_nodes)
         except Exception as e:
             print(f"  ✗ 失败: {e}")
             failed.append({"name": sub["name"], "error": str(e)})
@@ -321,6 +413,37 @@ def main():
     if not files:
         print("错误: 所有订阅下载失败")
         sys.exit(1)
+    
+    # 根据设置筛选用于生成sing-box配置的订阅
+    selected_subs = get_subs_for_singbox_config(all_subscription_names, singbox_subs_setting)
+    
+    # 生成最终的sing-box配置
+    if enable_convert and all_singbox_nodes:
+        print(f"\n→ 合并 {len(selected_subs)} 个订阅的节点到配置模板...")
+        
+        # 如果不是全部订阅，需要重新筛选节点
+        if len(selected_subs) != len(all_subscription_names):
+            # 重新下载并转换选定的订阅
+            filtered_nodes = []
+            for sub in subscriptions:
+                if sub['name'] in selected_subs:
+                    try:
+                        content, _ = download_subscription(sub["url"], user_agent)
+                        singbox_config = convert_to_singbox(content, script_dir)
+                        if singbox_config:
+                            nodes = singbox_config if isinstance(singbox_config, list) else singbox_config.get('outbounds', [])
+                            filtered_nodes.extend(nodes)
+                    except Exception as e:
+                        print(f"  ✗ {sub['name']} 转换失败: {e}")
+            final_nodes = filtered_nodes
+        else:
+            final_nodes = all_singbox_nodes
+        
+        if final_nodes:
+            merged_config = merge_singbox_config(final_nodes, script_dir)
+            if merged_config:
+                files["sing-box-config.json"] = json.dumps(merged_config, indent=2, ensure_ascii=False)
+                print(f"  ✓ 合并成功 ({len(files['sing-box-config.json'])} 字节, {len(final_nodes)} 个节点)")
     
     # 添加时间戳
     files[".last_update"] = f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}\n"
