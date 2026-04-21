@@ -18,8 +18,9 @@ import sys
 
 
 def log(msg):
-    """日志输出"""
-    print(f"[Merge] {msg}")
+    """日志输出到 stderr"""
+    import sys
+    print(f"[Merge] {msg}", file=sys.stderr)
 
 
 def parse_outbound_rules(outbound_str):

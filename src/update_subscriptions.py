@@ -303,8 +303,14 @@ def merge_singbox_config(singbox_nodes_list, script_dir):
                 print(f"  ✗ 合并失败: {result.stderr}")
                 return None
             
+            # 检查stdout是否为空或只有空白
+            stdout = result.stdout.strip()
+            if not stdout:
+                print(f"  ✗ 合并脚本没有输出")
+                return None
+            
             # 解析输出为JSON
-            merged_config = json.loads(result.stdout)
+            merged_config = json.loads(stdout)
             return merged_config
             
         finally:
