@@ -422,28 +422,33 @@ def main():
     
     # 根据设置筛选用于生成sing-box配置的订阅
     selected_subs = get_subs_for_singbox_config(all_subscription_names, singbox_subs_setting)
+    print(f"  → 选定的订阅: {selected_subs}")
     
     # 生成最终的sing-box配置
     if enable_convert and all_singbox_nodes:
         print(f"\n→ 合并 {len(selected_subs)} 个订阅的节点到配置模板...")
         
         # 如果不是全部订阅，需要重新筛选节点
-        if len(selected_subs) != len(all_subscription_names):
+        if len(selected_subs) != len(all_subscription_names) or selected_subs != all_subscription_names:
+            print(f"  → 重新筛选节点（当前: {len(all_singbox_nodes)} 个）")
             # 重新下载并转换选定的订阅
             filtered_nodes = []
             for sub in subscriptions:
                 if sub['name'] in selected_subs:
+                    print(f"  → 重新处理: {sub['name']}")
                     try:
                         content, _ = download_subscription(sub["url"], user_agent)
                         singbox_config = convert_to_singbox(content, script_dir)
                         if singbox_config:
                             nodes = singbox_config if isinstance(singbox_config, list) else singbox_config.get('outbounds', [])
                             filtered_nodes.extend(nodes)
+                            print(f"    → 获取 {len(nodes)} 个节点")
                     except Exception as e:
-                        print(f"  ✗ {sub['name']} 转换失败: {e}")
+                        print(f"    ✗ {sub['name']} 转换失败: {e}")
             final_nodes = filtered_nodes
         else:
             final_nodes = all_singbox_nodes
+            print(f"  → 使用已收集的节点: {len(final_nodes)} 个")
         
         if final_nodes:
             merged_config = merge_singbox_config(final_nodes, script_dir)
