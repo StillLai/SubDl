@@ -8,6 +8,9 @@ import sys
 import base64
 import re
 import time
+import json
+import subprocess
+import tempfile
 from urllib.parse import urlparse
 from datetime import datetime
 
@@ -227,6 +230,41 @@ def generate_readme(subscription_info):
     return "\n".join(lines)
 
 
+def convert_to_singbox(clash_content, script_dir):
+    """将Clash配置转换为Sing-box格式"""
+    try:
+        # 创建临时文件存储clash内容
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False, encoding='utf-8') as f:
+            f.write(clash_content)
+            temp_file = f.name
+        
+        try:
+            # 调用Node.js转换脚本
+            convert_script = os.path.join(script_dir, 'convert.js')
+            result = subprocess.run(
+                ['node', convert_script, 'convert', temp_file],
+                capture_output=True,
+                text=True,
+                encoding='utf-8'
+            )
+            
+            if result.returncode != 0:
+                print(f"  ✗ 转换失败: {result.stderr}")
+                return None
+            
+            # 解析输出为JSON
+            singbox_config = json.loads(result.stdout)
+            return singbox_config
+            
+        finally:
+            # 清理临时文件
+            os.unlink(temp_file)
+            
+    except Exception as e:
+        print(f"  ✗ 转换异常: {e}")
+        return None
+
+
 def main():
     print("=" * 60)
     print("SubDl - Subscription Downloader")
@@ -236,13 +274,22 @@ def main():
     github_token = get_env_var("GH_TOKEN", required=True)
     gist_id = get_env_var("GIST_ID", default="")
     user_agent = get_env_var("USER_AGENT", default="clash-verge/v2.4.4")
+    enable_convert = get_env_var("ENABLE_SINGBOX_CONVERT", default="true").lower() == "true"
+    
+    # 获取脚本所在目录
+    script_dir = os.path.dirname(os.path.abspath(__file__))
     
     subscriptions = parse_subscriptions()
     if not subscriptions:
         print("错误: 未找到订阅配置")
         sys.exit(1)
     
-    print(f"\n找到 {len(subscriptions)} 个订阅\n")
+    print(f"\n找到 {len(subscriptions)} 个订阅")
+    if enable_convert:
+        print("Sing-box转换: 已启用")
+    else:
+        print("Sing-box转换: 已禁用")
+    print()
     
     files = {}
     subscription_info = []
@@ -258,6 +305,15 @@ def main():
                 "flow": flow_info
             })
             print(f"  ✓ 成功 ({len(content)} 字节)")
+            
+            # 转换为Sing-box格式
+            if enable_convert:
+                print(f"  → 转换为Sing-box格式...")
+                singbox_config = convert_to_singbox(content, script_dir)
+                if singbox_config:
+                    singbox_filename = f"{sub['name']}-singbox.json"
+                    files[singbox_filename] = json.dumps(singbox_config, indent=2, ensure_ascii=False)
+                    print(f"  ✓ 转换成功 ({len(files[singbox_filename])} 字节)")
         except Exception as e:
             print(f"  ✗ 失败: {e}")
             failed.append({"name": sub["name"], "error": str(e)})

@@ -48,3 +48,6 @@ tests/
 .env
 .env.local
 config.local.*
+
+# Sub-Store dependency (auto-downloaded)
+src/deps/
