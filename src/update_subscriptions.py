@@ -423,10 +423,13 @@ def main():
     # 根据设置筛选用于生成sing-box配置的订阅
     selected_subs = get_subs_for_singbox_config(all_subscription_names, singbox_subs_setting)
     print(f"  → 选定的订阅: {selected_subs}")
+    print(f"  → 所有订阅: {all_subscription_names}")
     
     # 生成最终的sing-box配置
     if enable_convert and all_singbox_nodes:
         print(f"\n→ 合并 {len(selected_subs)} 个订阅的节点到配置模板...")
+        print(f"  → 当前条件: len(selected)={len(selected_subs)} != len(all)={len(all_subscription_names)} => {len(selected_subs) != len(all_subscription_names)}")
+        print(f"  → 当前条件: selected != all => {selected_subs != all_subscription_names}")
         
         # 如果不是全部订阅，需要重新筛选节点
         if len(selected_subs) != len(all_subscription_names) or selected_subs != all_subscription_names:
