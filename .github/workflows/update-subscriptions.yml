@@ -2,6 +2,7 @@ name: Update Subscriptions
 
 on:
   schedule:
+    # 每小时55分运行（UTC时间，对应北京时间每小时55分）
     - cron: '55 * * * *'
   workflow_dispatch:
   push:
