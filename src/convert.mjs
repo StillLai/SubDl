@@ -122,55 +122,48 @@ async function checkAndUpdateDeps(githubToken) {
 }
 
 /**
- * 使用jsdom创建浏览器环境并加载模块
+ * 加载Sub-Store模块
+ * 直接用file://协议导入，不折腾Blob URL
  */
 async function loadProxyUtils() {
-    // 创建jsdom实例
-    const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
-        url: 'https://localhost',
-        pretendToBeVisual: true,
-        resources: 'usable'
-    });
-    
-    const { window } = dom;
-    
-    // 使用Node.js原生的Blob（Node.js 18+支持）
-    const Blob = globalThis.Blob || (await import('buffer')).Blob;
-    
-    // 将浏览器API暴露到global
-    global.window = window;
-    global.document = window.document;
-    global.Blob = Blob;
-    global.URL = globalThis.URL;
-    global.URLSearchParams = window.URLSearchParams;
-    global.TextEncoder = window.TextEncoder;
-    global.TextDecoder = window.TextDecoder;
-    global.fetch = window.fetch;
-    global.navigator = window.navigator;
-    global.location = window.location;
-    global.self = window;
-    global.top = window;
-    global.parent = window;
-    
-    // 读取ESM文件内容
+    // 读取ESM文件，检查是否有浏览器特有的代码需要处理
     const source = fs.readFileSync(PROXY_UTILS_FILE, 'utf8');
     
-    // 创建Blob并生成URL（使用Node.js原生API）
-    const blob = new Blob([source], { type: 'text/javascript' });
-    const blobUrl = URL.createObjectURL(blob);
+    // 如果文件里有对window/document的直接访问，需要处理
+    // 但proxy-utils.esm.mjs应该是纯逻辑，不依赖DOM
+    
+    // 直接用file://协议导入
+    const modulePath = 'file://' + PROXY_UTILS_FILE;
     
     try {
-        // 使用动态import加载Blob URL
-        const mod = await import(blobUrl);
+        const mod = await import(modulePath);
         console.log('[Convert] 模块加载成功');
-        
-        // 清理
-        URL.revokeObjectURL(blobUrl);
-        
         return mod;
     } catch (e) {
-        URL.revokeObjectURL(blobUrl);
-        throw new Error(`加载模块失败: ${e.message}`);
+        // 如果直接导入失败，可能是因为模块内部有浏览器代码
+        // 尝试用jsdom创建最小环境后再导入
+        console.log('[Convert] 直接导入失败，尝试创建浏览器环境...');
+        
+        const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
+            url: 'https://localhost'
+        });
+        
+        // 只暴露必要的全局变量
+        global.window = dom.window;
+        global.document = dom.window.document;
+        global.Blob = globalThis.Blob;
+        global.URL = globalThis.URL;
+        global.URLSearchParams = dom.window.URLSearchParams;
+        global.TextEncoder = dom.window.TextEncoder;
+        global.TextDecoder = dom.window.TextDecoder;
+        global.navigator = dom.window.navigator;
+        global.location = dom.window.location;
+        global.self = dom.window;
+        
+        // 再次尝试导入
+        const mod = await import(modulePath);
+        console.log('[Convert] 模块加载成功（带浏览器环境）');
+        return mod;
     }
 }
 
