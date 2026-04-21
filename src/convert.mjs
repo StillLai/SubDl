@@ -167,6 +167,10 @@ async function main() {
     const command = args[0];
     const githubToken = process.env.GH_TOKEN || '';
 
+    // 将所有日志输出到stderr，stdout只输出JSON结果
+    const originalLog = console.log;
+    console.log = (...args) => console.error(...args);
+
     try {
         if (!fs.existsSync(DEPS_DIR)) fs.mkdirSync(DEPS_DIR, { recursive: true });
         await checkAndUpdateDeps(githubToken);
@@ -180,9 +184,12 @@ async function main() {
 
             const clashContent = fs.readFileSync(inputFile, 'utf8');
             const singboxConfig = await convertClashToSingbox(clashContent);
+            
+            // 恢复console.log，只输出JSON到stdout
+            console.log = originalLog;
             console.log(JSON.stringify(singboxConfig, null, 2));
         } else {
-            console.log('用法: node convert.mjs convert <input-file>');
+            console.error('用法: node convert.mjs convert <input-file>');
             process.exit(1);
         }
     } catch (err) {
