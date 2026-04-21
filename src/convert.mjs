@@ -123,48 +123,31 @@ async function checkAndUpdateDeps(githubToken) {
 
 /**
  * 加载Sub-Store模块
- * 直接用file://协议导入，不折腾Blob URL
+ * 关键：在全局注入require，因为proxy-utils.esm.mjs内部有eval使用require
  */
 async function loadProxyUtils() {
-    // 读取ESM文件，检查是否有浏览器特有的代码需要处理
-    const source = fs.readFileSync(PROXY_UTILS_FILE, 'utf8');
+    // 在全局注入require（这是proxy-utils.esm.mjs需要的）
+    const { createRequire } = await import('module');
+    global.require = createRequire(PROXY_UTILS_FILE);
     
-    // 如果文件里有对window/document的直接访问，需要处理
-    // 但proxy-utils.esm.mjs应该是纯逻辑，不依赖DOM
+    // 创建jsdom环境
+    const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
+        url: 'https://localhost'
+    });
+    
+    // 暴露浏览器API
+    global.window = dom.window;
+    global.document = dom.window.document;
+    global.self = dom.window;
+    global.navigator = dom.window.navigator;
+    global.location = dom.window.location;
     
     // 直接用file://协议导入
     const modulePath = 'file://' + PROXY_UTILS_FILE;
     
-    try {
-        const mod = await import(modulePath);
-        console.log('[Convert] 模块加载成功');
-        return mod;
-    } catch (e) {
-        // 如果直接导入失败，可能是因为模块内部有浏览器代码
-        // 尝试用jsdom创建最小环境后再导入
-        console.log('[Convert] 直接导入失败，尝试创建浏览器环境...');
-        
-        const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
-            url: 'https://localhost'
-        });
-        
-        // 只暴露必要的全局变量
-        global.window = dom.window;
-        global.document = dom.window.document;
-        global.Blob = globalThis.Blob;
-        global.URL = globalThis.URL;
-        global.URLSearchParams = dom.window.URLSearchParams;
-        global.TextEncoder = dom.window.TextEncoder;
-        global.TextDecoder = dom.window.TextDecoder;
-        global.navigator = dom.window.navigator;
-        global.location = dom.window.location;
-        global.self = dom.window;
-        
-        // 再次尝试导入
-        const mod = await import(modulePath);
-        console.log('[Convert] 模块加载成功（带浏览器环境）');
-        return mod;
-    }
+    const mod = await import(modulePath);
+    console.log('[Convert] 模块加载成功');
+    return mod;
 }
 
 /**
