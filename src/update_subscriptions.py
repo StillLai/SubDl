@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """
 Subscription Downloader and Gist Uploader
-
-定期拉取 Clash 订阅并上传到 GitHub Gists。
 """
 
 import os
@@ -17,63 +15,117 @@ import requests
 
 
 def get_env_var(name, default=None, required=False):
-    """获取环境变量"""
     value = os.environ.get(name, default)
     if required and not value:
         raise ValueError(f"环境变量 {name} 未设置")
     return value
 
 
+def parse_flow_info(headers):
+    """从响应头解析流量信息"""
+    flow_header = headers.get('subscription-userinfo', '')
+    if not flow_header:
+        return None
+    
+    # 解析 upload, download, total, expire
+    upload = re.search(r'upload=(\d+)', flow_header)
+    download = re.search(r'download=(\d+)', flow_header)
+    total = re.search(r'total=(\d+)', flow_header)
+    expire = re.search(r'expire=(\d+)', flow_header)
+    
+    return {
+        'upload': int(upload.group(1)) if upload else 0,
+        'download': int(download.group(1)) if download else 0,
+        'total': int(total.group(1)) if total else 0,
+        'expire': int(expire.group(1)) if expire else None,
+    }
+
+
+def format_bytes(bytes_val):
+    """格式化字节数"""
+    if bytes_val == 0:
+        return "0 B"
+    units = ['B', 'KB', 'MB', 'GB', 'TB']
+    unit_idx = 0
+    while bytes_val >= 1024 and unit_idx < len(units) - 1:
+        bytes_val /= 1024
+        unit_idx += 1
+    return f"{bytes_val:.2f} {units[unit_idx]}"
+
+
+def format_expire(timestamp):
+    """格式化到期时间"""
+    if not timestamp:
+        return "未知"
+    try:
+        dt = datetime.fromtimestamp(timestamp)
+        return dt.strftime("%Y-%m-%d")
+    except:
+        return "未知"
+
+
+def get_status(flow_info):
+    """获取状态"""
+    if not flow_info:
+        return "❓ 无信息"
+    
+    total = flow_info.get('total', 0)
+    used = flow_info.get('upload', 0) + flow_info.get('download', 0)
+    expire = flow_info.get('expire')
+    
+    # 检查是否过期
+    if expire and expire < time.time():
+        return "❌ 已过期"
+    
+    # 检查流量是否用完
+    if total > 0 and used >= total:
+        return "❌ 流量用完"
+    
+    # 检查是否即将到期（7天内）
+    if expire and expire - time.time() < 7 * 24 * 3600:
+        return "⚠️ 即将到期"
+    
+    return "✅ 正常"
+
+
 def download_subscription(url, user_agent, timeout=30000):
     """下载订阅内容"""
-    print(f"正在下载订阅: {url[:60]}...")
+    headers = {"User-Agent": user_agent}
     
-    headers = {
-        "User-Agent": user_agent,
-    }
+    response = requests.get(
+        url,
+        headers=headers,
+        timeout=timeout / 1000,
+        allow_redirects=True
+    )
+    response.raise_for_status()
     
+    content = response.text
+    
+    # 尝试 base64 解码
     try:
-        # requests 会自动处理 gzip/br 解压
-        response = requests.get(
-            url,
-            headers=headers,
-            timeout=timeout / 1000,
-            allow_redirects=True
-        )
-        response.raise_for_status()
-        
-        content = response.text
-        
-        # 尝试 base64 解码（有些订阅是 base64 编码的）
-        try:
-            cleaned = content.strip().replace(" ", "").replace("\n", "").replace("\r", "")
-            if re.match(r'^[A-Za-z0-9+/=]+$', cleaned):
-                decoded = base64.b64decode(cleaned + "=" * (4 - len(cleaned) % 4))
-                content = decoded.decode("utf-8")
-                print(f"  ✓ Base64 解码成功")
-        except Exception:
-            pass  # 不是 base64，保持原样
-        
-        print(f"  ✓ 下载成功 ({len(content)} 字节)")
-        return content
-        
-    except requests.exceptions.Timeout:
-        raise TimeoutError(f"下载超时: {url}")
-    except requests.exceptions.RequestException as e:
-        raise ConnectionError(f"下载失败: {e}")
+        cleaned = content.strip().replace(" ", "").replace("\n", "").replace("\r", "")
+        if re.match(r'^[A-Za-z0-9+/=]+$', cleaned):
+            decoded = base64.b64decode(cleaned + "=" * (4 - len(cleaned) % 4))
+            content = decoded.decode("utf-8")
+    except Exception:
+        pass
+    
+    # 获取流量信息
+    flow_info = parse_flow_info(response.headers)
+    
+    return content, flow_info
 
 
 def parse_subscriptions():
     """解析订阅配置"""
     subscriptions = []
     
-    # 检查 SUB_URL, SUB_URL_1, SUB_URL_2...
     for env_name in ["SUB_URL"] + [f"SUB_URL_{i}" for i in range(1, 10)]:
         value = os.environ.get(env_name, "").strip()
         if not value:
             continue
             
-        # 格式: 名称|URL 或 直接 URL
         if "|" in value:
             name, url = value.split("|", 1)
             name, url = name.strip(), url.strip()
@@ -92,7 +144,6 @@ def parse_subscriptions():
 
 
 def extract_name_from_url(url):
-    """从 URL 提取名称"""
     try:
         domain = urlparse(url).netloc.replace("www.", "").split(":")[0]
         name = re.sub(r'[^a-zA-Z0-9_-]', '_', domain)
@@ -102,7 +153,6 @@ def extract_name_from_url(url):
 
 
 def upload_to_gist(github_token, gist_id, files):
-    """上传文件到 Gist"""
     headers = {
         "Authorization": f"token {github_token}",
         "Accept": "application/vnd.github.v3+json",
@@ -111,7 +161,6 @@ def upload_to_gist(github_token, gist_id, files):
     gist_files = {filename: {"content": content} for filename, content in files.items()}
     
     if not gist_id:
-        print("创建新的 Gist...")
         response = requests.post(
             "https://api.github.com/gists",
             headers=headers,
@@ -122,80 +171,123 @@ def upload_to_gist(github_token, gist_id, files):
             },
             timeout=30
         )
-        result = response.json()
-        print(f"  ✓ Gist 创建成功: {result['id']}")
-        return result["id"]
+        return response.json()["id"]
     
-    print(f"更新 Gist: {gist_id}...")
-    response = requests.patch(
+    requests.patch(
         f"https://api.github.com/gists/{gist_id}",
         headers=headers,
         json={"files": gist_files},
         timeout=30
     )
-    response.raise_for_status()
-    print(f"  ✓ Gist 更新成功")
     return gist_id
 
 
+def generate_readme(subscription_info):
+    """生成 README 内容"""
+    lines = [
+        "# SubDl",
+        "",
+        f"> 最后更新: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}",
+        "",
+        "## 订阅状态",
+        "",
+        "| 订阅 | 总流量 | 已用 | 剩余 | 到期时间 | 状态 |",
+        "|------|--------|------|------|----------|------|",
+    ]
+    
+    for info in subscription_info:
+        flow = info.get('flow', {})
+        total = flow.get('total', 0)
+        used = flow.get('upload', 0) + flow.get('download', 0)
+        remaining = total - used if total > 0 else 0
+        expire = format_expire(flow.get('expire'))
+        status = get_status(flow)
+        
+        lines.append(f"| {info['name']} | {format_bytes(total)} | {format_bytes(used)} | {format_bytes(remaining)} | {expire} | {status} |")
+    
+    lines.extend([
+        "",
+        "## 快速配置",
+        "",
+        "1. Fork 本仓库",
+        "2. 在 Settings → Secrets → Actions 中添加:",
+        "   - `GH_TOKEN`: GitHub Token (需要 gist 权限)",
+        "   - `SUB_URL`: 订阅链接 (`名称|URL` 格式)",
+        "   - `SUB_URL_1`, `SUB_URL_2`...: 更多订阅（可选）",
+        "3. 在 Actions → Update Subscriptions 中点击 Run workflow",
+        "",
+        "## 说明",
+        "",
+        "- 每 6 小时自动更新订阅",
+        "- 订阅内容上传到 Gist，不保存在仓库",
+        "- 参考 [sub-store](https://github.com/sub-store-org/Sub-Store) 实现",
+        "",
+    ])
+    
+    return "\n".join(lines)
+
+
 def main():
-    """主函数"""
     print("=" * 60)
     print("SubDl - Subscription Downloader")
-    print(f"启动时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 60)
     
-    try:
-        github_token = get_env_var("GH_TOKEN", required=True)
-        gist_id = get_env_var("GIST_ID", default="")
-        user_agent = get_env_var("USER_AGENT", default="clash-verge/v2.4.4")
-        
-        subscriptions = parse_subscriptions()
-        
-        if not subscriptions:
-            print("错误: 未找到有效的订阅配置")
-            sys.exit(1)
-        
-        print(f"\n找到 {len(subscriptions)} 个订阅")
-        print("-" * 60)
-        
-        files = {}
-        failed = []
-        
-        for sub in subscriptions:
-            try:
-                content = download_subscription(sub["url"], user_agent)
-                files[sub["filename"]] = content
-            except Exception as e:
-                print(f"  ✗ 下载失败: {e}")
-                failed.append({"name": sub["name"], "error": str(e)})
-        
-        print("-" * 60)
-        
-        if not files:
-            print("错误: 所有订阅下载失败")
-            sys.exit(1)
-        
-        # 添加时间戳
-        files[".last_update"] = f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}\n"
-        
-        # 上传
-        print(f"\n上传 {len(files)} 个文件到 Gist...")
-        new_gist_id = upload_to_gist(github_token, gist_id, files)
-        
-        if new_gist_id != gist_id:
-            print(f"\n重要提示: 已创建新的 Gist ID: {new_gist_id}")
-            print("请在 Repository secrets 中设置 GIST_ID")
-        
-        print(f"\n完成! 成功处理 {len(files) - 1} 个订阅")
-        
-        if failed:
-            print(f"\n警告: {len(failed)} 个订阅下载失败")
-            sys.exit(2)
-            
-    except Exception as e:
-        print(f"\n错误: {e}")
+    github_token = get_env_var("GH_TOKEN", required=True)
+    gist_id = get_env_var("GIST_ID", default="")
+    user_agent = get_env_var("USER_AGENT", default="clash-verge/v2.4.4")
+    
+    subscriptions = parse_subscriptions()
+    if not subscriptions:
+        print("错误: 未找到订阅配置")
         sys.exit(1)
+    
+    print(f"\n找到 {len(subscriptions)} 个订阅\n")
+    
+    files = {}
+    subscription_info = []
+    failed = []
+    
+    for sub in subscriptions:
+        print(f"下载: {sub['name']}")
+        try:
+            content, flow_info = download_subscription(sub["url"], user_agent)
+            files[sub["filename"]] = content
+            subscription_info.append({
+                "name": sub["name"],
+                "flow": flow_info
+            })
+            print(f"  ✓ 成功 ({len(content)} 字节)")
+        except Exception as e:
+            print(f"  ✗ 失败: {e}")
+            failed.append({"name": sub["name"], "error": str(e)})
+    
+    if not files:
+        print("错误: 所有订阅下载失败")
+        sys.exit(1)
+    
+    # 添加时间戳
+    files[".last_update"] = f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}\n"
+    
+    # 生成并保存 README
+    readme_content = generate_readme(subscription_info)
+    with open("README.md", "w", encoding="utf-8") as f:
+        f.write(readme_content)
+    print("\n✓ README 已更新")
+    
+    # 上传 Gist
+    print(f"\n上传 {len(files)} 个文件到 Gist...")
+    new_gist_id = upload_to_gist(github_token, gist_id, files)
+    
+    if new_gist_id != gist_id:
+        print(f"\n重要提示: 已创建新的 Gist ID: {new_gist_id}")
+        print("请在 Repository secrets 中设置 GIST_ID")
+    
+    print(f"\n完成! 成功处理 {len(files)} 个订阅")
+    
+    if failed:
+        print(f"\n警告: {len(failed)} 个订阅下载失败")
+        sys.exit(2)
 
 
 if __name__ == "__main__":
