@@ -223,7 +223,7 @@ def generate_readme(subscription_info, auto_update_interval="6"):
         "",
         "## 说明",
         "",
-        f"- 每 {AUTO_UPDATE_INTERVAL} 小时自动更新订阅",
+        f"- 每 {auto_update_interval} 小时自动更新订阅",
         "- 订阅内容上传到 Gist，不保存在仓库",
         "- `sing-box-config.json` 是可直接使用的完整sing-box配置文件",
         "- 参考 [sub-store](https://github.com/sub-store-org/Sub-Store) 实现",
