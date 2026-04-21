@@ -239,8 +239,8 @@ def convert_to_singbox(clash_content, script_dir):
             temp_file = f.name
         
         try:
-            # 调用Node.js转换脚本
-            convert_script = os.path.join(script_dir, 'convert.js')
+            # 调用Node.js转换脚本（使用.mjs扩展名以支持ES模块）
+            convert_script = os.path.join(script_dir, 'convert.mjs')
             result = subprocess.run(
                 ['node', convert_script, 'convert', temp_file],
                 capture_output=True,
