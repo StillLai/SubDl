@@ -4,9 +4,13 @@
  * 使用 Sub-Store 的 proxy-utils.esm.mjs 作为依赖
  */
 
-const fs = require('fs');
-const path = require('path');
-const https = require('https');
+import fs from 'fs';
+import path from 'path';
+import https from 'https';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const DEPS_DIR = path.join(__dirname, 'deps');
 const PROXY_UTILS_FILE = path.join(DEPS_DIR, 'proxy-utils.esm.mjs');
@@ -41,7 +45,9 @@ function downloadFile(url, dest, headers = {}) {
                 file.close(resolve);
             });
         }).on('error', (err) => {
-            fs.unlinkSync(dest);
+            if (fs.existsSync(dest)) {
+                fs.unlinkSync(dest);
+            }
             reject(err);
         });
     });
