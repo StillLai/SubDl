@@ -28,7 +28,12 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GIST_ID: ${{ secrets.GIST_ID }}
-        SUBSCRIPTION_URLS: ${{ secrets.SUBSCRIPTION_URLS }}
         USER_AGENT: ${{ secrets.USER_AGENT || 'clash-verge/v2.4.4' }}
+        SUB_URL: ${{ secrets.SUB_URL }}
+        SUB_URL_1: ${{ secrets.SUB_URL_1 }}
+        SUB_URL_2: ${{ secrets.SUB_URL_2 }}
+        SUB_URL_3: ${{ secrets.SUB_URL_3 }}
+        SUB_URL_4: ${{ secrets.SUB_URL_4 }}
+        SUB_URL_5: ${{ secrets.SUB_URL_5 }}
       run: |
         python src/update_subscriptions.py

@@ -23,7 +23,7 @@
 | Secret 名称 | 必需 | 说明 |
 |------------|------|------|
 | `GITHUB_TOKEN` | ✅ | GitHub Personal Access Token，需要 `gist` 权限 |
-| `SUBSCRIPTION_URLS` | ✅ | 订阅链接配置（见下方格式） |
+| `SUB_URL` | ✅ | 订阅链接（见下方配置方法） |
 | `GIST_ID` | ❌ | 现有 Gist ID（首次运行可不设置，会自动创建） |
 | `USER_AGENT` | ❌ | 自定义 User-Agent（默认: `clash-verge/v2.4.4`） |
 
@@ -36,35 +36,23 @@
 
 ### 4. 配置订阅链接
 
-`SUBSCRIPTION_URLS` 支持多种格式：
+每个订阅链接单独设置一个 Secret，格式如下：
 
-#### 格式 1: JSON 数组（推荐）
-```json
-[
-  {
-    "name": "sub1",
-    "url": "https://example.com/subscription1",
-    "filename": "sub1.yaml"
-  },
-  {
-    "name": "sub2",
-    "url": "https://example.com/subscription2",
-    "filename": "sub2.yaml"
-  }
-]
-```
+| Secret 名称 | 说明 |
+|------------|------|
+| `SUB_URL` | 第一个订阅链接 |
+| `SUB_URL_1` | 第二个订阅链接（可选） |
+| `SUB_URL_2` | 第三个订阅链接（可选） |
+| ... | 更多订阅链接（最多支持到 `SUB_URL_5`） |
 
-#### 格式 2: 简单 URL 列表（每行一个）
-```
-https://example.com/subscription1
-https://example.com/subscription2
-```
+**配置方法：**
+1. 在 Secrets 页面点击 **New repository secret**
+2. Name 填 `SUB_URL`，Value 填你的订阅链接
+3. 如需添加更多订阅，继续添加 `SUB_URL_1`、`SUB_URL_2` 等
 
-#### 格式 3: 带名称的格式（name|url|filename）
-```
-sub1|https://example.com/subscription1|sub1.yaml
-sub2|https://example.com/subscription2|sub2.yaml
-```
+**示例：**
+- `SUB_URL` = `https://example.com/subscription1`
+- `SUB_URL_1` = `https://example.com/subscription2`
 
 ### 5. 手动运行测试
 

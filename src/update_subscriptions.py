@@ -65,70 +65,34 @@ def download_subscription(url, user_agent, timeout=30000):
         raise ConnectionError(f"下载失败: {e}")
 
 
-def parse_subscriptions(env_value):
-    """解析订阅配置"""
-    if not env_value:
-        return []
-    
+def parse_subscriptions():
+    """解析订阅配置 - 从环境变量 SUB_URL 或 SUB_URL_1, SUB_URL_2... 读取"""
     subscriptions = []
     
-    # 尝试解析为 JSON
-    try:
-        data = json.loads(env_value)
-        if isinstance(data, list):
-            for item in data:
-                if isinstance(item, dict):
-                    subscriptions.append({
-                        "name": item.get("name", "subscription"),
-                        "url": item.get("url"),
-                        "filename": item.get("filename", item.get("name", "subscription") + ".yaml")
-                    })
-                elif isinstance(item, str):
-                    # 简单的 URL 字符串
-                    name = extract_name_from_url(item)
-                    subscriptions.append({
-                        "name": name,
-                        "url": item,
-                        "filename": f"{name}.yaml"
-                    })
-        elif isinstance(data, dict):
-            # 单个订阅对象
-            subscriptions.append({
-                "name": data.get("name", "subscription"),
-                "url": data.get("url"),
-                "filename": data.get("filename", data.get("name", "subscription") + ".yaml")
-            })
-        return subscriptions
-    except json.JSONDecodeError:
-        pass
+    # 首先检查 SUB_URL（单个订阅）
+    sub_url = os.environ.get("SUB_URL", "").strip()
+    if sub_url:
+        name = extract_name_from_url(sub_url)
+        subscriptions.append({
+            "name": name,
+            "url": sub_url,
+            "filename": f"{name}.yaml"
+        })
     
-    # 尝试按行分割（每行一个 URL）
-    lines = env_value.strip().split("\n")
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-        
-        # 检查是否包含分隔符（name|url 或 url|filename 格式）
-        if "|" in line:
-            parts = line.split("|")
-            if len(parts) >= 2:
-                name = parts[0].strip()
-                url = parts[1].strip()
-                filename = parts[2].strip() if len(parts) >= 3 else f"{name}.yaml"
-                subscriptions.append({
-                    "name": name,
-                    "url": url,
-                    "filename": filename
-                })
-        else:
-            # 简单的 URL
-            name = extract_name_from_url(line)
-            subscriptions.append({
-                "name": name,
-                "url": line,
-                "filename": f"{name}.yaml"
-            })
+    # 然后检查 SUB_URL_1, SUB_URL_2...（多个订阅）
+    index = 1
+    while True:
+        env_name = f"SUB_URL_{index}"
+        sub_url = os.environ.get(env_name, "").strip()
+        if not sub_url:
+            break
+        name = extract_name_from_url(sub_url)
+        subscriptions.append({
+            "name": name,
+            "url": sub_url,
+            "filename": f"{name}.yaml"
+        })
+        index += 1
     
     return subscriptions
 
@@ -224,10 +188,9 @@ def main():
         github_token = get_env_var("GITHUB_TOKEN", required=True)
         gist_id = get_env_var("GIST_ID", default="")
         user_agent = get_env_var("USER_AGENT", default="clash-verge/v2.4.4")
-        sub_urls_env = get_env_var("SUBSCRIPTION_URLS", required=True)
         
         # 解析订阅配置
-        subscriptions = parse_subscriptions(sub_urls_env)
+        subscriptions = parse_subscriptions()
         
         if not subscriptions:
             print("错误: 未找到有效的订阅配置")
