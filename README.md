@@ -1,6 +1,6 @@
 # SubDl
 
-> 最后更新: 2026-04-21 21:50:19 CST
+> 最后更新: 2026-04-21 21:53:06 CST
 
 ## 订阅状态
 
@@ -21,7 +21,7 @@
 
 ## 说明
 
-- 每小时自动更新订阅
+- 每 3 小时自动更新订阅
 - 订阅内容上传到 Gist，不保存在仓库
 - `sing-box-config.json` 是可直接使用的完整sing-box配置文件
 - 参考 [sub-store](https://github.com/sub-store-org/Sub-Store) 实现
