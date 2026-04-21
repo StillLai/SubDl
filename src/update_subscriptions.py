@@ -25,6 +25,30 @@ def get_env_var(name, default=None, required=False):
     return value
 
 
+def decode_base64_content(content):
+    """尝试解码 base64 编码的内容"""
+    # 移除空白字符
+    cleaned = content.strip().replace(" ", "").replace("\n", "").replace("\r", "")
+    
+    # 检查是否像 base64（只包含 base64 字符且长度是4的倍数）
+    if not re.match(r'^[A-Za-z0-9+/=]+$', cleaned):
+        return content  # 不像 base64，直接返回原内容
+    
+    # 尝试解码
+    try:
+        # 补齐 base64 填充
+        padding_needed = 4 - len(cleaned) % 4
+        if padding_needed != 4:
+            cleaned += "=" * padding_needed
+        
+        decoded = base64.b64decode(cleaned).decode("utf-8")
+        print(f"  ✓ 内容已 Base64 解码")
+        return decoded
+    except Exception:
+        # 解码失败，返回原内容
+        return content
+
+
 def download_subscription(url, user_agent, timeout=30000):
     """下载订阅内容"""
     print(f"正在下载订阅: {url[:60]}...")
@@ -51,7 +75,10 @@ def download_subscription(url, user_agent, timeout=30000):
         if not content or len(content.strip()) == 0:
             raise ValueError("订阅内容为空")
         
-        # 检查内容是否有效（至少包含一些代理节点）
+        # 尝试解码 base64
+        content = decode_base64_content(content)
+        
+        # 检查内容是否有效
         content_stripped = content.replace(" ", "").replace("\n", "").replace("\r", "")
         if len(content_stripped) == 0:
             raise ValueError("订阅内容为空")
