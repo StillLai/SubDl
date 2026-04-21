@@ -66,18 +66,15 @@ def download_subscription(url, user_agent, timeout=30000):
 
 
 def parse_subscriptions():
-    """解析订阅配置 - 从环境变量 SUB_URL 或 SUB_URL_1, SUB_URL_2... 读取"""
+    """解析订阅配置 - 从环境变量 SUB_URL 或 SUB_URL_1, SUB_URL_2... 读取
+    格式: 名称|URL 或直接 URL
+    """
     subscriptions = []
     
     # 首先检查 SUB_URL（单个订阅）
     sub_url = os.environ.get("SUB_URL", "").strip()
     if sub_url:
-        name = extract_name_from_url(sub_url)
-        subscriptions.append({
-            "name": name,
-            "url": sub_url,
-            "filename": f"{name}.yaml"
-        })
+        subscriptions.append(parse_single_subscription(sub_url))
     
     # 然后检查 SUB_URL_1, SUB_URL_2...（多个订阅）
     index = 1
@@ -86,15 +83,41 @@ def parse_subscriptions():
         sub_url = os.environ.get(env_name, "").strip()
         if not sub_url:
             break
-        name = extract_name_from_url(sub_url)
-        subscriptions.append({
-            "name": name,
-            "url": sub_url,
-            "filename": f"{name}.yaml"
-        })
+        subscriptions.append(parse_single_subscription(sub_url))
         index += 1
     
-    return subscriptions
+    return [s for s in subscriptions if s]
+
+
+def parse_single_subscription(value):
+    """解析单个订阅配置
+    格式1: 名称|URL → 使用指定名称
+    格式2: URL → 自动从域名提取名称
+    """
+    value = value.strip()
+    if not value:
+        return None
+    
+    # 检查是否包含分隔符 |
+    if "|" in value:
+        parts = value.split("|", 1)
+        name = parts[0].strip()
+        url = parts[1].strip()
+        if name and url:
+            return {
+                "name": name,
+                "url": url,
+                "filename": f"{name}.yaml"
+            }
+    
+    # 没有分隔符，直接作为 URL 处理
+    url = value
+    name = extract_name_from_url(url)
+    return {
+        "name": name,
+        "url": url,
+        "filename": f"{name}.yaml"
+    }
 
 
 def extract_name_from_url(url):

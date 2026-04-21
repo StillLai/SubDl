@@ -36,7 +36,7 @@
 
 ### 4. 配置订阅链接
 
-每个订阅链接单独设置一个 Secret，格式如下：
+每个订阅链接单独设置一个 Secret，支持两种格式：
 
 | Secret 名称 | 说明 |
 |------------|------|
@@ -45,14 +45,30 @@
 | `SUB_URL_2` | 第三个订阅链接（可选） |
 | ... | 更多订阅链接（最多支持到 `SUB_URL_5`） |
 
+**格式 1：自定义名称（推荐）**
+```
+名称|https://订阅链接
+```
+例如：
+```
+MySub|https://example.com/api/v1/client/subscribe?token=xxxxx
+```
+这样 Gist 中的文件名会是 `MySub.yaml`
+
+**格式 2：仅 URL（自动生成名称）**
+```
+https://example.com/api/v1/client/subscribe?token=xxxxx
+```
+名称会自动从域名提取，例如 `example_com.yaml`
+
 **配置方法：**
 1. 在 Secrets 页面点击 **New repository secret**
-2. Name 填 `SUB_URL`，Value 填你的订阅链接
+2. Name 填 `SUB_URL`，Value 填 `名称|订阅链接` 或直接填 `订阅链接`
 3. 如需添加更多订阅，继续添加 `SUB_URL_1`、`SUB_URL_2` 等
 
 **示例：**
-- `SUB_URL` = `https://example.com/subscription1`
-- `SUB_URL_1` = `https://example.com/subscription2`
+- `SUB_URL` = `MySub|https://sub1.example.com/api?token=abc123`
+- `SUB_URL_1` = `BackupSub|https://sub2.example.com/api?token=xyz789`
 
 ### 5. 手动运行测试
 
