@@ -239,6 +239,7 @@ def generate_readme(subscription_info):
         "1. Fork 本仓库",
         "2. 在 Settings → Secrets → Actions 中添加:",
         "   - `GH_TOKEN`: GitHub Token (需要 gist 权限)",
+        "   - `GIST_ID`: Gist ID（可选，首次运行后会自动创建并输出）",
         "   - `SUB_URL`: 订阅链接 (`名称|URL` 格式)",
         "   - `SUB_URL_1`, `SUB_URL_2`...: 更多订阅（可选）",
         "   - `SINGBOX_CONFIG_SUBS`: 用于生成sing-box配置的订阅，设为 `all` 使用全部订阅，或用逗号分隔订阅名称，如 `sub1,sub2`",
