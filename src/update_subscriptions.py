@@ -124,8 +124,14 @@ def download_subscription(url, user_agent, timeout=30000):
         )
         response.raise_for_status()
         
+        # 打印响应头信息
+        print(f"  Content-Encoding: {response.headers.get('Content-Encoding', 'none')}")
+        print(f"  Content-Type: {response.headers.get('Content-Type', 'unknown')}")
+        
         # 获取原始二进制内容
         raw_content = response.content
+        print(f"  原始数据类型: {type(raw_content)}, 长度: {len(raw_content)}")
+        print(f"  原始数据前10字节(hex): {raw_content[:10].hex()}")
         
         # 尝试解码（处理 gzip 和 base64）
         content = try_decode_content(raw_content)
