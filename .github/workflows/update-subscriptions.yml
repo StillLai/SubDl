@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - 'sing-box_template.jsonc'
+      - 'template/sing-box_template.jsonc'
 
 permissions:
   contents: write
