@@ -6,9 +6,10 @@ Sing-box 配置合并脚本
 
 功能：
 1. 读取配置模板
-2. 将订阅节点按规则分配到不同的 outbound selector 中
-3. 设置 tls.insecure = true 以支持自签名证书
-4. 处理空 outbound 的兼容性问题
+2. 处理 outbounds 中的 Subscription 占位符
+3. 根据 include 正则筛选节点
+4. 设置 tls.insecure = true 以支持自签名证书
+5. 处理空 outbound 的兼容性问题
 """
 
 import json
@@ -17,135 +18,9 @@ import os
 import sys
 
 
-# ============== 配置项 ==============
-# 出站规则配置
-# 格式: "🕳出站选择器名称🏷节点标签正则🕳另一个选择器🏷另一个正则"
-OUTBOUND_RULES = "🕳✈️ Telegram🕳📹 YouTube🕳🎈 自动选择🕳🇭🇰 香港节点🏷^(?=.*(港|HK|hk|Hong Kong|HongKong|hongkong)).*$🕳🇹🇼 台湾节点🏷^(?=.*(台|新北|彰化|TW|Taiwan)).*$🕳🇯🇵 日本节点🏷^(?=.*(日本|川日|东京|大阪|泉日|埼玉|沪日|深日|[^-]日|JP|Japan)).*$🕳🇸🇬 新加坡节点🏷^(?=.*(新加坡|坡|狮城|SG|Singapore)).*$🕳🇺🇸 美国节点🏷^(?=.*(美|波特兰|达拉斯|俄勒冈|凤凰城|费利蒙|硅谷|拉斯维加斯|洛杉矶|圣何塞|圣克拉拉|西雅图|芝加哥|US|United States)).*$🕳🇪🇺 欧洲节点🏷^(?=.*(奥|比|保|克罗地亚|塞|捷|丹|爱沙|芬|法|德|希|匈|爱尔|意|拉|立|卢|马耳他|荷|波|葡|西班牙|俄罗斯|斯洛伐|斯洛文|瑞|英|冰岛|挪威|瑞士|列支|摩纳|梵蒂|圣马|黑山|阿尔巴|北马其|波斯尼|科索沃|🇷🇺|🇦🇹|🇧🇪|🇧🇬|🇭🇷|🇨🇾|🇨🇿|🇩🇰|🇪🇪|🇫🇮|🇫🇷|🇩🇪|🇬🇷|🇭🇺|🇮🇪|🇮🇹|🇱🇻|🇱🇹|🇱🇺|🇲🇹|🇳🇱|🇳🇴|🇵🇱|🇵🇹|🇷🇴|🇷🇸|🇸🇰|🇸🇮|🇪🇸|🇸🇪|🇨🇭|🇬🇧|🇮🇸|🇦🇱|🇲🇰|🇲🇪|🇽🇰|🇸🇲|🇻🇦|🇱🇮|🇧🇦|MOW|LED|SVO|CDG|FRA|AMS|MAD|BCN|FCO|MUC|BRU|VIE|ZRH|OSL|CPH|ARN|HEL|DUB)).*$🕳🧭 其它地区🏷^(?!.*(港|HK|hk|Hong Kong|HongKong|hongkong|日本|川日|东京|大阪|泉日|埼玉|沪日|深日|[^-]日|JP|Japan|美|波特兰|达拉斯|俄勒冈|凤凰城|费利蒙|硅谷|拉斯维加斯|洛杉矶|圣何塞|圣克拉拉|西雅图|芝加哥|US|United States|台|新北|彰化|TW|Taiwan|新加坡|坡|狮城|SG|Singapore|灾|网易|Netease|套餐|重置|剩余|到期|订阅|群|账户|流量|有效期|时间|官网)).*$"
-# ====================================
-
-
 def log(msg):
     """日志输出到 stderr"""
     print(f"[Merge] {msg}", file=sys.stderr)
-
-
-def parse_outbound_rules(outbound_str):
-    """
-    解析 outbound 规则字符串
-    格式: "🕳节点选择器名称🏷节点标签正则🕳另一个选择器🏷另一个正则"
-    """
-    if not outbound_str:
-        return []
-    
-    rules = []
-    parts = outbound_str.split('🕳')
-    
-    for part in parts:
-        if not part:
-            continue
-        
-        if '🏷' in part:
-            outbound_pattern, tag_pattern = part.split('🏷', 1)
-        else:
-            outbound_pattern = part
-            tag_pattern = '.*'
-        
-        rules.append((outbound_pattern.strip(), tag_pattern.strip()))
-    
-    return rules
-
-
-def create_tag_regex(tag_pattern):
-    """创建节点标签匹配正则"""
-    pattern = tag_pattern.replace('ℹ️', '')
-    flags = re.IGNORECASE if 'ℹ️' in tag_pattern else 0
-    return re.compile(pattern, flags)
-
-
-def create_outbound_regex(outbound_pattern):
-    """创建 outbound 选择器匹配正则"""
-    pattern = outbound_pattern.replace('ℹ️', '')
-    flags = re.IGNORECASE if 'ℹ️' in outbound_pattern else 0
-    return re.compile(pattern, flags)
-
-
-def fix_tls_insecure(proxies):
-    """遍历所有节点，将 tls.insecure 设为 true"""
-    fixed_count = 0
-    for proxy in proxies:
-        if 'tls' in proxy and isinstance(proxy['tls'], dict):
-            proxy['tls']['insecure'] = True
-            fixed_count += 1
-    return fixed_count
-
-
-def merge_config(template_config, proxies, outbound_rules_str):
-    """
-    合并配置
-    
-    Args:
-        template_config: 配置模板字典
-        proxies: sing-box 格式的代理节点列表
-        outbound_rules_str: outbound 规则字符串
-    
-    Returns:
-        合并后的配置字典
-    """
-    # 深拷贝配置模板
-    config = json.loads(json.dumps(template_config))
-    
-    # 确保 outbounds 是列表
-    if 'outbounds' not in config:
-        config['outbounds'] = []
-    
-    # 修复所有节点的 tls.insecure
-    fixed = fix_tls_insecure(proxies)
-    log(f"已设置 {fixed} 个节点的 tls.insecure = true")
-    
-    # 解析 outbound 规则
-    outbound_rules = parse_outbound_rules(outbound_rules_str)
-    log(f"解析到 {len(outbound_rules)} 条 outbound 规则")
-    
-    # 将节点插入到对应的 outbound selector 中
-    for outbound_rule in outbound_rules:
-        outbound_pattern, tag_pattern = outbound_rule
-        outbound_regex = create_outbound_regex(outbound_pattern)
-        tag_regex = create_tag_regex(tag_pattern)
-        
-        # 找到匹配的选择器
-        for outbound in config['outbounds']:
-            if outbound_regex.search(outbound.get('tag', '')):
-                if not isinstance(outbound.get('outbounds'), list):
-                    outbound['outbounds'] = []
-                
-                # 获取匹配的节点标签
-                matched_tags = [p['tag'] for p in proxies if tag_regex.search(p.get('tag', ''))]
-                outbound['outbounds'].extend(matched_tags)
-                log(f"  {outbound.get('tag')} -> 插入 {len(matched_tags)} 个节点 (匹配 {tag_pattern})")
-    
-    # 检查并修复空的 outbounds
-    compatible_outbound = {'tag': 'COMPATIBLE', 'type': 'direct'}
-    has_compatible = any(o.get('tag') == 'COMPATIBLE' for o in config['outbounds'])
-    
-    for outbound_rule in outbound_rules:
-        outbound_pattern, tag_pattern = outbound_rule
-        outbound_regex = create_outbound_regex(outbound_pattern)
-        
-        for outbound in config['outbounds']:
-            if outbound_regex.search(outbound.get('tag', '')):
-                if not isinstance(outbound.get('outbounds'), list) or len(outbound.get('outbounds', [])) == 0:
-                    if not has_compatible:
-                        config['outbounds'].append(compatible_outbound)
-                        has_compatible = True
-                    outbound['outbounds'] = outbound.get('outbounds', [])
-                    outbound['outbounds'].append('COMPATIBLE')
-                    log(f"  {outbound.get('tag')} -> 空 outbound，添加 COMPATIBLE")
-    
-    # 将所有代理节点添加到 outbounds 末尾
-    config['outbounds'].extend(proxies)
-    log(f"已添加 {len(proxies)} 个代理节点到配置")
-    
-    return config
 
 
 def load_jsonc(filepath):
@@ -169,6 +44,187 @@ def load_jsonc(filepath):
     return json.loads(content)
 
 
+def fix_tls_insecure(proxies):
+    """遍历所有节点，将 tls.insecure 设为 true"""
+    fixed_count = 0
+    for proxy in proxies:
+        if 'tls' in proxy and isinstance(proxy['tls'], dict):
+            proxy['tls']['insecure'] = True
+            fixed_count += 1
+    return fixed_count
+
+
+def expand_subscription_item(item, subscriptions_nodes, include_regex):
+    """
+    展开 Subscription 占位符为实际节点列表
+    
+    Args:
+        item: Subscription 对象 {"type": "Subscription", "tag": "xxx"} 或 {"type": "Subscription", "tag": ["sub1", "sub2"]}
+        subscriptions_nodes: dict，键为订阅名，值为节点列表
+        include_regex: include 正则表达式（可能为 None）
+    
+    Returns:
+        展开后的节点标签列表
+    """
+    if not isinstance(item, dict) or item.get('type') != 'Subscription':
+        return [item]
+    
+    tag_value = item.get('tag', '')
+    
+    # 确定要插入的订阅列表
+    if tag_value == '' or tag_value is None:
+        # 空值表示插入所有订阅
+        sub_names = list(subscriptions_nodes.keys())
+    elif isinstance(tag_value, list):
+        # 数组：插入多个订阅
+        sub_names = tag_value
+    else:
+        # 字符串：单个订阅
+        sub_names = [tag_value]
+    
+    result_tags = []
+    
+    for sub_name in sub_names:
+        if sub_name not in subscriptions_nodes:
+            log(f"  警告: 未找到订阅 '{sub_name}'，跳过")
+            continue
+        
+        nodes = subscriptions_nodes[sub_name]
+        
+        # 如果有 include 正则，筛选节点
+        if include_regex:
+            try:
+                pattern = re.compile(include_regex, re.IGNORECASE)
+                filtered = [node for node in nodes if pattern.search(node.get('tag', ''))]
+                log(f"    订阅 '{sub_name}': {len(nodes)} 个节点，筛选后 {len(filtered)} 个 (匹配 {include_regex})")
+                result_tags.extend([node['tag'] for node in filtered])
+            except re.error as e:
+                log(f"    错误: include 正则无效: {e}")
+                result_tags.extend([node['tag'] for node in nodes])
+        else:
+            result_tags.extend([node['tag'] for node in nodes])
+    
+    return result_tags
+
+
+def process_outbounds(outbounds, subscriptions_nodes, include_regex=None):
+    """
+    处理 outbounds 数组，展开 Subscription 占位符
+    
+    Args:
+        outbounds: outbounds 数组
+        subscriptions_nodes: dict，键为订阅名，值为节点列表
+        include_regex: 当前 outbound 的 include 正则（如果有）
+    
+    Returns:
+        处理后的 outbounds 数组
+    """
+    if not isinstance(outbounds, list):
+        return outbounds
+    
+    result = []
+    for item in outbounds:
+        if isinstance(item, dict) and item.get('type') == 'Subscription':
+            # 展开 Subscription
+            expanded = expand_subscription_item(item, subscriptions_nodes, include_regex)
+            result.extend(expanded)
+        else:
+            # 保留其他项（字符串或对象）
+            result.append(item)
+    
+    return result
+
+
+def remove_include_field(obj):
+    """递归移除对象中的 include 字段"""
+    if isinstance(obj, dict):
+        obj.pop('include', None)
+        for value in obj.values():
+            remove_include_field(value)
+    elif isinstance(obj, list):
+        for item in obj:
+            remove_include_field(item)
+
+
+def merge_config(template_config, subscriptions_nodes):
+    """
+    合并配置
+    
+    Args:
+        template_config: 配置模板字典
+        subscriptions_nodes: dict，键为订阅名，值为节点列表
+    
+    Returns:
+        合并后的配置字典
+    """
+    # 深拷贝配置模板
+    config = json.loads(json.dumps(template_config))
+    
+    # 确保 outbounds 是列表
+    if 'outbounds' not in config:
+        config['outbounds'] = []
+    
+    # 统计
+    total_subscription_count = 0
+    
+    # 处理所有 outbounds
+    for outbound in config['outbounds']:
+        if not isinstance(outbound, dict):
+            continue
+        
+        outbounds_list = outbound.get('outbounds', [])
+        if not isinstance(outbounds_list, list):
+            continue
+        
+        # 获取当前 outbound 的 include 正则
+        include_regex = outbound.get('include')
+        
+        # 展开 Subscription
+        processed = process_outbounds(outbounds_list, subscriptions_nodes, include_regex)
+        outbound['outbounds'] = processed
+        
+        # 统计 Subscription 展开的节点数
+        subscription_count = sum(1 for item in outbounds_list 
+                                  if isinstance(item, dict) and item.get('type') == 'Subscription')
+        total_subscription_count += subscription_count
+    
+    log(f"处理了 {total_subscription_count} 个 Subscription 占位符")
+    
+    # 移除所有 include 字段
+    remove_include_field(config)
+    
+    # 收集所有节点
+    all_nodes = []
+    for nodes in subscriptions_nodes.values():
+        all_nodes.extend(nodes)
+    
+    # 修复 tls.insecure
+    fixed = fix_tls_insecure(all_nodes)
+    log(f"已设置 {fixed} 个节点的 tls.insecure = true")
+    
+    # 将所有代理节点添加到 outbounds 末尾
+    config['outbounds'].extend(all_nodes)
+    log(f"已添加 {len(all_nodes)} 个代理节点到配置")
+    
+    # 处理空 outbound 的兼容性问题
+    compatible_outbound = {'tag': 'COMPATIBLE', 'type': 'direct'}
+    has_compatible = any(o.get('tag') == 'COMPATIBLE' for o in config['outbounds'])
+    
+    for outbound in config['outbounds']:
+        if not isinstance(outbound, dict):
+            continue
+        
+        outbounds_list = outbound.get('outbounds', [])
+        if not isinstance(outbounds_list, list) or len(outbounds_list) == 0:
+            if not has_compatible:
+                config['outbounds'].append(compatible_outbound)
+                has_compatible = True
+            outbound['outbounds'] = outbounds_list
+            outbound['outbounds'].append('COMPATIBLE')
+            log(f"  {outbound.get('tag')} -> 空 outbound，添加 COMPATIBLE")
+    
+    return config
+
 
 def main():
     import argparse
@@ -177,9 +233,6 @@ def main():
     parser.add_argument('template', help='配置模板文件路径 (.json 或 .jsonc)')
     parser.add_argument('subscription', help='sing-box 订阅文件路径')
     parser.add_argument('-o', '--output', help='输出文件路径 (默认输出到 stdout)')
-    parser.add_argument('--outbound-rules', 
-                       default=OUTBOUND_RULES,
-                       help='outbound 规则字符串')
     
     args = parser.parse_args()
     
@@ -198,16 +251,20 @@ def main():
         subscription = json.load(f)
     log(f"已加载订阅: {sub_path}")
     
-    # 获取代理节点
-    proxies = subscription if isinstance(subscription, list) else subscription.get('outbounds', [])
-    if not proxies:
-        log("警告: 未找到代理节点")
-        proxies = []
+    # 按订阅名分组节点
+    # 订阅文件格式: {"feiniaoyun": [...nodes...], "shanhai": [...nodes...]}
+    if isinstance(subscription, dict):
+        subscriptions_nodes = subscription
     else:
-        log(f"找到 {len(proxies)} 个代理节点")
+        # 如果是列表，默认放到 "default" 订阅
+        nodes = subscription if isinstance(subscription, list) else subscription.get('outbounds', [])
+        subscriptions_nodes = {"default": nodes}
+    
+    for sub_name, nodes in subscriptions_nodes.items():
+        log(f"订阅 '{sub_name}': {len(nodes)} 个节点")
     
     # 合并配置
-    merged = merge_config(template, proxies, args.outbound_rules)
+    merged = merge_config(template, subscriptions_nodes)
     
     # 输出结果
     output = json.dumps(merged, indent=2, ensure_ascii=False)

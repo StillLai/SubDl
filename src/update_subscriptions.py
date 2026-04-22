@@ -292,12 +292,12 @@ def convert_to_singbox(clash_content, script_dir):
         return None
 
 
-def merge_singbox_config(singbox_nodes_list, script_dir):
+def merge_singbox_config(subs_nodes_dict, script_dir):
     """
     将多个sing-box订阅节点合并到配置模板
     
     Args:
-        singbox_nodes_list: sing-box格式的代理节点列表（来自多个订阅的合并）
+        subs_nodes_dict: dict，键为订阅名，值为节点列表
         script_dir: 脚本所在目录
     
     Returns:
@@ -309,9 +309,9 @@ def merge_singbox_config(singbox_nodes_list, script_dir):
             print(f"  ✗ 配置模板不存在: {template_path}")
             return None
         
-        # 创建临时文件存储订阅节点
+        # 创建临时文件存储订阅节点（按订阅名分组）
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
-            json.dump(singbox_nodes_list, f)
+            json.dump(subs_nodes_dict, f)
             sub_temp_file = f.name
         
         try:
@@ -335,7 +335,7 @@ def merge_singbox_config(singbox_nodes_list, script_dir):
                 return None
             
             # 解析输出为JSON
-            merged_config = json.loads(stdout)
+            merged_config = json.loads(result.stdout)
             return merged_config
             
         finally:
@@ -401,9 +401,7 @@ def main():
     subscription_info = []
     failed = []
     
-    # 存储所有sing-box节点（用于生成最终配置）
-    all_singbox_nodes = []
-    # 记录哪些订阅需要包含在sing-box配置中
+    # 所有订阅名称
     all_subscription_names = [sub['name'] for sub in subscriptions]
     
     for sub in subscriptions:
@@ -428,9 +426,6 @@ def main():
                 singbox_filename = f"{sub['name']}-singbox.json"
                 files[singbox_filename] = json.dumps(singbox_config, indent=2, ensure_ascii=False)
                 print(f"  ✓ 转换成功 ({len(files[singbox_filename])} 字节, {len(singbox_nodes)} 个节点)")
-                
-                # 收集节点用于最终配置合并
-                all_singbox_nodes.extend(singbox_nodes)
         except Exception as e:
             print(f"  ✗ 失败: {e}")
             failed.append({"name": sub["name"], "error": str(e)})
@@ -445,36 +440,29 @@ def main():
     print(f"  → 所有订阅: {all_subscription_names}")
     
     # 生成最终的sing-box配置
-    if all_singbox_nodes:
+    if selected_subs:
         print(f"\n→ 合并 {len(selected_subs)} 个订阅的节点到配置模板...")
         
-        # 如果不是全部订阅，需要重新筛选节点
-        if len(selected_subs) != len(all_subscription_names) or selected_subs != all_subscription_names:
-            print(f"  → 重新筛选节点（当前: {len(all_singbox_nodes)} 个）")
-            # 重新下载并转换选定的订阅
-            filtered_nodes = []
-            for sub in subscriptions:
-                if sub['name'] in selected_subs:
-                    print(f"  → 重新处理: {sub['name']}")
-                    try:
-                        content, _ = download_subscription(sub["url"], user_agent)
-                        singbox_config = convert_to_singbox(content, script_dir)
-                        if singbox_config:
-                            nodes = singbox_config if isinstance(singbox_config, list) else singbox_config.get('outbounds', [])
-                            filtered_nodes.extend(nodes)
-                            print(f"    → 获取 {len(nodes)} 个节点")
-                    except Exception as e:
-                        print(f"    ✗ {sub['name']} 转换失败: {e}")
-            final_nodes = filtered_nodes
-        else:
-            final_nodes = all_singbox_nodes
-            print(f"  → 使用已收集的节点: {len(final_nodes)} 个")
+        # 构建按订阅名分组的节点字典
+        subs_nodes_dict = {}
+        for sub in subscriptions:
+            if sub['name'] in selected_subs:
+                try:
+                    content, _ = download_subscription(sub["url"], user_agent)
+                    singbox_config = convert_to_singbox(content, script_dir)
+                    if singbox_config:
+                        nodes = singbox_config if isinstance(singbox_config, list) else singbox_config.get('outbounds', [])
+                        subs_nodes_dict[sub['name']] = nodes
+                        print(f"  → 订阅 '{sub['name']}': {len(nodes)} 个节点")
+                except Exception as e:
+                    print(f"  ✗ {sub['name']} 获取节点失败: {e}")
         
-        if final_nodes:
-            merged_config = merge_singbox_config(final_nodes, script_dir)
+        if subs_nodes_dict:
+            merged_config = merge_singbox_config(subs_nodes_dict, script_dir)
             if merged_config:
+                total_nodes = sum(len(nodes) for nodes in subs_nodes_dict.values())
                 files["sing-box-config.json"] = json.dumps(merged_config, indent=2, ensure_ascii=False)
-                print(f"  ✓ 合并成功 ({len(files['sing-box-config.json'])} 字节, {len(final_nodes)} 个节点)")
+                print(f"  ✓ 合并成功 ({len(files['sing-box-config.json'])} 字节, {total_nodes} 个节点)")
     
     # 生成并保存 README
     readme_content = generate_readme(subscription_info)
