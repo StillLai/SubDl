@@ -102,7 +102,11 @@ def expand_subscription_item(item, subscriptions_nodes, include_regex):
                 log(f"    错误: include 正则无效: {e}")
                 result_tags.extend([node['tag'] for node in nodes])
         else:
-            result_tags.extend([node['tag'] for node in nodes])
+            # 没有 include 正则，返回所有节点标签
+            for node in nodes:
+                tag = node if isinstance(node, str) else node.get('tag', '')
+                if tag:
+                    result_tags.append(tag)
     
     return result_tags
 
