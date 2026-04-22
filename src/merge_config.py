@@ -228,8 +228,20 @@ def merge_config(template_config, subscriptions_nodes):
         
         outbounds_list = outbound.get('outbounds', [])
         if not isinstance(outbounds_list, list) or len(outbounds_list) == 0:
-            outbound['outbounds'] = ['block']
-            log(f"  {outbound.get('tag')} -> 空 outbound，添加 block")
+            outbound['outbounds'] = ['COMPATIBLE']
+            log(f"  {outbound.get('tag')} -> 空 outbound，添加 COMPATIBLE")
+    
+    # 添加 COMPATIBLE outbound 定义（如果不存在）
+    has_compatible = any(
+        isinstance(o, dict) and o.get('tag') == 'COMPATIBLE'
+        for o in config['outbounds']
+    )
+    if not has_compatible:
+        config['outbounds'].append({
+            "tag": "COMPATIBLE",
+            "type": "direct"
+        })
+        log("已添加 COMPATIBLE outbound 定义")
     
     return config
 
