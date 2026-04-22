@@ -43,10 +43,10 @@ jobs:
         SUB_URL_5: ${{ secrets.SUB_URL_5 }}
       run: python src/update_subscriptions.py
       
-    - name: Commit README
+    - name: Commit changes
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
-        git add README.md
+        git add README.md template/sing-box_template_noTun.jsonc
         git diff --quiet && git diff --staged --quiet || git commit -m "Update subscription info [skip ci]"
         git push
