@@ -268,13 +268,15 @@ def merge_all_templates(subs_nodes_dict, script_dir):
     for template_file in template_files:
         template_path = os.path.join(template_dir, template_file)
         # 将文件名中的 "template" 替换为 "config"，扩展名改为 .json
-        config_filename = template_file.replace('_template_', '_config_').replace('template', 'config')
-        if config_filename.endswith('.jsonc'):
-            config_filename = config_filename[:-5] + '.json'
-        elif config_filename.endswith('.json'):
-            pass  # 已经是 json 格式，保持不变
+        # 先分离扩展名，避免处理异常
+        if template_file.endswith('.jsonc'):
+            base_name = template_file[:-5]
+        elif template_file.endswith('.json'):
+            base_name = template_file[:-5]
         else:
-            config_filename = config_filename + '.json'
+            base_name = template_file
+        # 替换 template -> config
+        config_filename = base_name.replace('template', 'config') + '.json'
         
         print(f"  → 处理模板: {template_file}")
         merged_config = merge_singbox_config(subs_nodes_dict, script_dir, template_path)
