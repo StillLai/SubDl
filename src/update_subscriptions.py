@@ -394,7 +394,8 @@ def main():
         sys.exit(1)
     
     if notun_template:
-        files["template/sing-box_template_noTun.jsonc"] = notun_template
+        # Gist 文件名不能包含路径分隔符，使用下划线代替
+        files["template_sing-box_template_noTun.jsonc"] = notun_template
     
     print(f"\n→ 使用 {len(subscriptions)} 个订阅生成sing-box配置...")
     subs_nodes_dict = {}
