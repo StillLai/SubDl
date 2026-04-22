@@ -328,7 +328,7 @@
         "🎯 全球直连",
         {
           "type": "Subscription",
-          "tag": "feiniaoyun"
+          "tag": "🦩飞鸟云"
         }
       ],
       "include": "^(?=.*(港|HK|hk|Hong Kong|HongKong|hongkong)).*$"
