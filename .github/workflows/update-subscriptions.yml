@@ -35,7 +35,7 @@ jobs:
         GH_TOKEN: ${{ secrets.GH_TOKEN }}
         GIST_ID: ${{ secrets.GIST_ID }}
         USER_AGENT: ${{ secrets.USER_AGENT || 'clash-verge/v2.4.4' }}
-        SINGBOX_CONFIG_SUBS: ${{ secrets.SINGBOX_CONFIG_SUBS || 'all' }}
+        SINGBOX_CONFIG_SUBS: ${{ vars.SINGBOX_CONFIG_SUBS || 'all' }}
         SUB_URL: ${{ secrets.SUB_URL }}
         SUB_URL_1: ${{ secrets.SUB_URL_1 }}
         SUB_URL_2: ${{ secrets.SUB_URL_2 }}
