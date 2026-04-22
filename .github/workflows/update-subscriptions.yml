@@ -41,7 +41,6 @@ jobs:
         SUB_URL_3: ${{ secrets.SUB_URL_3 }}
         SUB_URL_4: ${{ secrets.SUB_URL_4 }}
         SUB_URL_5: ${{ secrets.SUB_URL_5 }}
-        SINGBOX_CONFIG_SUBS: ${{ vars.SINGBOX_CONFIG_SUBS || 'all' }}
       run: python src/update_subscriptions.py
       
     - name: Commit README
