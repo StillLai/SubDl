@@ -283,6 +283,8 @@ def generate_notun_template(script_dir):
         output_content = json.dumps(template, indent=2, ensure_ascii=False)
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(output_content)
+            f.flush()
+            os.fsync(f.fileno())
         print(f"  ✓ 已生成 noTun 模板: template/sing-box_template_noTun.jsonc")
         return output_content
     except Exception as e:
