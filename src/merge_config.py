@@ -56,7 +56,7 @@ def fix_tls_insecure(proxies):
 
 def expand_subscription_item(item, subscriptions_nodes, include_regex):
     """
-    展开 Subscription 占位符为实际节点列表
+    展开 Subscription 占位符为实际节点标签列表
     
     Args:
         item: Subscription 对象 {"type": "Subscription", "tag": "xxx"} 或 {"type": "Subscription", "tag": ["sub1", "sub2"]}
@@ -127,10 +127,9 @@ def process_outbounds(outbounds, subscriptions_nodes, include_regex=None):
         if isinstance(item, dict) and item.get('type') == 'Subscription':
             # 展开 Subscription，插入节点标签
             expanded = expand_subscription_item(item, subscriptions_nodes, include_regex)
-            for tag in expanded:
-                result.append(tag)
+            result.extend(expanded)
         else:
-            # 保留其他项（字符串或对象）
+            # 保留其他项（字符串、对象等）
             result.append(item)
     
     return result
@@ -207,21 +206,14 @@ def merge_config(template_config, subscriptions_nodes):
     config['outbounds'].extend(all_nodes)
     log(f"已添加 {len(all_nodes)} 个代理节点到配置")
     
-    # 处理空 outbound 的兼容性问题
-    compatible_outbound = {'tag': 'COMPATIBLE', 'type': 'direct'}
-    has_compatible = any(o.get('tag') == 'COMPATIBLE' for o in config['outbounds'])
-    
+    # 处理空 outbound 的兼容性问题（只添加 'COMPATIBLE' 字符串，不添加新 outbound）
     for outbound in config['outbounds']:
         if not isinstance(outbound, dict):
             continue
         
         outbounds_list = outbound.get('outbounds', [])
         if not isinstance(outbounds_list, list) or len(outbounds_list) == 0:
-            if not has_compatible:
-                config['outbounds'].append(compatible_outbound)
-                has_compatible = True
-            outbound['outbounds'] = outbounds_list
-            outbound['outbounds'].append('COMPATIBLE')
+            outbound['outbounds'] = ['COMPATIBLE']
             log(f"  {outbound.get('tag')} -> 空 outbound，添加 COMPATIBLE")
     
     return config
