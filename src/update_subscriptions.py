@@ -383,7 +383,6 @@ def main():
     github_token = get_env_var("GH_TOKEN", required=True)
     gist_id = get_env_var("GIST_ID", default="")
     user_agent = get_env_var("USER_AGENT", default="clash-verge/v2.4.4")
-    enable_convert = get_env_var("ENABLE_SINGBOX_CONVERT", default="true").lower() == "true"
     singbox_subs_setting = get_env_var("SINGBOX_CONFIG_SUBS", default="all")
     
     # 获取脚本所在目录
@@ -395,11 +394,7 @@ def main():
         sys.exit(1)
     
     print(f"\n找到 {len(subscriptions)} 个订阅")
-    if enable_convert:
-        print("Sing-box转换: 已启用")
-        print(f"用于生成配置的订阅: {singbox_subs_setting}")
-    else:
-        print("Sing-box转换: 已禁用")
+    print(f"用于生成sing-box配置的订阅: {singbox_subs_setting}")
     print()
     
     files = {}
@@ -423,20 +418,19 @@ def main():
             print(f"  ✓ 成功 ({len(content)} 字节)")
             
             # 转换为Sing-box格式
-            if enable_convert:
-                print(f"  → 转换为Sing-box格式...")
-                singbox_config = convert_to_singbox(content, script_dir)
-                if singbox_config:
-                    # 获取节点列表（可能是完整配置或直接是节点数组）
-                    singbox_nodes = singbox_config if isinstance(singbox_config, list) else singbox_config.get('outbounds', [])
-                    
-                    # 保存原始sing-box订阅（不含模板）
-                    singbox_filename = f"{sub['name']}-singbox.json"
-                    files[singbox_filename] = json.dumps(singbox_config, indent=2, ensure_ascii=False)
-                    print(f"  ✓ 转换成功 ({len(files[singbox_filename])} 字节, {len(singbox_nodes)} 个节点)")
-                    
-                    # 收集节点用于最终配置合并
-                    all_singbox_nodes.extend(singbox_nodes)
+            print(f"  → 转换为Sing-box格式...")
+            singbox_config = convert_to_singbox(content, script_dir)
+            if singbox_config:
+                # 获取节点列表（可能是完整配置或直接是节点数组）
+                singbox_nodes = singbox_config if isinstance(singbox_config, list) else singbox_config.get('outbounds', [])
+                
+                # 保存原始sing-box订阅（不含模板）
+                singbox_filename = f"{sub['name']}-singbox.json"
+                files[singbox_filename] = json.dumps(singbox_config, indent=2, ensure_ascii=False)
+                print(f"  ✓ 转换成功 ({len(files[singbox_filename])} 字节, {len(singbox_nodes)} 个节点)")
+                
+                # 收集节点用于最终配置合并
+                all_singbox_nodes.extend(singbox_nodes)
         except Exception as e:
             print(f"  ✗ 失败: {e}")
             failed.append({"name": sub["name"], "error": str(e)})
@@ -451,10 +445,8 @@ def main():
     print(f"  → 所有订阅: {all_subscription_names}")
     
     # 生成最终的sing-box配置
-    if enable_convert and all_singbox_nodes:
+    if all_singbox_nodes:
         print(f"\n→ 合并 {len(selected_subs)} 个订阅的节点到配置模板...")
-        print(f"  → 当前条件: len(selected)={len(selected_subs)} != len(all)={len(all_subscription_names)} => {len(selected_subs) != len(all_subscription_names)}")
-        print(f"  → 当前条件: selected != all => {selected_subs != all_subscription_names}")
         
         # 如果不是全部订阅，需要重新筛选节点
         if len(selected_subs) != len(all_subscription_names) or selected_subs != all_subscription_names:
