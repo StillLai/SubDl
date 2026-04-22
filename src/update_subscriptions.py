@@ -303,7 +303,7 @@ def merge_singbox_config(subs_nodes_dict, script_dir):
         合并后的完整配置JSON，或None表示失败
     """
     try:
-        template_path = os.path.join(script_dir, '..', 'sing-box_template.jsonc')
+        template_path = os.path.join(script_dir, '..', 'template', 'sing-box_template.jsonc')
         if not os.path.exists(template_path):
             print(f"  ✗ 配置模板不存在: {template_path}")
             return None
