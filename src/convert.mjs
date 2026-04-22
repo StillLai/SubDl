@@ -130,17 +130,37 @@ async function loadProxyUtils() {
     const { createRequire } = await import('module');
     global.require = createRequire(PROXY_UTILS_FILE);
     
-    // 创建jsdom环境
+    // 创建jsdom环境，使用 pretendToBeVisual 避免 navigator 只读问题
     const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
-        url: 'https://localhost'
+        url: 'https://localhost',
+        pretendToBeVisual: true
     });
     
+    // 先删除可能存在的只读属性，再重新设置
+    const setupGlobal = (name, value) => {
+        try {
+            global[name] = value;
+        } catch (e) {
+            try {
+                delete global[name];
+            } catch (err) {
+                // 忽略删除错误
+            }
+            Object.defineProperty(global, name, {
+                value: value,
+                configurable: true,
+                writable: true,
+                enumerable: true
+            });
+        }
+    };
+    
     // 暴露浏览器API
-    global.window = dom.window;
-    global.document = dom.window.document;
-    global.self = dom.window;
-    global.navigator = dom.window.navigator;
-    global.location = dom.window.location;
+    setupGlobal('window', dom.window);
+    setupGlobal('document', dom.window.document);
+    setupGlobal('self', dom.window);
+    setupGlobal('navigator', dom.window.navigator);
+    setupGlobal('location', dom.window.location);
     
     // 直接用file://协议导入
     const modulePath = 'file://' + PROXY_UTILS_FILE;
