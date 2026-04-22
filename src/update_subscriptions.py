@@ -133,14 +133,29 @@ def upload_to_gist(github_token, gist_id, files):
     headers = {"Authorization": f"token {github_token}", "Accept": "application/vnd.github.v3+json"}
     gist_files = {filename: {"content": content} for filename, content in files.items()}
     
-    if not gist_id:
-        response = requests.post("https://api.github.com/gists", headers=headers, json={
-            "description": "SubDl Subscriptions", "public": False, "files": gist_files
-        }, timeout=30)
-        return response.json()["id"]
-    
-    requests.patch(f"https://api.github.com/gists/{gist_id}", headers=headers, json={"files": gist_files}, timeout=30)
-    return gist_id
+    try:
+        if not gist_id:
+            print(f"    创建新的 Gist...")
+            response = requests.post("https://api.github.com/gists", headers=headers, json={
+                "description": "SubDl Subscriptions", "public": False, "files": gist_files
+            }, timeout=30)
+            response.raise_for_status()
+            new_id = response.json()["id"]
+            print(f"    ✓ 创建成功，Gist ID: {new_id}")
+            return new_id
+        
+        print(f"    更新 Gist: {gist_id}")
+        response = requests.patch(f"https://api.github.com/gists/{gist_id}", headers=headers, json={"files": gist_files}, timeout=30)
+        response.raise_for_status()
+        print(f"    ✓ 更新成功")
+        return gist_id
+    except requests.exceptions.HTTPError as e:
+        print(f"    ✗ Gist API 错误: {e}")
+        print(f"      响应: {e.response.text if hasattr(e, 'response') else 'N/A'}")
+        raise
+    except Exception as e:
+        print(f"    ✗ Gist 上传异常: {e}")
+        raise
 
 
 def parse_cron_interval():
@@ -270,9 +285,9 @@ def merge_all_templates(subs_nodes_dict, script_dir):
         # 将文件名中的 "template" 替换为 "config"，扩展名改为 .json
         # 先分离扩展名，避免处理异常
         if template_file.endswith('.jsonc'):
-            base_name = template_file[:-5]
+            base_name = template_file[:-6]  # .jsonc 是 6 个字符
         elif template_file.endswith('.json'):
-            base_name = template_file[:-5]
+            base_name = template_file[:-5]  # .json 是 5 个字符
         else:
             base_name = template_file
         # 替换 template -> config
