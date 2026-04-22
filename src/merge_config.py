@@ -172,9 +172,14 @@ def merge_config(template_config, subscriptions_nodes):
     # 统计
     total_subscription_count = 0
     
-    # 处理所有 outbounds
+    # 处理所有 outbounds（只处理有 outbounds 字段的 selector 和 urltest 类型）
     for outbound in config['outbounds']:
         if not isinstance(outbound, dict):
+            continue
+        
+        # 只有 selector 和 urltest 类型需要处理 outbounds 列表
+        outbound_type = outbound.get('type', '')
+        if outbound_type not in ('selector', 'urltest'):
             continue
         
         outbounds_list = outbound.get('outbounds', [])
