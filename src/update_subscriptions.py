@@ -476,9 +476,6 @@ def main():
                 files["sing-box-config.json"] = json.dumps(merged_config, indent=2, ensure_ascii=False)
                 print(f"  ✓ 合并成功 ({len(files['sing-box-config.json'])} 字节, {len(final_nodes)} 个节点)")
     
-    # 添加时间戳
-    files[".last_update"] = f"Last updated: {datetime.now(timezone(timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S CST')}\n"
-    
     # 生成并保存 README
     readme_content = generate_readme(subscription_info)
     with open("README.md", "w", encoding="utf-8") as f:
