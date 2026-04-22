@@ -102,23 +102,19 @@ def expand_subscription_item(item, subscriptions_nodes, include_regex):
                 log(f"    错误: include 正则无效: {e}")
                 result_tags.extend([node['tag'] for node in nodes])
         else:
-            # 没有 include 正则，返回所有节点标签
-            for node in nodes:
-                tag = node if isinstance(node, str) else node.get('tag', '')
-                if tag:
-                    result_tags.append(tag)
+            result_tags.extend([node['tag'] for node in nodes])
     
     return result_tags
 
 
-def process_outbounds(outbounds, subscriptions_nodes, include_regex=None):
+def process_outbounds(outbounds, subscriptions_nodes, default_include_regex=None):
     """
     处理 outbounds 数组，展开 Subscription 占位符
     
     Args:
         outbounds: outbounds 数组
         subscriptions_nodes: dict，键为订阅名，值为节点列表
-        include_regex: 当前 outbound 的 include 正则（如果有）
+        default_include_regex: 当前 outbound 的默认 include 正则（用于没有自己 include 的 Subscription）
     
     Returns:
         处理后的 outbounds 数组
@@ -129,8 +125,13 @@ def process_outbounds(outbounds, subscriptions_nodes, include_regex=None):
     result = []
     for item in outbounds:
         if isinstance(item, dict) and item.get('type') == 'Subscription':
+            # 每个 Subscription 使用自己的 include_regex（如果有）
+            # 如果 Subscription 没有自己的 include，使用父级 outbound 的 default_include_regex
+            sub_include_regex = item.get('include')
+            effective_include_regex = sub_include_regex if sub_include_regex else default_include_regex
+            
             # 展开 Subscription，插入节点标签
-            expanded = expand_subscription_item(item, subscriptions_nodes, include_regex)
+            expanded = expand_subscription_item(item, subscriptions_nodes, effective_include_regex)
             result.extend(expanded)
         else:
             # 保留其他项（字符串、对象等）

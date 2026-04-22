@@ -242,7 +242,6 @@ def generate_readme(subscription_info):
         "   - `GIST_ID`: Gist ID（可选，首次运行后会自动创建并输出）",
         "   - `SUB_URL`: 订阅链接 (`名称|URL` 格式)",
         "   - `SUB_URL_1`, `SUB_URL_2`...: 更多订阅（可选）",
-        "   - `SINGBOX_CONFIG_SUBS`: 用于生成sing-box配置的订阅，设为 `all` 使用全部订阅，或用逗号分隔订阅名称，如 `sub1,sub2`",
         "3. 在 Actions → Update Subscriptions 中点击 Run workflow",
         "",
         "## 说明",
@@ -347,33 +346,6 @@ def merge_singbox_config(subs_nodes_dict, script_dir):
         return None
 
 
-def get_subs_for_singbox_config(subscription_names, singbox_subs_setting):
-    """
-    根据设置获取用于生成sing-box配置的订阅列表
-    
-    Args:
-        subscription_names: 所有订阅名称列表
-        singbox_subs_setting: 环境变量 SINGBOX_CONFIG_SUBS 的值
-    
-    Returns:
-        选中的订阅名称列表
-    """
-    if not singbox_subs_setting or singbox_subs_setting.lower() == 'all':
-        return subscription_names
-    
-    # 解析逗号分隔的订阅名称
-    selected = [s.strip() for s in singbox_subs_setting.split(',') if s.strip()]
-    
-    # 过滤出存在的订阅
-    valid_subs = [s for s in selected if s in subscription_names]
-    
-    if not valid_subs:
-        print(f"  ⚠️ 没有找到匹配的订阅，使用全部订阅")
-        return subscription_names
-    
-    return valid_subs
-
-
 def main():
     print("=" * 60)
     print("SubDl - Subscription Downloader")
@@ -383,7 +355,6 @@ def main():
     github_token = get_env_var("GH_TOKEN", required=True)
     gist_id = get_env_var("GIST_ID", default="")
     user_agent = get_env_var("USER_AGENT", default="clash-verge/v2.4.4")
-    singbox_subs_setting = get_env_var("SINGBOX_CONFIG_SUBS", default="all")
     
     # 获取脚本所在目录
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -394,15 +365,11 @@ def main():
         sys.exit(1)
     
     print(f"\n找到 {len(subscriptions)} 个订阅")
-    print(f"用于生成sing-box配置的订阅: {singbox_subs_setting}")
     print()
     
     files = {}
     subscription_info = []
     failed = []
-    
-    # 所有订阅名称
-    all_subscription_names = [sub['name'] for sub in subscriptions]
     
     for sub in subscriptions:
         print(f"下载: {sub['name']}")
@@ -434,35 +401,28 @@ def main():
         print("错误: 所有订阅下载失败")
         sys.exit(1)
     
-    # 根据设置筛选用于生成sing-box配置的订阅
-    selected_subs = get_subs_for_singbox_config(all_subscription_names, singbox_subs_setting)
-    print(f"  → 选定的订阅: {selected_subs}")
-    print(f"  → 所有订阅: {all_subscription_names}")
+    # 使用所有订阅的节点来生成sing-box配置（按模板中Subscription的tag引用）
+    print(f"\n→ 使用 {len(subscriptions)} 个订阅生成sing-box配置...")
     
-    # 生成最终的sing-box配置
-    if selected_subs:
-        print(f"\n→ 合并 {len(selected_subs)} 个订阅的节点到配置模板...")
-        
-        # 构建按订阅名分组的节点字典
-        subs_nodes_dict = {}
-        for sub in subscriptions:
-            if sub['name'] in selected_subs:
-                try:
-                    content, _ = download_subscription(sub["url"], user_agent)
-                    singbox_config = convert_to_singbox(content, script_dir)
-                    if singbox_config:
-                        nodes = singbox_config if isinstance(singbox_config, list) else singbox_config.get('outbounds', [])
-                        subs_nodes_dict[sub['name']] = nodes
-                        print(f"  → 订阅 '{sub['name']}': {len(nodes)} 个节点")
-                except Exception as e:
-                    print(f"  ✗ {sub['name']} 获取节点失败: {e}")
-        
-        if subs_nodes_dict:
-            merged_config = merge_singbox_config(subs_nodes_dict, script_dir)
-            if merged_config:
-                total_nodes = sum(len(nodes) for nodes in subs_nodes_dict.values())
-                files["sing-box-config.json"] = json.dumps(merged_config, indent=2, ensure_ascii=False)
-                print(f"  ✓ 合并成功 ({len(files['sing-box-config.json'])} 字节, {total_nodes} 个节点)")
+    # 构建按订阅名分组的节点字典
+    subs_nodes_dict = {}
+    for sub in subscriptions:
+        try:
+            content, _ = download_subscription(sub["url"], user_agent)
+            singbox_config = convert_to_singbox(content, script_dir)
+            if singbox_config:
+                nodes = singbox_config if isinstance(singbox_config, list) else singbox_config.get('outbounds', [])
+                subs_nodes_dict[sub['name']] = nodes
+                print(f"  → 订阅 '{sub['name']}': {len(nodes)} 个节点")
+        except Exception as e:
+            print(f"  ✗ {sub['name']} 获取节点失败: {e}")
+    
+    if subs_nodes_dict:
+        merged_config = merge_singbox_config(subs_nodes_dict, script_dir)
+        if merged_config:
+            total_nodes = sum(len(nodes) for nodes in subs_nodes_dict.values())
+            files["sing-box-config.json"] = json.dumps(merged_config, indent=2, ensure_ascii=False)
+            print(f"  ✓ 合并成功 ({len(files['sing-box-config.json'])} 字节, {total_nodes} 个节点)")
     
     # 生成并保存 README
     readme_content = generate_readme(subscription_info)
