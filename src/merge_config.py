@@ -228,8 +228,8 @@ def merge_config(template_config, subscriptions_nodes):
         
         outbounds_list = outbound.get('outbounds', [])
         if not isinstance(outbounds_list, list) or len(outbounds_list) == 0:
-            outbound['outbounds'] = ['COMPATIBLE']
-            log(f"  {outbound.get('tag')} -> 空 outbound，添加 COMPATIBLE")
+            outbound['outbounds'] = ['block']
+            log(f"  {outbound.get('tag')} -> 空 outbound，添加 block")
     
     return config
 
