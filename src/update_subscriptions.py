@@ -368,15 +368,6 @@ def main():
         f.write(readme_content)
     print("\n✓ README 已更新")
     
-    # 提交 noTun 模板到仓库
-    noTun_path = os.path.join(script_dir, '..', 'template', 'sing-box_template_noTun.jsonc')
-    if os.path.exists(noTun_path):
-        print(f"\n→ 提交 noTun 模板到仓库...")
-        subprocess.run(['git', 'add', 'template/sing-box_template_noTun.jsonc'], check=True)
-        subprocess.run(['git', 'commit', '-m', 'chore: 更新 noTun 模板'], check=True, capture_output=True)
-        subprocess.run(['git', 'push'], check=True)
-        print("  ✓ 已提交 noTun 模板")
-    
     print(f"\n上传 {len(files)} 个文件到 Gist...")
     new_gist_id = upload_to_gist(github_token, gist_id, files)
     
