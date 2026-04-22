@@ -324,7 +324,14 @@
       "interval": "3m",
       "tolerance": 100,
       "interrupt_exist_connections": true,
-      "outbounds": []
+      "outbounds": [
+        "🎯 全球直连",
+        {
+          "type": "Subscription",
+          "tag": "feiniaoyun"
+        }
+      ],
+      "include": "^(?=.*(港|HK|hk|Hong Kong|HongKong|hongkong)).*$"
     },
     {
       "type": "urltest",
