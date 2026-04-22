@@ -211,9 +211,14 @@ def merge_config(template_config, subscriptions_nodes):
     config['outbounds'].extend(all_nodes)
     log(f"已添加 {len(all_nodes)} 个代理节点到配置")
     
-    # 处理空 outbound 的兼容性问题（只添加 'COMPATIBLE' 字符串，不添加新 outbound）
+    # 处理空 outbound 的兼容性问题（只对 selector 和 urltest 类型）
     for outbound in config['outbounds']:
         if not isinstance(outbound, dict):
+            continue
+        
+        # 只有 selector 和 urltest 类型需要有 outbounds 列表
+        outbound_type = outbound.get('type', '')
+        if outbound_type not in ('selector', 'urltest'):
             continue
         
         outbounds_list = outbound.get('outbounds', [])
