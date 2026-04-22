@@ -30,7 +30,6 @@ def parse_flow_info(headers):
     if not flow_header:
         return None
     
-    # 解析 upload, download, total, expire
     upload = re.search(r'upload=(\d+)', flow_header)
     download = re.search(r'download=(\d+)', flow_header)
     total = re.search(r'total=(\d+)', flow_header)
@@ -76,36 +75,22 @@ def get_status(flow_info):
     used = flow_info.get('upload', 0) + flow_info.get('download', 0)
     expire = flow_info.get('expire')
     
-    # 检查是否过期
     if expire and expire < time.time():
         return "❌ 已过期"
-    
-    # 检查流量是否用完
     if total > 0 and used >= total:
         return "❌ 流量用完"
-    
-    # 检查是否即将到期（7天内）
     if expire and expire - time.time() < 7 * 24 * 3600:
         return "⚠️ 即将到期"
-    
     return "✅ 正常"
 
 
 def download_subscription(url, user_agent, timeout=30000):
     """下载订阅内容"""
     headers = {"User-Agent": user_agent}
-    
-    response = requests.get(
-        url,
-        headers=headers,
-        timeout=timeout / 1000,
-        allow_redirects=True
-    )
+    response = requests.get(url, headers=headers, timeout=timeout / 1000, allow_redirects=True)
     response.raise_for_status()
-    
     content = response.text
     
-    # 尝试 base64 解码
     try:
         cleaned = content.strip().replace(" ", "").replace("\n", "").replace("\r", "")
         if re.match(r'^[A-Za-z0-9+/=]+$', cleaned):
@@ -114,35 +99,24 @@ def download_subscription(url, user_agent, timeout=30000):
     except Exception:
         pass
     
-    # 获取流量信息
-    flow_info = parse_flow_info(response.headers)
-    
-    return content, flow_info
+    return content, parse_flow_info(response.headers)
 
 
 def parse_subscriptions():
     """解析订阅配置"""
     subscriptions = []
-    
     for env_name in ["SUB_URL"] + [f"SUB_URL_{i}" for i in range(1, 10)]:
         value = os.environ.get(env_name, "").strip()
         if not value:
             continue
-            
         if "|" in value:
             name, url = value.split("|", 1)
             name, url = name.strip(), url.strip()
         else:
             url = value
             name = extract_name_from_url(url)
-        
         if name and url:
-            subscriptions.append({
-                "name": name,
-                "url": url,
-                "filename": f"{name}.yaml"
-            })
-    
+            subscriptions.append({"name": name, "url": url, "filename": f"{name}.yaml"})
     return subscriptions
 
 
@@ -156,43 +130,25 @@ def extract_name_from_url(url):
 
 
 def upload_to_gist(github_token, gist_id, files):
-    headers = {
-        "Authorization": f"token {github_token}",
-        "Accept": "application/vnd.github.v3+json",
-    }
-    
+    headers = {"Authorization": f"token {github_token}", "Accept": "application/vnd.github.v3+json"}
     gist_files = {filename: {"content": content} for filename, content in files.items()}
     
     if not gist_id:
-        response = requests.post(
-            "https://api.github.com/gists",
-            headers=headers,
-            json={
-                "description": "SubDl Subscriptions",
-                "public": False,
-                "files": gist_files
-            },
-            timeout=30
-        )
+        response = requests.post("https://api.github.com/gists", headers=headers, json={
+            "description": "SubDl Subscriptions", "public": False, "files": gist_files
+        }, timeout=30)
         return response.json()["id"]
     
-    requests.patch(
-        f"https://api.github.com/gists/{gist_id}",
-        headers=headers,
-        json={"files": gist_files},
-        timeout=30
-    )
+    requests.patch(f"https://api.github.com/gists/{gist_id}", headers=headers, json={"files": gist_files}, timeout=30)
     return gist_id
 
 
 def parse_cron_interval():
     """从 workflow 文件解析 cron 间隔"""
-    import os
     workflow_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.github', 'workflows', 'update-subscriptions.yml')
     try:
         with open(workflow_path, 'r', encoding='utf-8') as f:
             content = f.read()
-            # 匹配 cron: '55 * * * *'
             match = re.search(r"cron:\s*['\"](\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)['\"]", content)
             if match:
                 minute, hour, day, month, weekday = match.groups()
@@ -201,8 +157,7 @@ def parse_cron_interval():
                 elif minute == '*' and hour == '*':
                     return "每分钟"
                 elif hour.startswith('*/'):
-                    interval = hour[2:]
-                    return f"每 {interval} 小时"
+                    return f"每 {hour[2:]} 小时"
     except:
         pass
     return "每小时"
@@ -212,12 +167,9 @@ def generate_readme(subscription_info):
     """生成 README 内容"""
     interval = parse_cron_interval()
     lines = [
-        "# SubDl",
-        "",
-        f"> 最后更新: {datetime.now(timezone(timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S CST')}",
-        "",
-        "## 订阅状态",
-        "",
+        "# SubDl", "",
+        f"> 最后更新: {datetime.now(timezone(timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S CST')}", "",
+        "## 订阅状态", "",
         "| 订阅 | 总流量 | 已用 | 剩余 | 到期时间 | 状态 |",
         "|------|--------|------|------|----------|------|",
     ]
@@ -226,123 +178,115 @@ def generate_readme(subscription_info):
         flow = info.get('flow', {})
         total = flow.get('total', 0)
         used = flow.get('upload', 0) + flow.get('download', 0)
-        remaining = total - used if total > 0 else 0
-        expire = format_expire(flow.get('expire'))
-        status = get_status(flow)
-        
-        lines.append(f"| {info['name']} | {format_bytes(total)} | {format_bytes(used)} | {format_bytes(remaining)} | {expire} | {status} |")
+        lines.append(f"| {info['name']} | {format_bytes(total)} | {format_bytes(used)} | {format_bytes(total - used if total > 0 else 0)} | {format_expire(flow.get('expire'))} | {get_status(flow)} |")
     
     lines.extend([
-        "",
-        "## 快速配置",
-        "",
+        "", "## 快速配置", "",
         "1. Fork 本仓库",
         "2. 在 Settings → Secrets → Actions 中添加:",
         "   - `GH_TOKEN`: GitHub Token (需要 gist 权限)",
         "   - `GIST_ID`: Gist ID（可选，首次运行后会自动创建并输出）",
         "   - `SUB_URL`: 订阅链接 (`名称|URL` 格式)",
         "   - `SUB_URL_1`, `SUB_URL_2`...: 更多订阅（可选）",
-        "3. 在 Actions → Update Subscriptions 中点击 Run workflow",
-        "",
-        "## 说明",
-        "",
+        "3. 在 Actions → Update Subscriptions 中点击 Run workflow", "",
+        "## 说明", "",
         f"- {interval}自动更新订阅",
         "- 订阅内容上传到 Gist，不保存在仓库",
         "- `sing-box-config.json` 是可直接使用的完整sing-box配置文件",
-        "- 参考 [sub-store](https://github.com/sub-store-org/Sub-Store) 实现",
-        "",
+        "- 参考 [sub-store](https://github.com/sub-store-org/Sub-Store) 实现", "",
     ])
-    
     return "\n".join(lines)
 
 
 def convert_to_singbox(clash_content, script_dir):
     """将Clash配置转换为Sing-box格式"""
     try:
-        # 创建临时文件存储clash内容
         with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False, encoding='utf-8') as f:
             f.write(clash_content)
             temp_file = f.name
-        
         try:
-            # 调用Node.js转换脚本（使用.mjs ES模块格式）
             convert_script = os.path.join(script_dir, 'convert.mjs')
-            result = subprocess.run(
-                ['node', convert_script, 'convert', temp_file],
-                capture_output=True,
-                text=True,
-                encoding='utf-8'
-            )
-            
+            result = subprocess.run(['node', convert_script, 'convert', temp_file], capture_output=True, text=True, encoding='utf-8')
             if result.returncode != 0:
                 print(f"  ✗ 转换失败: {result.stderr}")
                 return None
-            
-            # 解析输出为JSON
-            singbox_config = json.loads(result.stdout)
-            return singbox_config
-            
+            return json.loads(result.stdout)
         finally:
-            # 清理临时文件
             os.unlink(temp_file)
-            
     except Exception as e:
         print(f"  ✗ 转换异常: {e}")
         return None
 
 
 def merge_singbox_config(subs_nodes_dict, script_dir):
-    """
-    将多个sing-box订阅节点合并到配置模板
-    
-    Args:
-        subs_nodes_dict: dict，键为订阅名，值为节点列表
-        script_dir: 脚本所在目录
-    
-    Returns:
-        合并后的完整配置JSON，或None表示失败
-    """
+    """将多个sing-box订阅节点合并到配置模板"""
     try:
         template_path = os.path.join(script_dir, '..', 'template', 'sing-box_template.jsonc')
         if not os.path.exists(template_path):
             print(f"  ✗ 配置模板不存在: {template_path}")
             return None
         
-        # 创建临时文件存储订阅节点（按订阅名分组）
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
             json.dump(subs_nodes_dict, f)
             sub_temp_file = f.name
         
         try:
-            # 调用Python合并脚本
             merge_script = os.path.join(script_dir, 'merge_config.py')
-            result = subprocess.run(
-                ['python', merge_script, template_path, sub_temp_file],
-                capture_output=True,
-                text=True,
-                encoding='utf-8'
-            )
-            
+            result = subprocess.run(['python', merge_script, template_path, sub_temp_file], capture_output=True, text=True, encoding='utf-8')
             if result.returncode != 0:
                 print(f"  ✗ 合并失败: {result.stderr}")
                 return None
-            
-            # 检查stdout是否为空或只有空白
             stdout = result.stdout.strip()
             if not stdout:
                 print(f"  ✗ 合并脚本没有输出")
                 return None
-            
-            # 解析输出为JSON
-            merged_config = json.loads(result.stdout)
-            return merged_config
-            
+            return json.loads(stdout)
         finally:
-            # 清理临时文件
             os.unlink(sub_temp_file)
-            
     except Exception as e:
         print(f"  ✗ 合并异常: {e}")
+        return None
+
+
+def load_jsonc(filepath):
+    """加载 JSONC 文件（支持注释）"""
+    with open(filepath, 'r', encoding='utf-8') as f:
+        content = f.read()
+    lines = []
+    for line in content.split('\n'):
+        stripped = line.lstrip()
+        if stripped.startswith('//'):
+            indent = line[:len(line) - len(line.lstrip())]
+            lines.append(indent)
+        else:
+            lines.append(line)
+    return json.loads('\n'.join(lines))
+
+
+def generate_notun_template(script_dir):
+    """生成不含 tun inbound 的模板文件"""
+    try:
+        template_path = os.path.join(script_dir, '..', 'template', 'sing-box_template.jsonc')
+        output_path = os.path.join(script_dir, '..', 'template', 'sing-box_template_noTun.jsonc')
+        
+        template = load_jsonc(template_path)
+        
+        if 'inbounds' in template and isinstance(template['inbounds'], list):
+            original_count = len(template['inbounds'])
+            template['inbounds'] = [
+                inbound for inbound in template['inbounds']
+                if not (isinstance(inbound, dict) and inbound.get('type') == 'tun')
+            ]
+            removed_count = original_count - len(template['inbounds'])
+            print(f"  ✓ 已移除 {removed_count} 个 tun inbound")
+        
+        output_content = json.dumps(template, indent=2, ensure_ascii=False)
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write(output_content)
+        print(f"  ✓ 已生成 noTun 模板: template/sing-box_template_noTun.jsonc")
+        return output_content
+    except Exception as e:
+        print(f"  ✗ 生成 noTun 模板异常: {e}")
         return None
 
 
@@ -355,17 +299,17 @@ def main():
     github_token = get_env_var("GH_TOKEN", required=True)
     gist_id = get_env_var("GIST_ID", default="")
     user_agent = get_env_var("USER_AGENT", default="clash-verge/v2.4.4")
-    
-    # 获取脚本所在目录
     script_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    print("\n→ 生成不含 tun inbound 的模板...")
+    notun_template = generate_notun_template(script_dir)
     
     subscriptions = parse_subscriptions()
     if not subscriptions:
         print("错误: 未找到订阅配置")
         sys.exit(1)
     
-    print(f"\n找到 {len(subscriptions)} 个订阅")
-    print()
+    print(f"\n找到 {len(subscriptions)} 个订阅\n")
     
     files = {}
     subscription_info = []
@@ -376,20 +320,13 @@ def main():
         try:
             content, flow_info = download_subscription(sub["url"], user_agent)
             files[sub["filename"]] = content
-            subscription_info.append({
-                "name": sub["name"],
-                "flow": flow_info
-            })
+            subscription_info.append({"name": sub["name"], "flow": flow_info})
             print(f"  ✓ 成功 ({len(content)} 字节)")
             
-            # 转换为Sing-box格式
             print(f"  → 转换为Sing-box格式...")
             singbox_config = convert_to_singbox(content, script_dir)
             if singbox_config:
-                # 获取节点列表（可能是完整配置或直接是节点数组）
                 singbox_nodes = singbox_config if isinstance(singbox_config, list) else singbox_config.get('outbounds', [])
-                
-                # 保存原始sing-box订阅（不含模板）
                 singbox_filename = f"{sub['name']}-singbox.json"
                 files[singbox_filename] = json.dumps(singbox_config, indent=2, ensure_ascii=False)
                 print(f"  ✓ 转换成功 ({len(files[singbox_filename])} 字节, {len(singbox_nodes)} 个节点)")
@@ -401,10 +338,10 @@ def main():
         print("错误: 所有订阅下载失败")
         sys.exit(1)
     
-    # 使用所有订阅的节点来生成sing-box配置（按模板中Subscription的tag引用）
-    print(f"\n→ 使用 {len(subscriptions)} 个订阅生成sing-box配置...")
+    if notun_template:
+        files["template/sing-box_template_noTun.jsonc"] = notun_template
     
-    # 构建按订阅名分组的节点字典
+    print(f"\n→ 使用 {len(subscriptions)} 个订阅生成sing-box配置...")
     subs_nodes_dict = {}
     for sub in subscriptions:
         try:
@@ -424,13 +361,11 @@ def main():
             files["sing-box-config.json"] = json.dumps(merged_config, indent=2, ensure_ascii=False)
             print(f"  ✓ 合并成功 ({len(files['sing-box-config.json'])} 字节, {total_nodes} 个节点)")
     
-    # 生成并保存 README
     readme_content = generate_readme(subscription_info)
     with open("README.md", "w", encoding="utf-8") as f:
         f.write(readme_content)
     print("\n✓ README 已更新")
     
-    # 上传 Gist
     print(f"\n上传 {len(files)} 个文件到 Gist...")
     new_gist_id = upload_to_gist(github_token, gist_id, files)
     
@@ -439,7 +374,6 @@ def main():
         print("请在 Repository secrets 中设置 GIST_ID")
     
     print(f"\n完成! 成功处理 {len(files)} 个订阅")
-    
     if failed:
         print(f"\n警告: {len(failed)} 个订阅下载失败")
         sys.exit(2)
