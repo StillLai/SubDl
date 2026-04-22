@@ -125,9 +125,10 @@ def process_outbounds(outbounds, subscriptions_nodes, include_regex=None):
     result = []
     for item in outbounds:
         if isinstance(item, dict) and item.get('type') == 'Subscription':
-            # 展开 Subscription
+            # 展开 Subscription，插入节点标签
             expanded = expand_subscription_item(item, subscriptions_nodes, include_regex)
-            result.extend(expanded)
+            for tag in expanded:
+                result.append(tag)
         else:
             # 保留其他项（字符串或对象）
             result.append(item)
