@@ -218,10 +218,11 @@ def convert_to_singbox(clash_content, script_dir):
         return None
 
 
-def merge_singbox_config(subs_nodes_dict, script_dir):
+def merge_singbox_config(subs_nodes_dict, script_dir, template_path=None):
     """将多个sing-box订阅节点合并到配置模板"""
     try:
-        template_path = os.path.join(script_dir, '..', 'template', 'sing-box_template.jsonc')
+        if template_path is None:
+            template_path = os.path.join(script_dir, '..', 'template', 'sing-box_template.jsonc')
         if not os.path.exists(template_path):
             print(f"  ✗ 配置模板不存在: {template_path}")
             return None
@@ -246,6 +247,43 @@ def merge_singbox_config(subs_nodes_dict, script_dir):
     except Exception as e:
         print(f"  ✗ 合并异常: {e}")
         return None
+
+
+def merge_all_templates(subs_nodes_dict, script_dir):
+    """遍历所有模板文件并生成配置文件"""
+    template_dir = os.path.join(script_dir, '..', 'template')
+    if not os.path.exists(template_dir):
+        print(f"  ✗ 模板目录不存在: {template_dir}")
+        return {}
+    
+    merged_configs = {}
+    template_files = [f for f in os.listdir(template_dir) if f.endswith(('.jsonc', '.json'))]
+    
+    if not template_files:
+        print(f"  ✗ 模板目录中没有找到模板文件")
+        return {}
+    
+    print(f"  找到 {len(template_files)} 个模板文件")
+    
+    for template_file in template_files:
+        template_path = os.path.join(template_dir, template_file)
+        # 将文件名中的 "template" 替换为 "config"，扩展名改为 .json
+        config_filename = template_file.replace('_template_', '_config_').replace('template', 'config')
+        if config_filename.endswith('.jsonc'):
+            config_filename = config_filename[:-5] + '.json'
+        elif config_filename.endswith('.json'):
+            pass  # 已经是 json 格式，保持不变
+        else:
+            config_filename = config_filename + '.json'
+        
+        print(f"  → 处理模板: {template_file}")
+        merged_config = merge_singbox_config(subs_nodes_dict, script_dir, template_path)
+        if merged_config:
+            merged_configs[config_filename] = json.dumps(merged_config, indent=2, ensure_ascii=False)
+            total_nodes = sum(len(nodes) for nodes in subs_nodes_dict.values())
+            print(f"    ✓ 生成 {config_filename} ({len(merged_configs[config_filename])} 字节, {total_nodes} 个节点)")
+    
+    return merged_configs
 
 
 def load_jsonc(filepath):
@@ -355,11 +393,12 @@ def main():
             print(f"  ✗ {sub['name']} 获取节点失败: {e}")
     
     if subs_nodes_dict:
-        merged_config = merge_singbox_config(subs_nodes_dict, script_dir)
-        if merged_config:
-            total_nodes = sum(len(nodes) for nodes in subs_nodes_dict.values())
-            files["sing-box-config.json"] = json.dumps(merged_config, indent=2, ensure_ascii=False)
-            print(f"  ✓ 合并成功 ({len(files['sing-box-config.json'])} 字节, {total_nodes} 个节点)")
+        # 遍历所有模板文件生成配置文件
+        merged_configs = merge_all_templates(subs_nodes_dict, script_dir)
+        for filename, content in merged_configs.items():
+            files[filename] = content
+        if merged_configs:
+            print(f"  ✓ 共生成 {len(merged_configs)} 个配置文件")
     
         readme_content = generate_readme(subscription_info)
     with open("README.md", "w", encoding="utf-8") as f:
