@@ -1028,6 +1028,20 @@
       {
         "rule_set": ["geosite-tld-cn", "GeositeCN", "geoip-cn"],
         "outbound": "🎯 全球直连"
+      },
+      {
+        "action": "resolve",
+        "server": "Google-DNS",
+        "client_subnet": "183.39.0.1/24"
+      },
+      {
+        "rule_set": ["geoip-cn"],
+        "invert": true,
+        "outbound": "🚀 节点选择"
+      },
+      {
+        "rule_set": ["geoip-cn"],
+        "outbound": "🎯 全球直连"
       }
     ],
     "final": "🐟 漏网之鱼"
