@@ -208,12 +208,8 @@ async function main() {
             // 恢复console.log，只输出JSON到stdout
             console.log = originalLog;
             
-            // produce 函数返回的 singbox 格式已经是 JSON 字符串，不需要再次 stringify
-            if (typeof singboxConfig === 'string') {
-                console.log(singboxConfig);
-            } else {
-                console.log(JSON.stringify(singboxConfig, null, 2));
-            }
+            // produce 函数返回的 singbox 格式是 JSON 字符串
+            console.log(singboxConfig);
         } else {
             console.error('用法: node convert.mjs convert <input-file>');
             process.exit(1);

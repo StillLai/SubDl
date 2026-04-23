@@ -28,7 +28,7 @@ jobs:
         
     - run: pip install requests brotli
         
-    - run: npm install jsdom dotenv
+    - run: npm install jsdom
         
     - name: Update subscriptions
       env:

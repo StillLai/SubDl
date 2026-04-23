@@ -382,10 +382,7 @@ def main():
             singbox_config = convert_to_singbox(content, script_dir)
             if singbox_config:
                 # 提取 outbounds 和 endpoints（singbox 新格式）
-                if isinstance(singbox_config, dict):
-                    singbox_nodes = singbox_config.get('outbounds', []) + singbox_config.get('endpoints', [])
-                else:
-                    singbox_nodes = singbox_config if isinstance(singbox_config, list) else []
+                singbox_nodes = singbox_config.get('outbounds', []) + singbox_config.get('endpoints', [])
                 singbox_filename = f"{sub['name']}-singbox.json"
                 files[singbox_filename] = json.dumps(singbox_config, indent=2, ensure_ascii=False)
                 print(f"  ✓ 转换成功 ({len(files[singbox_filename])} 字节, {len(singbox_nodes)} 个节点)")
@@ -405,10 +402,7 @@ def main():
             singbox_config = convert_to_singbox(content, script_dir)
             if singbox_config:
                 # 提取 outbounds 和 endpoints（singbox 新格式）
-                if isinstance(singbox_config, dict):
-                    nodes = singbox_config.get('outbounds', []) + singbox_config.get('endpoints', [])
-                else:
-                    nodes = singbox_config if isinstance(singbox_config, list) else []
+                nodes = singbox_config.get('outbounds', []) + singbox_config.get('endpoints', [])
                 subs_nodes_dict[sub['name']] = nodes
                 print(f"  → 订阅 '{sub['name']}': {len(nodes)} 个节点")
         except Exception as e:
