@@ -273,11 +273,19 @@ def main():
     
     # 按订阅名分组节点
     # 订阅文件格式: {"feiniaoyun": [...nodes...], "shanhai": [...nodes...]}
+    # 新格式支持 singbox 的 {"outbounds": [...], "endpoints": [...]} 包装格式
     if isinstance(subscription, dict):
-        subscriptions_nodes = subscription
+        # 提取 outbounds 和 endpoints（singbox 新格式）
+        all_nodes = subscription.get('outbounds', []) + subscription.get('endpoints', [])
+        if all_nodes:
+            # 有 outbounds/endpoints 包装，使用 "default" 订阅
+            subscriptions_nodes = {"default": all_nodes}
+        else:
+            # 旧格式：直接是 {"feiniaoyun": [...nodes...]} 的形式
+            subscriptions_nodes = subscription
     else:
         # 如果是列表，默认放到 "default" 订阅
-        nodes = subscription if isinstance(subscription, list) else subscription.get('outbounds', [])
+        nodes = subscription if isinstance(subscription, list) else []
         subscriptions_nodes = {"default": nodes}
     
     for sub_name, nodes in subscriptions_nodes.items():

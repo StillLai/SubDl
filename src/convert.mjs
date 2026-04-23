@@ -176,7 +176,7 @@ async function loadProxyUtils() {
 async function convertClashToSingbox(clashContent) {
     const { parse, produce } = await loadProxyUtils();
     const proxies = parse(clashContent);
-    return produce(proxies, 'singbox', 'internal');
+    return produce(proxies, 'singbox');
 }
 
 /**
