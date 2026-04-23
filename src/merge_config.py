@@ -272,8 +272,8 @@ def main():
     log(f"已加载订阅: {sub_path}")
     
     # 按订阅名分组节点
-    # 订阅文件格式: {"feiniaoyun": [...nodes...], "shanhai": [...nodes...]}
-    # 新格式支持 singbox 的 {"outbounds": [...], "endpoints": [...]} 包装格式
+    # 订阅文件格式: {"outbounds": [...], "endpoints": [...]} (singbox 标准格式)
+    # 或 {"feiniaoyun": [...nodes...], "shanhai": [...nodes...]} (多订阅分组格式)
     if isinstance(subscription, dict):
         # 提取 outbounds 和 endpoints（singbox 新格式）
         all_nodes = subscription.get('outbounds', []) + subscription.get('endpoints', [])
@@ -284,9 +284,8 @@ def main():
             # 旧格式：直接是 {"feiniaoyun": [...nodes...]} 的形式
             subscriptions_nodes = subscription
     else:
-        # 如果是列表，默认放到 "default" 订阅
-        nodes = subscription if isinstance(subscription, list) else []
-        subscriptions_nodes = {"default": nodes}
+        # 异常情况：subscription 应该是 dict，如果不是则报错
+        raise ValueError(f"订阅文件格式错误：期望 dict，实际为 {type(subscription).__name__}")
     
     for sub_name, nodes in subscriptions_nodes.items():
         log(f"订阅 '{sub_name}': {len(nodes)} 个节点")
