@@ -471,25 +471,25 @@
       {
         "tag": "custom_whitelist",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/rule_srs/custom_whitelist.srs",
+        "url": "https://gh-proxy.org/https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/ruleset_srs/custom_whitelist.srs",
         "update_interval": "3h"
       },
       {
         "tag": "custom_block",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/rule_srs/custom_block.srs",
+        "url": "https://gh-proxy.org/https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/ruleset_srs/custom_block.srs",
         "update_interval": "3h"
       },
       {
         "tag": "custom_direct",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/rule_srs/custom_direct.srs",
+        "url": "https://gh-proxy.org/https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/ruleset_srs/custom_direct.srs",
         "update_interval": "3h"
       },
       {
         "tag": "custom_proxy",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/rule_srs/custom_proxy.srs",
+        "url": "https://gh-proxy.org/https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/ruleset_srs/custom_proxy.srs",
         "update_interval": "3h"
       },
       {
@@ -525,7 +525,7 @@
       {
         "tag": "WebRTC",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/rule_srs/WebRTC.srs",
+        "url": "https://gh-proxy.org/https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/ruleset_srs/WebRTC.srs",
         "update_interval": "6h"
       },
       {
@@ -561,7 +561,7 @@
       {
         "tag": "BOCOM",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/rule_srs/BOCOM.srs",
+        "url": "https://gh-proxy.org/https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/ruleset_srs/BOCOM.srs",
         "update_interval": "6h"
       },
       {
@@ -573,19 +573,19 @@
       {
         "tag": "WeChat",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/rule_srs/WeChat.srs",
+        "url": "https://gh-proxy.org/https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/ruleset_srs/WeChat.srs",
         "update_interval": "6h"
       },
       {
         "tag": "AliPay",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/rule_srs/AliPay.srs",
+        "url": "https://gh-proxy.org/https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/ruleset_srs/AliPay.srs",
         "update_interval": "6h"
       },
       {
         "tag": "BiliBili",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/rule_srs/BiliBili.srs",
+        "url": "https://gh-proxy.org/https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/ruleset_srs/BiliBili.srs",
         "update_interval": "6h"
       },
       {
@@ -597,7 +597,7 @@
       {
         "tag": "Weibo",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/rule_srs/Weibo.srs",
+        "url": "https://gh-proxy.org/https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/ruleset_srs/Weibo.srs",
         "update_interval": "6h"
       },
       {
@@ -723,7 +723,7 @@
       {
         "tag": "GoogleFCM",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/rule_srs/GoogleFCM.srs",
+        "url": "https://gh-proxy.org/https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/ruleset_srs/GoogleFCM.srs",
         "update_interval": "6h"
       },
       {
@@ -747,7 +747,7 @@
       {
         "tag": "Apple",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/rule_srs/Apple.srs",
+        "url": "https://gh-proxy.org/https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/ruleset_srs/Apple.srs",
         "update_interval": "6h"
       },
       {
@@ -759,13 +759,13 @@
       {
         "tag": "XiaoMi",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/rule_srs/XiaoMi.srs",
+        "url": "https://gh-proxy.org/https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/ruleset_srs/XiaoMi.srs",
         "update_interval": "6h"
       },
       {
         "tag": "GlobalMedia",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/rule_srs/GlobalMedia.srs",
+        "url": "https://gh-proxy.org/https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/ruleset_srs/GlobalMedia.srs",
         "update_interval": "6h"
       },
       {
@@ -803,7 +803,7 @@
       {
         "tag": "GeositeCN",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/rule_srs/GeositeCN.srs",
+        "url": "https://gh-proxy.org/https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/ruleset_srs/GeositeCN.srs",
         "update_interval": "6h"
       },
       {
