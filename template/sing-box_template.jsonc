@@ -283,11 +283,11 @@
       "tolerance": 150,
       "interrupt_exist_connections": true,
       "outbounds": [
+        "🎯 全球直连",
         {
           "type": "Subscription",
           "tag": "feiniaoyun"
-        },
-        "🎯 全球直连"
+        }
       ]
     },
     {
