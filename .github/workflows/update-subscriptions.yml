@@ -28,6 +28,7 @@ jobs:
         
     - run: pip install requests brotli
         
+    # 注意：dotenv 是 Sub-Store proxy-utils.esm.mjs 库的内部依赖，请勿移除
     - run: npm install jsdom dotenv
         
     - name: Update subscriptions
