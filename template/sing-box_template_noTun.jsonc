@@ -48,12 +48,6 @@
         "type": "h3",
         "server": "1.1.1.1",
         "detour": "🎈 自动选择"
-      },
-      {
-        "tag": "Fake-IP",
-        "type": "fakeip",
-        "inet4_range": "198.18.0.0/15",
-        "inet6_range": "fc00::/18"
       }
     ],
     "rules": [
@@ -72,7 +66,7 @@
             "inbound": "mixed-in-global"
           }
         ],
-        "server": "Fake-IP"
+        "server": "Google-DNS"
       },
       {
         "type": "logical",
@@ -208,18 +202,9 @@
           }
         ],
         "server": "Tencent-DNS"
-      },
-      {
-        "query_type": [
-          "A",
-          "AAAA"
-        ],
-        "server": "Fake-IP",
-        "rewrite_ttl": 10
       }
     ],
-    "final": "Google-DNS",
-    "client_subnet": "183.39.0.1/24"
+    "final": "Google-DNS"
   },
   "inbounds": [
     {
