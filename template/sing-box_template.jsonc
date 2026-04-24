@@ -238,7 +238,7 @@
       "tag": "✈️ Telegram",
       "url": "https://api.telegram.org/robots.txt",
       "interval": "1m",
-      "tolerance": 150,
+      "tolerance": 50,
       "interrupt_exist_connections": true,
       "outbounds": [
         "🎯 全球直连",
@@ -268,7 +268,7 @@
       "tag": "📹 YouTube",
       "url": "https://www.youtube.com/generate_204",
       "interval": "1m",
-      "tolerance": 150,
+      "tolerance": 100,
       "interrupt_exist_connections": true,
       "outbounds": [
         "🎯 全球直连",
@@ -311,7 +311,7 @@
     {
       "type": "urltest",
       "tag": "🎈 自动选择",
-      "url": "http://www.apple.com/library/test/success.html",
+      "url": "https://cp.cloudflare.com",
       "interval": "3m",
       "tolerance": 100,
       "interrupt_exist_connections": true,
@@ -325,7 +325,7 @@
     {
       "type": "urltest",
       "tag": "🗂️ 备用自动",
-      "url": "http://www.apple.com/library/test/success.html",
+      "url": "https://cp.cloudflare.com",
       "interval": "3m",
       "tolerance": 100,
       "interrupt_exist_connections": true,
@@ -339,7 +339,7 @@
     {
       "type": "urltest",
       "tag": "🇭🇰 香港节点",
-      "url": "http://www.apple.com/library/test/success.html",
+      "url": "https://cp.cloudflare.com",
       "interval": "3m",
       "tolerance": 100,
       "interrupt_exist_connections": true,
@@ -354,7 +354,7 @@
     {
       "type": "urltest",
       "tag": "🇹🇼 台湾节点",
-      "url": "http://www.apple.com/library/test/success.html",
+      "url": "https://cp.cloudflare.com",
       "interval": "3m",
       "tolerance": 100,
       "interrupt_exist_connections": true,
@@ -369,7 +369,7 @@
     {
       "type": "urltest",
       "tag": "🇸🇬 新加坡节点",
-      "url": "http://www.apple.com/library/test/success.html",
+      "url": "https://cp.cloudflare.com",
       "interval": "3m",
       "tolerance": 100,
       "interrupt_exist_connections": true,
@@ -384,7 +384,7 @@
     {
       "type": "urltest",
       "tag": "🇯🇵 日本节点",
-      "url": "http://www.apple.com/library/test/success.html",
+      "url": "https://cp.cloudflare.com",
       "interval": "3m",
       "tolerance": 100,
       "interrupt_exist_connections": true,
@@ -399,7 +399,7 @@
     {
       "type": "urltest",
       "tag": "🇺🇸 美国节点",
-      "url": "http://www.apple.com/library/test/success.html",
+      "url": "https://cp.cloudflare.com",
       "interval": "3m",
       "tolerance": 100,
       "interrupt_exist_connections": true,
@@ -414,7 +414,7 @@
     {
       "type": "urltest",
       "tag": "🇪🇺 欧洲节点",
-      "url": "http://www.apple.com/library/test/success.html",
+      "url": "https://cp.cloudflare.com",
       "interval": "3m",
       "tolerance": 100,
       "interrupt_exist_connections": true,
@@ -429,7 +429,7 @@
     {
       "type": "urltest",
       "tag": "🧭 其它地区",
-      "url": "http://www.apple.com/library/test/success.html",
+      "url": "https://cp.cloudflare.com",
       "interval": "3m",
       "tolerance": 100,
       "interrupt_exist_connections": true,
