@@ -1019,8 +1019,7 @@
       },
       {
         "action": "resolve",
-        "server": "Google-DNS",
-        "client_subnet": "183.39.0.1/24"
+        "server": "Google-DNS"
       },
       {
         "rule_set": ["geoip-cn"],
