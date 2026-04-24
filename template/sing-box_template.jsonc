@@ -115,6 +115,10 @@
           {"rule_set": ["geosite-geolocation-!cn", "geosite-google", "geoip-google", "geosite-google-play"], "invert": true}
         ],
         "server": "Tencent-DNS"
+      },
+      {
+        "rule_set": ["geosite-cloudflare"],
+        "server": "Cloudflare-DNS"
       }
     ],
     "final": "Google-DNS"
