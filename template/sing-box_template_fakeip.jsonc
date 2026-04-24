@@ -45,6 +45,12 @@
         "type": "h3",
         "server": "1.1.1.1",
         "detour": "🎈 自动选择"
+      },
+      {
+        "tag": "Fake-IP",
+        "type": "fakeip",
+        "inet4_range": "198.18.0.0/15",
+        "inet6_range": "fc00::/18"
       }
     ],
     "rules": [
@@ -59,7 +65,7 @@
           {"clash_mode": "Global"},
           {"inbound": "mixed-in-global"}
         ],
-        "server": "Google-DNS"
+        "server": "Fake-IP"
       },
       {
         "type": "logical",
@@ -115,9 +121,15 @@
           {"rule_set": ["geosite-geolocation-!cn", "geosite-google", "geoip-google", "geosite-google-play"], "invert": true}
         ],
         "server": "Tencent-DNS"
+      },
+      {
+        "query_type": ["A", "AAAA"],
+        "server": "Fake-IP",
+        "rewrite_ttl": 10
       }
     ],
-    "final": "Google-DNS"
+    "final": "Google-DNS",
+    "client_subnet": "183.39.0.1/24"
   },
   "inbounds": [
     {
