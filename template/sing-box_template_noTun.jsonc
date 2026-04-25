@@ -151,12 +151,18 @@
         "rules": [
           {
             "rule_set": [
-              "WeChat"
+              "WeChat",
+              "BiliBili",
+              "geosite-douyin",
+              "geosite-xiaohongshu"
             ]
           },
           {
             "package_name": [
-              "com.tencent.mm"
+              "com.tencent.mm",
+              "tv.danmaku.bili",
+              "com.ss.android.ugc.aweme",
+              "com.xingin.xhs"
             ]
           }
         ],
@@ -205,12 +211,19 @@
       },
       {
         "rule_set": [
+          "geosite-google",
+          "geosite-google-play"
+        ],
+        "server": "Google-DNS"
+      },
+      {
+        "rule_set": [
           "geosite-cloudflare"
         ],
         "server": "Cloudflare-DNS"
       }
     ],
-    "final": "Google-DNS"
+    "final": "Cloudflare-DNS"
   },
   "inbounds": [
     {
