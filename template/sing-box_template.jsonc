@@ -93,8 +93,8 @@
         "type": "logical",
         "mode": "or",
         "rules": [
-          {"rule_set": ["WeChat"]},
-          {"package_name": ["com.tencent.mm"]}
+          {"rule_set": ["WeChat", "BiliBili", "geosite-douyin", "geosite-xiaohongshu"]},
+          {"package_name": ["com.tencent.mm", "tv.danmaku.bili", "com.ss.android.ugc.aweme", "com.xingin.xhs"]}
         ],
         "server": "Tencent-DNS"
       },
@@ -117,11 +117,15 @@
         "server": "Tencent-DNS"
       },
       {
+        "rule_set": ["geosite-google", "geosite-google-play"],
+        "server": "Google-DNS"
+      },
+      {
         "rule_set": ["geosite-cloudflare"],
         "server": "Cloudflare-DNS"
       }
     ],
-    "final": "Google-DNS"
+    "final": "Cloudflare-DNS"
   },
   "inbounds": [
     {
