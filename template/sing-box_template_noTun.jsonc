@@ -151,29 +151,6 @@
         "rules": [
           {
             "rule_set": [
-              "WeChat",
-              "BiliBili",
-              "geosite-douyin",
-              "geosite-xiaohongshu"
-            ]
-          },
-          {
-            "package_name": [
-              "com.tencent.mm",
-              "tv.danmaku.bili",
-              "com.ss.android.ugc.aweme",
-              "com.xingin.xhs"
-            ]
-          }
-        ],
-        "server": "Tencent-DNS"
-      },
-      {
-        "type": "logical",
-        "mode": "or",
-        "rules": [
-          {
-            "rule_set": [
               "AliPay"
             ]
           },
