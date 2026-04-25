@@ -40,13 +40,15 @@
       {
         "tag": "Google-DNS",
         "type": "h3",
-        "server": "8.8.8.8",
+        "server": "dns.google",
+        "domain_resolver": "DNS-Resolver",
         "detour": "🇬 Google"
       },
       {
         "tag": "Cloudflare-DNS",
         "type": "h3",
-        "server": "1.1.1.1",
+        "server": "dns.cloudflare.com",
+        "domain_resolver": "DNS-Resolver",
         "detour": "☁️ Cloudflare"
       }
     ],
