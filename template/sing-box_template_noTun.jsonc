@@ -1605,7 +1605,7 @@
       },
       {
         "action": "resolve",
-        "server": "Google-DNS"
+        "server": "Cloudflare-DNS"
       },
       {
         "rule_set": [
