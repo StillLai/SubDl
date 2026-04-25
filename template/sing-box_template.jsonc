@@ -44,7 +44,7 @@
       {
         "tag": "Cloudflare-DNS",
         "type": "h3",
-        "server": "dns.cloudflare.com",
+        "server": "cloudflare-dns.com",
         "domain_resolver": "DNS-Resolver",
         "detour": "☁️ Cloudflare"
       }
