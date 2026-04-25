@@ -617,7 +617,7 @@
     },
     {
       "type": "selector",
-      "tag": "🌍 国外媒体",
+      "tag": "🌎 国外媒体",
       "outbounds": [
         "🚀 节点选择",
         "🎈 自动选择",
@@ -820,7 +820,7 @@
     },
     {
       "type": "urltest",
-      "tag": "🧭 其它地区",
+      "tag": "🌐 其它地区",
       "url": "https://cp.cloudflare.com",
       "interval": "3m",
       "tolerance": 100,
