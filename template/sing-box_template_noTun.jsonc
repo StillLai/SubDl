@@ -210,7 +210,8 @@
       {
         "rule_set": [
           "geosite-google",
-          "geosite-google-play"
+          "geosite-google-play",
+          "geosite-youtube"
         ],
         "server": "Google-DNS"
       },
