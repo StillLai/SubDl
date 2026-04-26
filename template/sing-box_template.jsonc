@@ -250,7 +250,6 @@
       "tolerance": 50,
       "interrupt_exist_connections": true,
       "outbounds": [
-        "🎯 全球直连",
         {
           "type": "Subscription",
           "tag": "feiniaoyun"
@@ -280,7 +279,6 @@
       "tolerance": 100,
       "interrupt_exist_connections": true,
       "outbounds": [
-        "🎯 全球直连",
         {
           "type": "Subscription",
           "tag": "feiniaoyun"
