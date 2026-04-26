@@ -118,7 +118,7 @@
         "server": "Tencent-DNS"
       },
       {
-        "rule_set": ["geosite-google", "geosite-google-play"],
+        "rule_set": ["geosite-google", "geosite-google-play", "geosite-youtube"],
         "server": "Google-DNS"
       },
       {
