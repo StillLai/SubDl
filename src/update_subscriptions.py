@@ -185,15 +185,20 @@ def generate_readme(subscription_info):
         "# SubDl", "",
         f"> 最后更新: {datetime.now(timezone(timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S CST')}", "",
         "## 订阅状态", "",
-        "| 订阅 | 总流量 | 已用 | 剩余 | 到期时间 | 状态 |",
-        "|------|--------|------|------|----------|------|",
+        "| 订阅 | 总流量 | 已用 | 剩余 | 到期时间 | 状态 | 节点数 |",
+        "|------|--------|------|------|----------|------|--------|",
     ]
     
+    total_nodes = 0
     for info in subscription_info:
         flow = info.get('flow', {})
         total = flow.get('total', 0)
         used = flow.get('upload', 0) + flow.get('download', 0)
-        lines.append(f"| {info['name']} | {format_bytes(total)} | {format_bytes(used)} | {format_bytes(total - used if total > 0 else 0)} | {format_expire(flow.get('expire'))} | {get_status(flow)} |")
+        node_count = info.get('node_count', 0)
+        total_nodes += node_count
+        lines.append(f"| {info['name']} | {format_bytes(total)} | {format_bytes(used)} | {format_bytes(total - used if total > 0 else 0)} | {format_expire(flow.get('expire'))} | {get_status(flow)} | {node_count} |")
+    
+    lines.append(f"| **合计** | | | | | | **{total_nodes}** |")
     
     lines.extend([
         "", "## 快速配置", "",
@@ -375,17 +380,21 @@ def main():
         try:
             content, flow_info = download_subscription(sub["url"], user_agent)
             files[sub["filename"]] = content
-            subscription_info.append({"name": sub["name"], "flow": flow_info})
-            print(f"  ✓ 成功 ({len(content)} 字节)")
             
-            print(f"  → 转换为Sing-box格式...")
+            # 转换为Sing-box格式并获取节点数量
+            node_count = 0
             singbox_config = convert_to_singbox(content, script_dir)
             if singbox_config:
                 # 提取 outbounds 和 endpoints（singbox 新格式）
                 singbox_nodes = singbox_config.get('outbounds', []) + singbox_config.get('endpoints', [])
+                node_count = len(singbox_nodes)
                 singbox_filename = f"{sub['name']}-singbox.json"
                 files[singbox_filename] = json.dumps(singbox_config, indent=2, ensure_ascii=False)
-                print(f"  ✓ 转换成功 ({len(files[singbox_filename])} 字节, {len(singbox_nodes)} 个节点)")
+                print(f"  ✓ 转换成功 ({len(files[singbox_filename])} 字节, {node_count} 个节点)")
+            else:
+                print(f"  ✓ 成功 ({len(content)} 字节)")
+            
+            subscription_info.append({"name": sub["name"], "flow": flow_info, "node_count": node_count})
         except Exception as e:
             print(f"  ✗ 失败: {e}")
             failed.append({"name": sub["name"], "error": str(e)})
