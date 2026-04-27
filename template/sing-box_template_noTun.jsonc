@@ -1602,7 +1602,7 @@
       },
       {
         "action": "resolve",
-        "server": "Cloudflare-DNS"
+        "server": "Tencent-DNS"
       },
       {
         "rule_set": [
