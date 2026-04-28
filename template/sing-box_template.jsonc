@@ -73,15 +73,15 @@
         ],
         "action": "reject"
       },
-      {
-        "type": "logical",
-        "mode": "or",
-        "rules": [
-          {"rule_set": ["fakeip-filter", "geosite-connectivity-check", "geosite-private", "geosite-tracker"]},
-          {"domain_suffix": ["mijia.tech", "getui.com", "d.meituan.net", "dreport.meituan.net"]}
-        ],
-        "server": "Tencent-DNS"
-      },
+      // {
+      //   "type": "logical",
+      //   "mode": "or",
+      //   "rules": [
+      //     {"rule_set": ["fakeip-filter", "geosite-connectivity-check", "geosite-private", "geosite-tracker"]},
+      //     {"domain_suffix": ["mijia.tech", "getui.com", "d.meituan.net", "dreport.meituan.net"]}
+      //   ],
+      //   "server": "Tencent-DNS"
+      // },
       {
         "type": "logical",
         "mode": "or",
