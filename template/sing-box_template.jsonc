@@ -122,7 +122,8 @@
         "mode": "and",
         "rules": [
           {"rule_set": ["GeositeCN", "geosite-geolocation-cn", "custom_direct", "XiaoMi"]},
-          {"rule_set": ["geosite-geolocation-!cn"], "invert": true}
+          {"rule_set": ["geosite-geolocation-!cn"], "invert": true},
+          {"domain_keyword": "browserleaks", "invert": true}
         ],
         "server": "Tencent-DNS"
       },
