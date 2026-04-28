@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/jiang-zhexin/typebox/releases/latest/download/schema.json",
+  "$schema": "https://gh-proxy.org/https://github.com/jiang-zhexin/typebox/releases/latest/download/schema.json",
   "log": {"level": "warn", "timestamp": true},
   "experimental": {
     "clash_api": {
