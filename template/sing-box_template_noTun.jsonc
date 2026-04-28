@@ -1615,7 +1615,8 @@
       },
       {
         "action": "resolve",
-        "server": "Tencent-DNS"
+        "server": "Google-DNS",
+        "client_subnet": "113.84.43.67/24"
       },
       {
         "rule_set": [
