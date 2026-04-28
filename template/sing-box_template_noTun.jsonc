@@ -193,6 +193,10 @@
               "geosite-geolocation-!cn"
             ],
             "invert": true
+          },
+          {
+            "domain_keyword": "browserleaks",
+            "invert": true
           }
         ],
         "server": "Tencent-DNS"
