@@ -134,21 +134,16 @@
           {"rule_set": "geosite-geolocation-!cn", "invert": true},
           {"rule_set": "geoip-cn"}
         ],
-        "server": "Tencent-DNS"
-        // "server": "Google-DNS",
-        // "client_subnet": "113.84.0.1/24"
+        "server": "Google-DNS",
+        "client_subnet": "113.84.0.1/24"
       }
-      // {
-      //   "rule_set": ["geoip-cn"],
-      //   "invert": true,
-      //   "server": "Cloudflare-DNS"
-      // },
-      // {
-      //   "rule_set": ["geoip-cn"],
-      //   "server": "Tencent-DNS"
-      // }
+      {
+        "rule_set": ["geoip-cn"],
+        "invert": true,
+        "server": "Cloudflare-DNS"
+      }
     ],
-    "final": "Cloudflare-DNS"
+    "final": "Tencent-DNS"
   },
   "inbounds": [
     {
