@@ -242,7 +242,8 @@
         "server": "Cloudflare-DNS"
       }
     ],
-    "final": "Cloudflare-DNS"
+    "final": "Google-DNS",
+    "client_subnet": "113.84.0.1/24"
   },
   "inbounds": [
     {
