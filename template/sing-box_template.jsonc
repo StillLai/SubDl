@@ -121,20 +121,19 @@
         "type": "logical",
         "mode": "and",
         "rules": [
-          {"rule_set": ["GeositeCN", "geosite-geolocation-cn", "custom_direct", "XiaoMi"]},
-          {"rule_set": ["geosite-geolocation-!cn", "custom_proxy"], "invert": true},
+          {"rule_set": ["geosite-geolocation-!cn", "custom_proxy"]},
           {"domain_keyword": "browserleaks", "invert": true}
         ],
-        "server": "Tencent-DNS"
+        "server": "Cloudflare-DNS"
       },
       {
         "type": "logical",
         "mode": "and",
         "rules": [
-          {"rule_set": ["geosite-geolocation-!cn", "custom_proxy"]},
+          {"rule_set": ["GeositeCN", "geosite-geolocation-cn", "custom_direct", "XiaoMi"]},
           {"domain_keyword": "browserleaks", "invert": true}
         ],
-        "server": "Cloudflare-DNS"
+        "server": "Tencent-DNS"
       },
       {
         "type": "logical",
