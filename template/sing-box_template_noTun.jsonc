@@ -182,32 +182,6 @@
         "rules": [
           {
             "rule_set": [
-              "GeositeCN",
-              "geosite-geolocation-cn",
-              "custom_direct",
-              "XiaoMi"
-            ]
-          },
-          {
-            "rule_set": [
-              "geosite-geolocation-!cn",
-              "custom_proxy"
-            ],
-            "invert": true
-          },
-          {
-            "domain_keyword": "browserleaks",
-            "invert": true
-          }
-        ],
-        "server": "Tencent-DNS"
-      },
-      {
-        "type": "logical",
-        "mode": "and",
-        "rules": [
-          {
-            "rule_set": [
               "geosite-geolocation-!cn",
               "custom_proxy"
             ]
@@ -218,6 +192,25 @@
           }
         ],
         "server": "Cloudflare-DNS"
+      },
+      {
+        "type": "logical",
+        "mode": "and",
+        "rules": [
+          {
+            "rule_set": [
+              "GeositeCN",
+              "geosite-geolocation-cn",
+              "custom_direct",
+              "XiaoMi"
+            ]
+          },
+          {
+            "domain_keyword": "browserleaks",
+            "invert": true
+          }
+        ],
+        "server": "Tencent-DNS"
       },
       {
         "type": "logical",
