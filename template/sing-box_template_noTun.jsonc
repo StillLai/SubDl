@@ -190,7 +190,8 @@
           },
           {
             "rule_set": [
-              "geosite-geolocation-!cn"
+              "geosite-geolocation-!cn",
+              "custom_proxy"
             ],
             "invert": true
           },
@@ -200,6 +201,23 @@
           }
         ],
         "server": "Tencent-DNS"
+      },
+      {
+        "type": "logical",
+        "mode": "and",
+        "rules": [
+          {
+            "rule_set": [
+              "geosite-geolocation-!cn",
+              "custom_proxy"
+            ]
+          },
+          {
+            "domain_keyword": "browserleaks",
+            "invert": true
+          }
+        ],
+        "server": "Cloudflare-DNS"
       },
       {
         "type": "logical",
