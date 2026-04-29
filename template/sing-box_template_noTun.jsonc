@@ -224,7 +224,7 @@
         "server": "Cloudflare-DNS"
       }
     ],
-    "final": "Tencent-DNS"
+    "final": "Cloudflare-DNS"
   },
   "inbounds": [
     {
