@@ -122,7 +122,14 @@
             ]
           }
         ],
-        "server": "Ali-DNS"
+        "server": "Tencent-DNS"
+      },
+      {
+        "rule_set": [
+          "geosite-amazon",
+          "geosite-amazon@ads"
+        ],
+        "server": "Cloudflare-DNS"
       },
       {
         "type": "logical",
@@ -130,16 +137,12 @@
         "rules": [
           {
             "rule_set": [
-              "WeChat",
-              "XiaoMi"
+              "WeChat"
             ]
           },
           {
             "package_name": [
-              "com.tencent.mm",
-              "tv.danmaku.bili",
-              "com.ss.android.ugc.aweme",
-              "com.xingin.xhs"
+              "com.tencent.mm"
             ]
           }
         ],
@@ -168,6 +171,199 @@
         "rules": [
           {
             "rule_set": [
+              "BiliBili"
+            ]
+          },
+          {
+            "package_name": [
+              "tv.danmaku.bili"
+            ]
+          }
+        ],
+        "server": "Tencent-DNS"
+      },
+      {
+        "type": "logical",
+        "mode": "or",
+        "rules": [
+          {
+            "rule_set": [
+              "geosite-douyin"
+            ]
+          },
+          {
+            "package_name": [
+              "com.ss.android.ugc.aweme"
+            ]
+          }
+        ],
+        "server": "Tencent-DNS"
+      },
+      {
+        "rule_set": [
+          "Weibo"
+        ],
+        "server": "Ali-DNS"
+      },
+      {
+        "type": "logical",
+        "mode": "or",
+        "rules": [
+          {
+            "rule_set": [
+              "geosite-xiaohongshu"
+            ]
+          },
+          {
+            "package_name": [
+              "com.xingin.xhs"
+            ]
+          }
+        ],
+        "server": "Tencent-DNS"
+      },
+      {
+        "rule_set": [
+          "geosite-steam"
+        ],
+        "server": "Cloudflare-DNS"
+      },
+      {
+        "rule_set": [
+          "geosite-ubisoft"
+        ],
+        "server": "Cloudflare-DNS"
+      },
+      {
+        "rule_set": [
+          "geosite-epicgames"
+        ],
+        "server": "Cloudflare-DNS"
+      },
+      {
+        "rule_set": [
+          "geosite-github"
+        ],
+        "server": "Cloudflare-DNS"
+      },
+      {
+        "rule_set": [
+          "geosite-youtube"
+        ],
+        "server": "Google-DNS"
+      },
+      {
+        "type": "logical",
+        "mode": "or",
+        "rules": [
+          {
+            "rule_set": [
+              "geosite-netflix",
+              "geoip-netflix"
+            ]
+          },
+          {
+            "package_name": [
+              "com.netflix.mediaclient"
+            ]
+          }
+        ],
+        "server": "Cloudflare-DNS"
+      },
+      {
+        "type": "logical",
+        "mode": "or",
+        "rules": [
+          {
+            "rule_set": [
+              "geosite-tiktok"
+            ]
+          },
+          {
+            "package_name": [
+              "com.zhiliaoapp.musically"
+            ]
+          }
+        ],
+        "server": "Cloudflare-DNS"
+      },
+      {
+        "type": "logical",
+        "mode": "or",
+        "rules": [
+          {
+            "rule_set": [
+              "geosite-spotify"
+            ]
+          },
+          {
+            "package_name": [
+              "com.spotify.music"
+            ]
+          }
+        ],
+        "server": "Cloudflare-DNS"
+      },
+      {
+        "type": "logical",
+        "mode": "or",
+        "rules": [
+          {
+            "rule_set": [
+              "geosite-telegram",
+              "geoip-telegram"
+            ]
+          },
+          {
+            "package_name": [
+              "nekox.messenger",
+              "org.telegram.messenger",
+              "tw.nekomimi.nekogram",
+              "xyz.nextalone.nagram"
+            ]
+          }
+        ],
+        "server": "Cloudflare-DNS"
+      },
+      {
+        "rule_set": [
+          "geosite-twitter",
+          "geoip-twitter"
+        ],
+        "server": "Cloudflare-DNS"
+      },
+      {
+        "rule_set": [
+          "geosite-facebook",
+          "geoip-facebook"
+        ],
+        "server": "Cloudflare-DNS"
+      },
+      {
+        "rule_set": [
+          "geosite-discord"
+        ],
+        "server": "Cloudflare-DNS"
+      },
+      {
+        "rule_set": [
+          "geosite-openai"
+        ],
+        "server": "Cloudflare-DNS"
+      },
+      {
+        "rule_set": [
+          "geosite-cloudflare",
+          "geoip-cloudflare"
+        ],
+        "server": "Cloudflare-DNS"
+      },
+      {
+        "type": "logical",
+        "mode": "or",
+        "rules": [
+          {
+            "rule_set": [
               "geosite-google",
               "geoip-google",
               "geosite-google-play",
@@ -183,13 +379,49 @@
             ]
           }
         ],
-        "server": "Google-DNS"
+        "server": "Google-DNS",
+        "client_subnet": "64.23.0.1/24"
       },
       {
         "rule_set": [
-          "geosite-cloudflare"
+          "XiaoMi"
+        ],
+        "server": "Tencent-DNS"
+      },
+      {
+        "rule_set": [
+          "Apple"
+        ],
+        "server": "Tencent-DNS"
+      },
+      {
+        "rule_set": [
+          "geosite-microsoft"
         ],
         "server": "Cloudflare-DNS"
+      },
+      {
+        "rule_set": [
+          "GlobalMedia"
+        ],
+        "server": "Cloudflare-DNS"
+      },
+      {
+        "type": "logical",
+        "mode": "and",
+        "rules": [
+          {
+            "rule_set": [
+              "geosite-geolocation-cn",
+              "custom_direct"
+            ]
+          },
+          {
+            "domain_keyword": "browserleaks",
+            "invert": true
+          }
+        ],
+        "server": "Tencent-DNS"
       },
       {
         "type": "logical",
@@ -209,44 +441,13 @@
         "server": "Cloudflare-DNS"
       },
       {
-        "type": "logical",
-        "mode": "and",
-        "rules": [
-          {
-            "rule_set": [
-              "GeositeCN",
-              "geosite-geolocation-cn",
-              "custom_direct"
-            ]
-          },
-          {
-            "domain_keyword": "browserleaks",
-            "invert": true
-          }
-        ],
-        "server": "Tencent-DNS"
-      },
-      {
-        "type": "logical",
-        "mode": "and",
-        "rules": [
-          {
-            "rule_set": "geosite-geolocation-!cn",
-            "invert": true
-          },
-          {
-            "rule_set": "geoip-cn"
-          }
+        "rule_set": [
+          "geosite-tld-cn",
+          "GeositeCN",
+          "geoip-cn"
         ],
         "server": "Google-DNS",
         "client_subnet": "113.84.0.1/24"
-      },
-      {
-        "rule_set": [
-          "geoip-cn"
-        ],
-        "invert": true,
-        "server": "Cloudflare-DNS"
       }
     ],
     "final": "Google-DNS",
