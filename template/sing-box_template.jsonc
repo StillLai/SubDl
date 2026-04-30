@@ -95,7 +95,7 @@
         "type": "logical",
         "mode": "or",
         "rules": [
-          {"rule_set": ["WeChat"]},
+          {"rule_set": ["WeChat", "XiaoMi"]},
           {"package_name": ["com.tencent.mm", "tv.danmaku.bili", "com.ss.android.ugc.aweme", "com.xingin.xhs"]}
         ],
         "server": "Tencent-DNS"
@@ -130,7 +130,7 @@
         "type": "logical",
         "mode": "and",
         "rules": [
-          {"rule_set": ["GeositeCN", "geosite-geolocation-cn", "custom_direct", "XiaoMi"]},
+          {"rule_set": ["GeositeCN", "geosite-geolocation-cn", "custom_direct"]},
           {"domain_keyword": "browserleaks", "invert": true}
         ],
         "server": "Tencent-DNS"
