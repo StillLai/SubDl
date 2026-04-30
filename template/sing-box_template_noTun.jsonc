@@ -441,13 +441,30 @@
         "server": "Cloudflare-DNS"
       },
       {
-        "rule_set": [
-          "geosite-tld-cn",
-          "GeositeCN",
-          "geoip-cn"
+        "type": "logical",
+        "mode": "and",
+        "rules": [
+          {
+            "rule_set": [
+              "geosite-tld-cn",
+              "GeositeCN",
+              "geoip-cn"
+            ]
+          },
+          {
+            "domain_keyword": "browserleaks",
+            "invert": true
+          }
         ],
         "server": "Google-DNS",
         "client_subnet": "113.84.0.1/24"
+      },
+      {
+        "rule_set": [
+          "geoip-cn"
+        ],
+        "invert": true,
+        "server": "Cloudflare-DNS"
       }
     ],
     "final": "Google-DNS",
