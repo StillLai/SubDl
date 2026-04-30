@@ -246,43 +246,37 @@
       //   ],
       //   "server": "Tencent-DNS"
       // },
-      // {
-      //   "type": "logical",
-      //   "mode": "and",
-      //   "rules": [
-      //     {"rule_set": ["geosite-geolocation-!cn", "custom_proxy"]},
-      //     {"domain_keyword": "browserleaks", "invert": true}
-      //   ],
-      //   "server": "Cloudflare-DNS"
-      // },
-      // {
-      //   "type": "logical",
-      //   "mode": "and",
-      //   "rules": [
-      //     {"rule_set": ["geosite-tld-cn", "GeositeCN", "geoip-cn"]},
-      //     {"domain_keyword": "browserleaks", "invert": true}
-      //   ],
-      //   "server": "Google-DNS",
-      //   "client_subnet": "113.84.0.1/24"
-      // },
-      // {
-      //   "rule_set": ["geoip-cn"],
-      //   "invert": true,
-      //   "server": "Cloudflare-DNS"
-      // },
       {
-        "rule_set": "geosite-geolocation-cn",
+        "rule_set": ["geosite-geolocation-cn", "custom_direct"],
         "server": "Tencent-DNS"
       },
       {
         "type": "logical",
         "mode": "and",
         "rules": [
-          {"rule_set": "geosite-geolocation-!cn", "invert": true},
+          {"rule_set": ["geosite-geolocation-!cn", "custom_proxy"], "invert": true},
           {"rule_set": "geoip-cn"}
         ],
         "server": "Google-DNS",
         "client_subnet": "113.84.0.1/24"
+      },
+      {
+        "type": "logical",
+        "mode": "and",
+        "rules": [
+          {"rule_set": ["geosite-geolocation-!cn", "custom_proxy"]},
+          {"domain_keyword": "browserleaks", "invert": true}
+        ],
+        "server": "Cloudflare-DNS"
+      },
+      {
+        "type": "logical",
+        "mode": "and",
+        "rules": [
+          {"rule_set": ["geosite-tld-cn", "GeositeCN", "geoip-cn"]},
+          {"domain_keyword": "browserleaks", "invert": true}
+        ],
+        "server": "Tencent-DNS"
       }
     ],
     "final": "Cloudflare-DNS"
