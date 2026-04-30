@@ -110,7 +110,12 @@
         "server": "Ali-DNS"
       },
       {
-        "rule_set": ["geosite-google", "geoip-google", "geosite-google-play", "geosite-youtube"],
+        "type": "logical",
+        "mode": "or",
+        "rules": [
+          {"rule_set": ["geosite-google", "geoip-google", "geosite-google-play", "geosite-youtube"]},
+          {"package_name": ["com.android.vending", "com.google.android.gms", "com.google.android.gsf", "com.google.android.onetimeinitializer"]}
+        ],
         "server": "Google-DNS"
       },
       {
@@ -1019,7 +1024,12 @@
         "outbound": "☁️ Cloudflare"
       },
       {
-        "rule_set": ["GoogleFCM", "geosite-google", "geoip-google", "geosite-google-play"],
+        "type": "logical",
+        "mode": "or",
+        "rules": [
+          {"rule_set": ["geosite-google", "geoip-google", "geosite-google-play", "geosite-youtube"]},
+          {"package_name": ["com.android.vending", "com.google.android.gms", "com.google.android.gsf", "com.google.android.onetimeinitializer"]}
+        ],
         "outbound": "🇬 Google"
       },
       {
