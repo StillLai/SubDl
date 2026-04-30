@@ -237,15 +237,6 @@
       //   "rule_set": ["GlobalMedia"],
       //   "server": "Cloudflare-DNS"
       // },
-      // {
-      //   "type": "logical",
-      //   "mode": "and",
-      //   "rules": [
-      //     {"rule_set": ["geosite-geolocation-cn", "custom_direct"]},
-      //     {"domain_keyword": "browserleaks", "invert": true}
-      //   ],
-      //   "server": "Tencent-DNS"
-      // },
       {
         "rule_set": ["geosite-geolocation-cn", "custom_direct"],
         "server": "Tencent-DNS"
