@@ -82,135 +82,135 @@
         ],
         "server": "Tencent-DNS"
       },
-      // {
-      //   "rule_set": ["geosite-amazon", "geosite-amazon@ads"],
-      //   "server": "Cloudflare-DNS"
-      // },
-      // {
-      //   "type": "logical",
-      //   "mode": "or",
-      //   "rules": [
-      //     {"rule_set": ["WeChat"]},
-      //     {"package_name": ["com.tencent.mm"]}
-      //   ],
-      //   "server": "Tencent-DNS"
-      // },
-      // {
-      //   "type": "logical",
-      //   "mode": "or",
-      //   "rules": [
-      //     {"rule_set": ["AliPay"]},
-      //     {"package_name": ["com.eg.android.AlipayGphone"]}
-      //   ],
-      //   "server": "Ali-DNS"
-      // },
-      // {
-      //   "type": "logical",
-      //   "mode": "or",
-      //   "rules": [
-      //     {"rule_set": ["BiliBili"]},
-      //     {"package_name": ["tv.danmaku.bili"]}
-      //   ],
-      //   "server": "Tencent-DNS"
-      // },
-      // {
-      //   "type": "logical",
-      //   "mode": "or",
-      //   "rules": [
-      //     {"rule_set": ["geosite-douyin"]},
-      //     {"package_name": ["com.ss.android.ugc.aweme"]}
-      //   ],
-      //   "server": "Tencent-DNS"
-      // },
-      // {
-      //   "rule_set": ["Weibo"],
-      //   "server": "Ali-DNS"
-      // },
-      // {
-      //   "type": "logical",
-      //   "mode": "or",
-      //   "rules": [
-      //     {"rule_set": ["geosite-xiaohongshu"]},
-      //     {"package_name": ["com.xingin.xhs"]}
-      //   ],
-      //   "server": "Tencent-DNS"
-      // },
-      // {
-      //   "rule_set": ["geosite-steam"],
-      //   "server": "Cloudflare-DNS"
-      // },
-      // {
-      //   "rule_set": ["geosite-ubisoft"],
-      //   "server": "Cloudflare-DNS"
-      // },
-      // {
-      //   "rule_set": ["geosite-epicgames"],
-      //   "server": "Cloudflare-DNS"
-      // },
-      // {
-      //   "rule_set": ["geosite-github"],
-      //   "server": "Cloudflare-DNS"
-      // },
-      // {
-      //   "rule_set": ["geosite-youtube"],
-      //   "server": "Google-DNS"
-      // },
-      // {
-      //   "type": "logical",
-      //   "mode": "or",
-      //   "rules": [
-      //     {"rule_set": ["geosite-netflix", "geoip-netflix"]},
-      //     {"package_name": ["com.netflix.mediaclient"]}
-      //   ],
-      //   "server": "Cloudflare-DNS"
-      // },
-      // {
-      //   "type": "logical",
-      //   "mode": "or",
-      //   "rules": [
-      //     {"rule_set": ["geosite-tiktok"]},
-      //     {"package_name": ["com.zhiliaoapp.musically"]}
-      //   ],
-      //   "server": "Cloudflare-DNS"
-      // },
-      // {
-      //   "type": "logical",
-      //   "mode": "or",
-      //   "rules": [
-      //     {"rule_set": ["geosite-spotify"]},
-      //     {"package_name": ["com.spotify.music"]}
-      //   ],
-      //   "server": "Cloudflare-DNS"
-      // },
-      // {
-      //   "type": "logical",
-      //   "mode": "or",
-      //   "rules": [
-      //     {"rule_set": ["geosite-telegram", "geoip-telegram"]},
-      //     {"package_name": ["nekox.messenger", "org.telegram.messenger", "tw.nekomimi.nekogram", "xyz.nextalone.nagram"]}
-      //   ],
-      //   "server": "Cloudflare-DNS"
-      // },
-      // {
-      //   "rule_set": ["geosite-twitter", "geoip-twitter"],
-      //   "server": "Cloudflare-DNS"
-      // },
-      // {
-      //   "rule_set": ["geosite-facebook", "geoip-facebook"],
-      //   "server": "Cloudflare-DNS"
-      // },
-      // {
-      //   "rule_set": ["geosite-discord"],
-      //   "server": "Cloudflare-DNS"
-      // },
-      // {
-      //   "rule_set": ["geosite-openai"],
-      //   "server": "Cloudflare-DNS"
-      // },
-      // {
-      //   "rule_set": ["geosite-cloudflare", "geoip-cloudflare"],
-      //   "server": "Cloudflare-DNS"
-      // },
+      {
+        "rule_set": ["geosite-amazon", "geosite-amazon@ads"],
+        "server": "Cloudflare-DNS"
+      },
+      {
+        "type": "logical",
+        "mode": "or",
+        "rules": [
+          {"rule_set": ["WeChat"]},
+          {"package_name": ["com.tencent.mm"]}
+        ],
+        "server": "Tencent-DNS"
+      },
+      {
+        "type": "logical",
+        "mode": "or",
+        "rules": [
+          {"rule_set": ["AliPay"]},
+          {"package_name": ["com.eg.android.AlipayGphone"]}
+        ],
+        "server": "Ali-DNS"
+      },
+      {
+        "type": "logical",
+        "mode": "or",
+        "rules": [
+          {"rule_set": ["BiliBili"]},
+          {"package_name": ["tv.danmaku.bili"]}
+        ],
+        "server": "Tencent-DNS"
+      },
+      {
+        "type": "logical",
+        "mode": "or",
+        "rules": [
+          {"rule_set": ["geosite-douyin"]},
+          {"package_name": ["com.ss.android.ugc.aweme"]}
+        ],
+        "server": "Tencent-DNS"
+      },
+      {
+        "rule_set": ["Weibo"],
+        "server": "Ali-DNS"
+      },
+      {
+        "type": "logical",
+        "mode": "or",
+        "rules": [
+          {"rule_set": ["geosite-xiaohongshu"]},
+          {"package_name": ["com.xingin.xhs"]}
+        ],
+        "server": "Tencent-DNS"
+      },
+      {
+        "rule_set": ["geosite-steam"],
+        "server": "Cloudflare-DNS"
+      },
+      {
+        "rule_set": ["geosite-ubisoft"],
+        "server": "Cloudflare-DNS"
+      },
+      {
+        "rule_set": ["geosite-epicgames"],
+        "server": "Cloudflare-DNS"
+      },
+      {
+        "rule_set": ["geosite-github"],
+        "server": "Cloudflare-DNS"
+      },
+      {
+        "rule_set": ["geosite-youtube"],
+        "server": "Google-DNS"
+      },
+      {
+        "type": "logical",
+        "mode": "or",
+        "rules": [
+          {"rule_set": ["geosite-netflix", "geoip-netflix"]},
+          {"package_name": ["com.netflix.mediaclient"]}
+        ],
+        "server": "Cloudflare-DNS"
+      },
+      {
+        "type": "logical",
+        "mode": "or",
+        "rules": [
+          {"rule_set": ["geosite-tiktok"]},
+          {"package_name": ["com.zhiliaoapp.musically"]}
+        ],
+        "server": "Cloudflare-DNS"
+      },
+      {
+        "type": "logical",
+        "mode": "or",
+        "rules": [
+          {"rule_set": ["geosite-spotify"]},
+          {"package_name": ["com.spotify.music"]}
+        ],
+        "server": "Cloudflare-DNS"
+      },
+      {
+        "type": "logical",
+        "mode": "or",
+        "rules": [
+          {"rule_set": ["geosite-telegram", "geoip-telegram"]},
+          {"package_name": ["nekox.messenger", "org.telegram.messenger", "tw.nekomimi.nekogram", "xyz.nextalone.nagram"]}
+        ],
+        "server": "Cloudflare-DNS"
+      },
+      {
+        "rule_set": ["geosite-twitter", "geoip-twitter"],
+        "server": "Cloudflare-DNS"
+      },
+      {
+        "rule_set": ["geosite-facebook", "geoip-facebook"],
+        "server": "Cloudflare-DNS"
+      },
+      {
+        "rule_set": ["geosite-discord"],
+        "server": "Cloudflare-DNS"
+      },
+      {
+        "rule_set": ["geosite-openai"],
+        "server": "Cloudflare-DNS"
+      },
+      {
+        "rule_set": ["geosite-cloudflare", "geoip-cloudflare"],
+        "server": "Cloudflare-DNS"
+      },
       {
         "type": "logical",
         "mode": "or",
@@ -221,22 +221,22 @@
         "server": "Google-DNS",
         "client_subnet": "64.23.0.1/24"
       },
-      // {
-      //   "rule_set": ["XiaoMi"],
-      //   "server": "Tencent-DNS"
-      // },
-      // {
-      //   "rule_set": ["Apple"],
-      //   "server": "Tencent-DNS"
-      // },
-      // {
-      //   "rule_set": ["geosite-microsoft"],
-      //   "server": "Cloudflare-DNS"
-      // },
-      // {
-      //   "rule_set": ["GlobalMedia"],
-      //   "server": "Cloudflare-DNS"
-      // },
+      {
+        "rule_set": ["XiaoMi"],
+        "server": "Tencent-DNS"
+      },
+      {
+        "rule_set": ["Apple"],
+        "server": "Tencent-DNS"
+      },
+      {
+        "rule_set": ["geosite-microsoft"],
+        "server": "Cloudflare-DNS"
+      },
+      {
+        "rule_set": ["GlobalMedia"],
+        "server": "Cloudflare-DNS"
+      },
       {
         "rule_set": ["geosite-geolocation-cn", "custom_direct"],
         "server": "Tencent-DNS"
