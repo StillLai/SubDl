@@ -212,9 +212,26 @@ def merge_config(template_config, subscriptions_nodes):
     fixed = fix_tls_insecure(all_nodes)
     log(f"已设置 {fixed} 个节点的 tls.insecure = true")
     
-    # 将所有代理节点添加到 outbounds 末尾
-    config['outbounds'].extend(all_nodes)
-    log(f"已添加 {len(all_nodes)} 个代理节点到配置")
+    # 去重：移除重复 tag 的节点，保留第一个出现的
+    seen_tags = set()
+    unique_nodes = []
+    duplicate_count = 0
+    for node in all_nodes:
+        if isinstance(node, dict) and 'tag' in node:
+            tag = node['tag']
+            if tag in seen_tags:
+                duplicate_count += 1
+                log(f"  跳过重复节点: {tag}")
+                continue
+            seen_tags.add(tag)
+        unique_nodes.append(node)
+    
+    if duplicate_count > 0:
+        log(f"已移除 {duplicate_count} 个重复节点")
+    
+    # 将去重后的代理节点添加到 outbounds 末尾
+    config['outbounds'].extend(unique_nodes)
+    log(f"已添加 {len(unique_nodes)} 个代理节点到配置")
     
     # 处理空 outbound 的兼容性问题（只对 selector 和 urltest 类型）
     for outbound in config['outbounds']:
