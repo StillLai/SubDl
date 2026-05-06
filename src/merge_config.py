@@ -54,13 +54,41 @@ def fix_tls_insecure(proxies):
     return fixed_count
 
 
-def expand_subscription_item(item, subscriptions_nodes, include_regex):
+def create_tag_mapping(all_nodes):
+    """
+    从节点列表创建 tag 映射表，处理重复 tag
+    
+    Args:
+        all_nodes: 所有节点的列表
+    
+    Returns:
+        dict: tag → 新tag 的映射表
+    """
+    tag_counts = {}
+    tag_mapping = {}
+    
+    for node in all_nodes:
+        if isinstance(node, dict) and 'tag' in node:
+            original_tag = node['tag']
+            if original_tag in tag_counts:
+                tag_counts[original_tag] += 1
+                new_tag = f"{original_tag}-{tag_counts[original_tag]}"
+            else:
+                tag_counts[original_tag] = 0
+                new_tag = original_tag
+            tag_mapping[original_tag] = new_tag
+    
+    return tag_mapping
+
+
+def expand_subscription_item(item, subscriptions_nodes, tag_mapping, include_regex):
     """
     展开 Subscription 占位符为实际节点标签列表
     
     Args:
         item: Subscription 对象 {"type": "Subscription", "tag": "xxx"} 或 {"type": "Subscription", "tag": ["sub1", "sub2"]}
         subscriptions_nodes: dict，键为订阅名，值为节点列表
+        tag_mapping: dict，原始tag → 新tag 的映射表
         include_regex: include 正则表达式（可能为 None）
     
     Returns:
@@ -97,23 +125,26 @@ def expand_subscription_item(item, subscriptions_nodes, include_regex):
                 pattern = re.compile(include_regex, re.IGNORECASE)
                 filtered = [node for node in nodes if pattern.search(node.get('tag', ''))]
                 log(f"    订阅 '{sub_name}': {len(nodes)} 个节点，筛选后 {len(filtered)} 个 (匹配 {include_regex})")
-                result_tags.extend([node['tag'] for node in filtered])
+                # 使用映射后的 tag
+                result_tags.extend([tag_mapping.get(node['tag'], node['tag']) for node in filtered])
             except re.error as e:
                 log(f"    错误: include 正则无效: {e}")
-                result_tags.extend([node['tag'] for node in nodes])
+                result_tags.extend([tag_mapping.get(node['tag'], node['tag']) for node in nodes])
         else:
-            result_tags.extend([node['tag'] for node in nodes])
+            # 使用映射后的 tag
+            result_tags.extend([tag_mapping.get(node['tag'], node['tag']) for node in nodes])
     
     return result_tags
 
 
-def process_outbounds(outbounds, subscriptions_nodes, default_include_regex=None):
+def process_outbounds(outbounds, subscriptions_nodes, tag_mapping, default_include_regex=None):
     """
     处理 outbounds 数组，展开 Subscription 占位符
     
     Args:
         outbounds: outbounds 数组
         subscriptions_nodes: dict，键为订阅名，值为节点列表
+        tag_mapping: dict，原始tag → 新tag 的映射表
         default_include_regex: 当前 outbound 的默认 include 正则（用于没有自己 include 的 Subscription）
     
     Returns:
@@ -130,8 +161,8 @@ def process_outbounds(outbounds, subscriptions_nodes, default_include_regex=None
             sub_include_regex = item.get('include')
             effective_include_regex = sub_include_regex if sub_include_regex else default_include_regex
             
-            # 展开 Subscription，插入节点标签
-            expanded = expand_subscription_item(item, subscriptions_nodes, effective_include_regex)
+            # 展开 Subscription，插入节点标签（使用映射后的 tag）
+            expanded = expand_subscription_item(item, subscriptions_nodes, tag_mapping, effective_include_regex)
             result.extend(expanded)
         else:
             # 保留其他项（字符串、对象等）
@@ -169,10 +200,35 @@ def merge_config(template_config, subscriptions_nodes):
     if 'outbounds' not in config:
         config['outbounds'] = []
     
-    # 统计
+    # ========== 步骤 1: 收集所有节点并构建 tag 映射表 ==========
+    all_nodes = []
+    for nodes in subscriptions_nodes.values():
+        all_nodes.extend(nodes)
+    
+    tag_mapping = create_tag_mapping(all_nodes)
+    
+    # 统计重命名数量
+    renamed_count = sum(1 for original, mapped in tag_mapping.items() if original != mapped)
+    if renamed_count > 0:
+        log(f"发现 {renamed_count} 个重复 tag，已映射")
+    
+    # ========== 步骤 2: 根据 tag_mapping 更新所有节点的 tag ==========
+    for node in all_nodes:
+        if isinstance(node, dict) and 'tag' in node:
+            original_tag = node['tag']
+            if original_tag in tag_mapping:
+                new_tag = tag_mapping[original_tag]
+                if original_tag != new_tag:
+                    log(f"  重命名节点: {original_tag} -> {new_tag}")
+                node['tag'] = new_tag
+    
+    # ========== 步骤 3: 修复 tls.insecure ==========
+    fixed = fix_tls_insecure(all_nodes)
+    log(f"已设置 {fixed} 个节点的 tls.insecure = true")
+    
+    # ========== 步骤 4: 处理所有 outbounds（展开 Subscription）==========
     total_subscription_count = 0
     
-    # 处理所有 outbounds（只处理有 outbounds 字段的 selector 和 urltest 类型）
     for outbound in config['outbounds']:
         if not isinstance(outbound, dict):
             continue
@@ -189,8 +245,8 @@ def merge_config(template_config, subscriptions_nodes):
         # 获取当前 outbound 的 include 正则
         include_regex = outbound.get('include')
         
-        # 展开 Subscription
-        processed = process_outbounds(outbounds_list, subscriptions_nodes, include_regex)
+        # 展开 Subscription（传入 tag_mapping）
+        processed = process_outbounds(outbounds_list, subscriptions_nodes, tag_mapping, include_regex)
         outbound['outbounds'] = processed
         
         # 统计 Subscription 展开的节点数
@@ -200,45 +256,14 @@ def merge_config(template_config, subscriptions_nodes):
     
     log(f"处理了 {total_subscription_count} 个 Subscription 占位符")
     
-    # 移除所有 include 字段
+    # ========== 步骤 5: 移除所有 include 字段 ==========
     remove_include_field(config)
     
-    # 收集所有节点
-    all_nodes = []
-    for nodes in subscriptions_nodes.values():
-        all_nodes.extend(nodes)
+    # ========== 步骤 6: 将代理节点添加到 outbounds 末尾 ==========
+    config['outbounds'].extend(all_nodes)
+    log(f"已添加 {len(all_nodes)} 个代理节点到配置")
     
-    # 修复 tls.insecure
-    fixed = fix_tls_insecure(all_nodes)
-    log(f"已设置 {fixed} 个节点的 tls.insecure = true")
-    
-    # 处理重复 tag：给重复的节点添加后缀 "-1", "-2" 等，保留所有节点
-    tag_counts = {}
-    unique_nodes = []
-    renamed_count = 0
-    for node in all_nodes:
-        if isinstance(node, dict) and 'tag' in node:
-            original_tag = node['tag']
-            if original_tag in tag_counts:
-                # 重复 tag，添加后缀
-                tag_counts[original_tag] += 1
-                new_tag = f"{original_tag}-{tag_counts[original_tag]}"
-                log(f"  重命名重复节点: {original_tag} -> {new_tag}")
-                node['tag'] = new_tag
-                renamed_count += 1
-            else:
-                # 第一个出现的 tag
-                tag_counts[original_tag] = 0
-        unique_nodes.append(node)
-    
-    if renamed_count > 0:
-        log(f"已重命名 {renamed_count} 个重复节点")
-    
-    # 将去重后的代理节点添加到 outbounds 末尾
-    config['outbounds'].extend(unique_nodes)
-    log(f"已添加 {len(unique_nodes)} 个代理节点到配置")
-    
-    # 处理空 outbound 的兼容性问题（只对 selector 和 urltest 类型）
+    # ========== 步骤 7: 处理空 outbound 的兼容性问题 ==========
     for outbound in config['outbounds']:
         if not isinstance(outbound, dict):
             continue
@@ -253,7 +278,7 @@ def merge_config(template_config, subscriptions_nodes):
             outbound['outbounds'] = ['COMPATIBLE']
             log(f"  {outbound.get('tag')} -> 空 outbound，添加 COMPATIBLE")
     
-    # 添加 COMPATIBLE outbound 定义（如果不存在）
+    # ========== 步骤 8: 添加 COMPATIBLE outbound 定义 ==========
     has_compatible = any(
         isinstance(o, dict) and o.get('tag') == 'COMPATIBLE'
         for o in config['outbounds']
