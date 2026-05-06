@@ -403,8 +403,16 @@ def main():
         print("错误: 所有订阅下载失败")
         sys.exit(1)
     
+    # 检查是否有下载失败的订阅
+    if failed:
+        print(f"\n✗ 错误: {len(failed)} 个订阅下载失败，将不上传配置文件")
+        for f in failed:
+            print(f"  - {f['name']}: {f['error']}")
+        sys.exit(1)
+    
     print(f"\n→ 使用 {len(subscriptions)} 个订阅生成sing-box配置...")
     subs_nodes_dict = {}
+    empty_subs = []
     for sub in subscriptions:
         try:
             content, _ = download_subscription(sub["url"], user_agent)
@@ -412,20 +420,38 @@ def main():
             if singbox_config:
                 # 提取 outbounds 和 endpoints（singbox 新格式）
                 nodes = singbox_config.get('outbounds', []) + singbox_config.get('endpoints', [])
-                subs_nodes_dict[sub['name']] = nodes
-                print(f"  → 订阅 '{sub['name']}': {len(nodes)} 个节点")
+                if not nodes:
+                    empty_subs.append(sub['name'])
+                    print(f"  ✗ 订阅 '{sub['name']}': 节点列表为空")
+                else:
+                    subs_nodes_dict[sub['name']] = nodes
+                    print(f"  → 订阅 '{sub['name']}': {len(nodes)} 个节点")
+            else:
+                empty_subs.append(sub['name'])
+                print(f"  ✗ 订阅 '{sub['name']}': 转换失败")
         except Exception as e:
+            empty_subs.append(sub['name'])
             print(f"  ✗ {sub['name']} 获取节点失败: {e}")
     
-    if subs_nodes_dict:
-        # 遍历所有模板文件生成配置文件
-        merged_configs = merge_all_templates(subs_nodes_dict, script_dir)
-        for filename, content in merged_configs.items():
-            files[filename] = content
-        if merged_configs:
-            print(f"  ✓ 共生成 {len(merged_configs)} 个配置文件")
+    # 检查是否有节点为空的订阅
+    if empty_subs:
+        print(f"\n✗ 错误: {len(empty_subs)} 个订阅节点为空，将不上传配置文件")
+        for name in empty_subs:
+            print(f"  - {name}")
+        sys.exit(1)
     
-        readme_content = generate_readme(subscription_info)
+    if not subs_nodes_dict:
+        print("\n✗ 错误: 没有有效的订阅节点，将不上传配置文件")
+        sys.exit(1)
+    
+    # 遍历所有模板文件生成配置文件
+    merged_configs = merge_all_templates(subs_nodes_dict, script_dir)
+    for filename, content in merged_configs.items():
+        files[filename] = content
+    if merged_configs:
+        print(f"  ✓ 共生成 {len(merged_configs)} 个配置文件")
+    
+    readme_content = generate_readme(subscription_info)
     with open("README.md", "w", encoding="utf-8") as f:
         f.write(readme_content)
     print("\n✓ README 已更新")
@@ -438,9 +464,6 @@ def main():
         print("请在 Repository secrets 中设置 GIST_ID")
     
     print(f"\n完成! 成功处理 {len(files)} 个订阅")
-    if failed:
-        print(f"\n警告: {len(failed)} 个订阅下载失败")
-        sys.exit(2)
 
 
 if __name__ == "__main__":
