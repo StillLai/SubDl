@@ -649,7 +649,7 @@
       {
         "tag": "ads",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/217heidai/adblockfilters/raw/refs/heads/main/rules/adblocksingbox.srs",
+        "url": "https://gh-proxy.org/https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/ruleset_srs/AWAvenue-Ads-Rule-Surge-RULE-SET.srs",
         "update_interval": "6h"
       },
       {
