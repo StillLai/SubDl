@@ -467,7 +467,8 @@
         "server": "Tencent-DNS"
       }
     ],
-    "final": "Cloudflare-DNS"
+    "final": "Google-DNS",
+    "client_subnet": "113.84.0.1/24"
   },
   "inbounds": [
     {
@@ -504,6 +505,7 @@
       "type": "selector",
       "tag": "🐟 漏网之鱼",
       "outbounds": [
+        "🎯 全球直连",
         "🚀 节点选择",
         "🎈 自动选择",
         "🗂️ 备用自动",
@@ -513,8 +515,7 @@
         "🇯🇵 日本节点",
         "🇺🇸 美国节点",
         "🇪🇺 欧洲节点",
-        "🇺🇳 其它地区",
-        "🎯 全球直连"
+        "🇺🇳 其它地区"
       ]
     },
     {
