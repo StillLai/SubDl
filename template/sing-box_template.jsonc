@@ -623,18 +623,6 @@
         "update_interval": "3h"
       },
       {
-        "tag": "fakeip-filter",
-        "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/fakeip-filter.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geosite-connectivity-check",
-        "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/connectivity-check.srs",
-        "update_interval": "6h"
-      },
-      {
         "tag": "geosite-amazon",
         "type": "remote",
         "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/amazon.srs",
