@@ -252,21 +252,11 @@
         "client_subnet": "113.84.0.1/24"
       },
       {
-        "type": "logical",
-        "mode": "and",
-        "rules": [
-          {"rule_set": ["geosite-geolocation-!cn", "custom_proxy"]},
-          {"domain_keyword": "browserleaks", "invert": true}
-        ],
+        "rule_set": ["geosite-geolocation-!cn", "custom_proxy"],
         "server": "Cloudflare-DNS"
       },
       {
-        "type": "logical",
-        "mode": "and",
-        "rules": [
-          {"rule_set": ["geosite-tld-cn", "GeositeCN", "geoip-cn"]},
-          {"domain_keyword": "browserleaks", "invert": true}
-        ],
+        "rule_set": ["geosite-tld-cn", "GeositeCN", "geoip-cn"],
         "server": "Tencent-DNS"
       }
     ],
