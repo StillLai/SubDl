@@ -745,7 +745,7 @@
       ]
     },
     {
-      "type": "urltest",
+      "type": "selector",
       "tag": "✈️ Telegram",
       "outbounds": [
         "🚀 节点选择",
@@ -813,7 +813,7 @@
       ]
     },
     {
-      "type": "urltest",
+      "type": "selector",
       "tag": "📹 YouTube",
       "outbounds": [
         "🚀 节点选择",
