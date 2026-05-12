@@ -747,15 +747,18 @@
     {
       "type": "urltest",
       "tag": "✈️ Telegram",
-      "url": "https://api.telegram.org/robots.txt",
-      "interval": "1m",
-      "tolerance": 50,
-      "interrupt_exist_connections": true,
       "outbounds": [
-        {
-          "type": "Subscription",
-          "tag": "feiniaoyun"
-        }
+        "🚀 节点选择",
+        "🎈 自动选择",
+        "🗂️ 备用自动",
+        "🇭🇰 香港节点",
+        "🇹🇼 台湾节点",
+        "🇸🇬 新加坡节点",
+        "🇯🇵 日本节点",
+        "🇺🇸 美国节点",
+        "🇪🇺 欧洲节点",
+        "🇺🇳 其它地区",
+        "🎯 全球直连"
       ]
     },
     {
@@ -812,15 +815,18 @@
     {
       "type": "urltest",
       "tag": "📹 YouTube",
-      "url": "https://www.youtube.com/generate_204",
-      "interval": "1m",
-      "tolerance": 100,
-      "interrupt_exist_connections": true,
       "outbounds": [
-        {
-          "type": "Subscription",
-          "tag": "feiniaoyun"
-        }
+        "🚀 节点选择",
+        "🎈 自动选择",
+        "🗂️ 备用自动",
+        "🇭🇰 香港节点",
+        "🇹🇼 台湾节点",
+        "🇸🇬 新加坡节点",
+        "🇯🇵 日本节点",
+        "🇺🇸 美国节点",
+        "🇪🇺 欧洲节点",
+        "🇺🇳 其它地区",
+        "🎯 全球直连"
       ]
     },
     {
