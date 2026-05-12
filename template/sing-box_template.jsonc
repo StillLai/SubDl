@@ -269,7 +269,7 @@
       "tag": "tun-in",
       "interface_name": "net9",
       "address": [
-        "fdfe:dcba:9876::1/126",
+        // "fdfe:dcba:9876::1/126",
         "172.19.0.1/30"
       ],
       "mtu": 1500,
@@ -948,16 +948,6 @@
       {
         "inbound": "mixed-in-global",
         "outbound": "GLOBAL"
-      },
-      {
-        "type": "logical",
-        "mode": "and",
-        "rules": [
-          {"clash_mode": "AlwAds", "invert": true},
-          {"rule_set": ["custom_whitelist", "geosite-amazon", "geosite-amazon@ads"], "invert": true},
-          {"rule_set": ["ads", "custom_block", "WebRTC"]}
-        ],
-        "action": "reject"
       },
       {
         "type": "logical",
