@@ -402,12 +402,6 @@
       },
       {
         "rule_set": [
-          "GlobalMedia"
-        ],
-        "server": "Cloudflare-DNS"
-      },
-      {
-        "rule_set": [
           "geosite-geolocation-cn",
           "custom_direct"
         ],
@@ -1354,12 +1348,6 @@
         "update_interval": "6h"
       },
       {
-        "tag": "GlobalMedia",
-        "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/ruleset_srs/GlobalMedia.srs",
-        "update_interval": "6h"
-      },
-      {
         "tag": "geosite-private",
         "type": "remote",
         "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/private.srs",
@@ -1760,12 +1748,6 @@
           "geosite-microsoft"
         ],
         "outbound": "🪟 Microsoft"
-      },
-      {
-        "rule_set": [
-          "GlobalMedia"
-        ],
-        "outbound": "🌎 国外媒体"
       },
       {
         "rule_set": [
