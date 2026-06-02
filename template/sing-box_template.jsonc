@@ -1,6 +1,6 @@
 {
   "$schema": "https://gh-proxy.org/https://github.com/jiang-zhexin/typebox/releases/latest/download/schema.json",
-  "log": {"level": "fatal", "timestamp": true},
+  "log": {"level": "warn", "timestamp": true},
   "experimental": {
     "clash_api": {
       "default_mode": "Rule",
@@ -218,8 +218,7 @@
           {"rule_set": ["geosite-google", "geoip-google", "geosite-google-play", "geosite-youtube"]},
           {"package_name": ["com.android.vending", "com.google.android.gms", "com.google.android.gsf", "com.google.android.onetimeinitializer"]}
         ],
-        "server": "Google-DNS",
-        "client_subnet": "64.23.0.1/24"
+        "server": "Google-DNS"
       },
       {
         "rule_set": ["XiaoMi"],
