@@ -350,6 +350,38 @@ def generate_notun_template(script_dir):
         return None
 
 
+def generate_tproxy_template(script_dir):
+    """生成 tproxy inbound 的模板文件"""
+    try:
+        template_path = os.path.join(script_dir, '..', 'template', 'sing-box_template.jsonc')
+        output_path = os.path.join(script_dir, '..', 'template', 'sing-box_template_tproxy.jsonc')
+        
+        template = load_jsonc(template_path)
+        
+        tproxy_inbound = {
+            "type": "tproxy",
+            "tag": "tproxy-in",
+            "listen": "::",
+            "listen_port": 1536
+        }
+        
+        if 'inbounds' in template and isinstance(template['inbounds'], list):
+            for i, inbound in enumerate(template['inbounds']):
+                if isinstance(inbound, dict) and inbound.get('type') == 'tun':
+                    template['inbounds'][i] = tproxy_inbound
+                    print(f"  ✓ 已将 tun inbound 替换为 tproxy inbound")
+                    break
+        
+        output_content = json.dumps(template, indent=2, ensure_ascii=False)
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write(output_content)
+        print(f"  ✓ 已生成 tproxy 模板: template/sing-box_template_tproxy.jsonc")
+        return output_content
+    except Exception as e:
+        print(f"  ✗ 生成 tproxy 模板异常: {e}")
+        return None
+
+
 def main():
     print("=" * 60)
     print("SubDl - Subscription Downloader")
@@ -363,6 +395,9 @@ def main():
     
     print("\n→ 生成不含 tun inbound 的模板...")
     notun_template = generate_notun_template(script_dir)
+    
+    print("\n→ 生成 tproxy inbound 的模板...")
+    tproxy_template = generate_tproxy_template(script_dir)
     
     subscriptions = parse_subscriptions()
     if not subscriptions:
