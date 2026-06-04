@@ -85,7 +85,7 @@ def build_duplicate_tag_info(all_nodes):
     return duplicate_tag_info
 
 
-def expand_subscription_item(item, subscriptions_nodes, duplicate_tag_info, include_regex):
+def expand_subscription_item(item, subscriptions_nodes, duplicate_tag_info, include_regex=None, exclude_regex=None):
     """
     展开 Subscription 占位符为实际节点标签列表
     
@@ -94,6 +94,7 @@ def expand_subscription_item(item, subscriptions_nodes, duplicate_tag_info, incl
         subscriptions_nodes: dict，键为订阅名，值为节点列表
         duplicate_tag_info: dict, 重复 tag 的新 tag 信息 {tag: [新tag列表]}
         include_regex: include 正则表达式（可能为 None）
+        exclude_regex: exclude 正则表达式（可能为 None），匹配该正则的节点将被排除
     
     Returns:
         tuple: (展开后的节点标签列表, 更新后的 duplicate_tag_info)
@@ -123,17 +124,35 @@ def expand_subscription_item(item, subscriptions_nodes, duplicate_tag_info, incl
         
         nodes = subscriptions_nodes[sub_name]
         
-        # 如果有 include 正则，筛选节点
-        if include_regex:
+        # 如果有 include 或 exclude 正则，筛选节点
+        if include_regex or exclude_regex:
             try:
-                pattern = re.compile(include_regex, re.IGNORECASE)
-                filtered = [node for node in nodes if pattern.search(node.get('tag', ''))]
-                log(f"    订阅 '{sub_name}': {len(nodes)} 个节点，筛选后 {len(filtered)} 个 (匹配 {include_regex})")
+                include_pattern = re.compile(include_regex, re.IGNORECASE) if include_regex else None
+                exclude_pattern = re.compile(exclude_regex, re.IGNORECASE) if exclude_regex else None
+                
+                filtered = []
+                for node in nodes:
+                    tag = node.get('tag', '')
+                    # 先按 include 筛选（保留匹配项）
+                    if include_pattern and not include_pattern.search(tag):
+                        continue
+                    # 再按 exclude 排除（移除匹配项）
+                    if exclude_pattern and exclude_pattern.search(tag):
+                        continue
+                    filtered.append(node)
+                
+                filter_desc = []
+                if include_regex:
+                    filter_desc.append(f"include({include_regex})")
+                if exclude_regex:
+                    filter_desc.append(f"exclude({exclude_regex})")
+                log(f"    订阅 '{sub_name}': {len(nodes)} 个节点，筛选后 {len(filtered)} 个 ({', '.join(filter_desc)})")
+                
                 for node in filtered:
                     new_tag = get_next_new_tag(node['tag'], duplicate_tag_info)
                     result_tags.append(new_tag)
             except re.error as e:
-                log(f"    错误: include 正则无效: {e}")
+                log(f"    错误: 正则无效: {e}")
                 for node in nodes:
                     new_tag = get_next_new_tag(node['tag'], duplicate_tag_info)
                     result_tags.append(new_tag)
@@ -152,7 +171,7 @@ def get_next_new_tag(original_tag, duplicate_tag_info):
     return original_tag
 
 
-def process_outbounds(outbounds, subscriptions_nodes, duplicate_tag_info, default_include_regex=None):
+def process_outbounds(outbounds, subscriptions_nodes, duplicate_tag_info, default_include_regex=None, default_exclude_regex=None):
     """
     处理 outbounds 数组，展开 Subscription 占位符
     
@@ -161,6 +180,7 @@ def process_outbounds(outbounds, subscriptions_nodes, duplicate_tag_info, defaul
         subscriptions_nodes: dict，键为订阅名，值为节点列表
         duplicate_tag_info: dict, 重复 tag 的新 tag 信息
         default_include_regex: 当前 outbound 的默认 include 正则（用于没有自己 include 的 Subscription）
+        default_exclude_regex: 当前 outbound 的默认 exclude 正则（用于没有自己 exclude 的 Subscription）
     
     Returns:
         tuple: (处理后的 outbounds 数组, 更新后的 duplicate_tag_info)
@@ -171,14 +191,16 @@ def process_outbounds(outbounds, subscriptions_nodes, duplicate_tag_info, defaul
     result = []
     for item in outbounds:
         if isinstance(item, dict) and item.get('type') == 'Subscription':
-            # 每个 Subscription 使用自己的 include_regex（如果有）
-            # 如果 Subscription 没有自己的 include，使用父级 outbound 的 default_include_regex
+            # 每个 Subscription 使用自己的 include/exclude 正则（如果有）
+            # 如果 Subscription 没有自己的 include/exclude，使用父级 outbound 的默认值
             sub_include_regex = item.get('include')
+            sub_exclude_regex = item.get('exclude')
             effective_include_regex = sub_include_regex if sub_include_regex else default_include_regex
+            effective_exclude_regex = sub_exclude_regex if sub_exclude_regex else default_exclude_regex
             
             # 展开 Subscription，插入节点标签
             expanded, duplicate_tag_info = expand_subscription_item(
-                item, subscriptions_nodes, duplicate_tag_info, effective_include_regex
+                item, subscriptions_nodes, duplicate_tag_info, effective_include_regex, effective_exclude_regex
             )
             result.extend(expanded)
         else:
@@ -188,15 +210,16 @@ def process_outbounds(outbounds, subscriptions_nodes, duplicate_tag_info, defaul
     return result, duplicate_tag_info
 
 
-def remove_include_field(obj):
-    """递归移除对象中的 include 字段"""
+def remove_filter_fields(obj):
+    """递归移除对象中的 include 和 exclude 字段"""
     if isinstance(obj, dict):
         obj.pop('include', None)
+        obj.pop('exclude', None)
         for value in obj.values():
-            remove_include_field(value)
+            remove_filter_fields(value)
     elif isinstance(obj, list):
         for item in obj:
-            remove_include_field(item)
+            remove_filter_fields(item)
 
 
 def merge_config(template_config, subscriptions_nodes):
@@ -262,12 +285,13 @@ def merge_config(template_config, subscriptions_nodes):
         if not isinstance(outbounds_list, list):
             continue
         
-        # 获取当前 outbound 的 include 正则
+        # 获取当前 outbound 的 include 和 exclude 正则
         include_regex = outbound.get('include')
+        exclude_regex = outbound.get('exclude')
         
         # 展开 Subscription（传入 duplicate_tag_info）
         processed, duplicate_tag_info = process_outbounds(
-            outbounds_list, subscriptions_nodes, duplicate_tag_info, include_regex
+            outbounds_list, subscriptions_nodes, duplicate_tag_info, include_regex, exclude_regex
         )
         outbound['outbounds'] = processed
         
@@ -278,8 +302,8 @@ def merge_config(template_config, subscriptions_nodes):
     
     log(f"处理了 {total_subscription_count} 个 Subscription 占位符")
     
-    # ========== 步骤 6: 移除所有 include 字段 ==========
-    remove_include_field(config)
+    # ========== 步骤 6: 移除所有 include 和 exclude 字段 ==========
+    remove_filter_fields(config)
     
     # ========== 步骤 7: 将代理节点添加到 outbounds 末尾 ==========
     config['outbounds'].extend(all_nodes)
