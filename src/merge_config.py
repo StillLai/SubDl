@@ -117,18 +117,18 @@ def expand_subscription_item(item, subscriptions_nodes, include_regex=None, excl
                 log(f"    订阅 '{sub_name}': {len(nodes)} 个节点，筛选后 {len(filtered)} 个 ({', '.join(filter_desc)})")
                 
                 for node in filtered:
-                    new_tag = f"{sub_name}/{node['tag']}"
+                    new_tag = node['tag']
                     result_tags.append(new_tag)
             except re.error as e:
                 log(f"    错误: 正则无效: {e}")
                 for node in nodes:
-                    new_tag = f"{sub_name}/{node['tag']}"
+                    new_tag = node['tag']
                     result_tags.append(new_tag)
         else:
             for node in nodes:
-                new_tag = f"{sub_name}/{node['tag']}"
+                new_tag = node['tag']
                 result_tags.append(new_tag)
-    
+
     return result_tags
 
 
