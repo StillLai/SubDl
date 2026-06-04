@@ -266,21 +266,21 @@ def merge_config(template_config, subscriptions_nodes):
         
         outbounds_list = outbound.get('outbounds', [])
         if not isinstance(outbounds_list, list) or len(outbounds_list) == 0:
-            outbound['outbounds'] = ['COMPATIBLE']
-            log(f"  {outbound.get('tag')} -> 空 outbound，添加 COMPATIBLE")
+            outbound['outbounds'] = ['Compatible']
+            log(f"  {outbound.get('tag')} -> 空 outbound，添加 Compatible")
     
-    # ========== 步骤 7: 添加 COMPATIBLE outbound 定义 ==========
+    # ========== 步骤 7: 添加 Compatible outbound 定义 ==========
     has_compatible = any(
-        isinstance(o, dict) and o.get('tag') == 'COMPATIBLE'
+        isinstance(o, dict) and o.get('tag') == 'Compatible'
         for o in config['outbounds']
     )
     if not has_compatible:
         config['outbounds'].append({
-            "tag": "COMPATIBLE",
+            "tag": "Compatible",
             "type": "direct"
         })
-        log("已添加 COMPATIBLE outbound 定义")
-    
+        log("已添加 Compatible outbound 定义")
+
     return config
 
 
