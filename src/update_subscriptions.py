@@ -84,22 +84,63 @@ def get_status(flow_info):
     return "✅ 正常"
 
 
-def download_subscription(url, user_agent, timeout=30000):
-    """下载订阅内容"""
+def download_subscription(url, user_agent, timeout=30000, max_retries=3):
+    """下载订阅内容，带重试机制"""
     headers = {"User-Agent": user_agent}
-    response = requests.get(url, headers=headers, timeout=timeout / 1000, allow_redirects=True)
-    response.raise_for_status()
-    content = response.text
+    last_error = None
     
-    try:
-        cleaned = content.strip().replace(" ", "").replace("\n", "").replace("\r", "")
-        if re.match(r'^[A-Za-z0-9+/=]+$', cleaned):
-            decoded = base64.b64decode(cleaned + "=" * (4 - len(cleaned) % 4))
-            content = decoded.decode("utf-8")
-    except Exception:
-        pass
+    for attempt in range(1, max_retries + 1):
+        try:
+            if attempt > 1:
+                print(f"    重试 ({attempt}/{max_retries})...")
+                time.sleep(2)  # 重试前等待2秒
+            
+            response = requests.get(url, headers=headers, timeout=timeout / 1000, allow_redirects=True)
+            response.raise_for_status()
+            content = response.text
+            
+            try:
+                cleaned = content.strip().replace(" ", "").replace("\n", "").replace("\r", "")
+                if re.match(r'^[A-Za-z0-9+/=]+$', cleaned):
+                    decoded = base64.b64decode(cleaned + "=" * (4 - len(cleaned) % 4))
+                    content = decoded.decode("utf-8")
+            except Exception:
+                pass
+            
+            return content, parse_flow_info(response.headers)
+            
+        except requests.exceptions.RequestException as e:
+            last_error = e
+            if attempt < max_retries:
+                continue
+            raise
     
-    return content, parse_flow_info(response.headers)
+    raise last_error if last_error else Exception("下载失败")
+
+
+def validate_subscription_content(content, sub_name):
+    """验证订阅内容是否有效"""
+    # 检查是否为空
+    if not content or len(content.strip()) < 10:
+        return False, "内容为空或过短"
+    
+    # 检查是否为HTML错误页面
+    content_lower = content.lower().strip()
+    if content_lower.startswith('<!doctype') or content_lower.startswith('<html'):
+        # 检查是否是错误页面
+        error_indicators = ['404', 'not found', 'error', 'access denied', 'forbidden', 'captcha', '验证码']
+        if any(indicator in content_lower for indicator in error_indicators):
+            return False, "返回HTML错误页面"
+        # 可能只是重定向到网页，尝试解析
+        if '<!doctype html>' in content_lower or '<html' in content_lower:
+            return False, "返回的是网页而非订阅内容"
+    
+    # 检查是否为有效配置（至少有一些关键字）
+    valid_indicators = ['proxies', 'proxy-providers', 'proxy-groups', 'servers', 'outbounds', 'endpoints', 'vmess', 'trojan', 'ssid', 'wireguard']
+    if not any(indicator in content_lower for indicator in valid_indicators):
+        return False, "内容不包含有效的订阅配置"
+    
+    return True, "有效"
 
 
 def parse_subscriptions():
@@ -412,8 +453,19 @@ def main():
     
     for sub in subscriptions:
         print(f"下载: {sub['name']}")
+        content = None
+        flow_info = None
         try:
             content, flow_info = download_subscription(sub["url"], user_agent)
+            
+            # 验证订阅内容
+            is_valid, reason = validate_subscription_content(content, sub['name'])
+            if not is_valid:
+                print(f"  ⚠️ 内容无效: {reason}，跳过该订阅")
+                failed.append({"name": sub["name"], "error": reason})
+                subscription_info.append({"name": sub["name"], "flow": flow_info, "node_count": 0, "status": "invalid"})
+                continue
+            
             files[sub["filename"]] = content
             
             # 转换为Sing-box格式并获取节点数量
@@ -429,55 +481,65 @@ def main():
             else:
                 print(f"  ✓ 成功 ({len(content)} 字节)")
             
-            subscription_info.append({"name": sub["name"], "flow": flow_info, "node_count": node_count})
+            subscription_info.append({"name": sub["name"], "flow": flow_info, "node_count": node_count, "status": "ok"})
         except Exception as e:
             print(f"  ✗ 失败: {e}")
             failed.append({"name": sub["name"], "error": str(e)})
+            subscription_info.append({"name": sub["name"], "flow": flow_info, "node_count": 0, "status": "error"})
     
-    if not files:
-        print("错误: 所有订阅下载失败")
+    # 温和降级：只要有一个有效订阅就继续
+    valid_count = len(files)
+    if valid_count == 0:
+        print("\n错误: 所有订阅下载失败或内容无效")
         sys.exit(1)
     
-    # 检查是否有下载失败的订阅
+    # 显示失败的订阅信息（但不阻止继续）
     if failed:
-        print(f"\n✗ 错误: {len(failed)} 个订阅下载失败，将不上传配置文件")
-        for f in failed:
-            print(f"  - {f['name']}: {f['error']}")
-        sys.exit(1)
+        print(f"\n⚠️ {len(failed)} 个订阅跳过: {', '.join([f['name'] for f in failed])}")
+    
+    print(f"\n✓ 有效订阅: {valid_count}/{len(subscriptions)}")
     
     print(f"\n→ 使用 {len(subscriptions)} 个订阅生成sing-box配置...")
     subs_nodes_dict = {}
-    empty_subs = []
+    skipped_subs = []
     for sub in subscriptions:
         try:
             content, _ = download_subscription(sub["url"], user_agent)
+            
+            # 验证内容
+            is_valid, reason = validate_subscription_content(content, sub['name'])
+            if not is_valid:
+                skipped_subs.append({"name": sub['name'], "reason": reason})
+                print(f"  ⚠️ 订阅 '{sub['name']}': {reason}，跳过")
+                continue
+            
             singbox_config = convert_to_singbox(content, script_dir)
             if singbox_config:
                 # 提取 outbounds 和 endpoints（singbox 新格式）
                 nodes = singbox_config.get('outbounds', []) + singbox_config.get('endpoints', [])
                 if not nodes:
-                    empty_subs.append(sub['name'])
-                    print(f"  ✗ 订阅 '{sub['name']}': 节点列表为空")
+                    skipped_subs.append({"name": sub['name'], "reason": "节点列表为空"})
+                    print(f"  ⚠️ 订阅 '{sub['name']}': 节点列表为空，跳过")
                 else:
                     subs_nodes_dict[sub['name']] = nodes
                     print(f"  → 订阅 '{sub['name']}': {len(nodes)} 个节点")
             else:
-                empty_subs.append(sub['name'])
-                print(f"  ✗ 订阅 '{sub['name']}': 转换失败")
+                skipped_subs.append({"name": sub['name'], "reason": "转换失败"})
+                print(f"  ⚠️ 订阅 '{sub['name']}': 转换失败，跳过")
         except Exception as e:
-            empty_subs.append(sub['name'])
-            print(f"  ✗ {sub['name']} 获取节点失败: {e}")
+            skipped_subs.append({"name": sub['name'], "reason": str(e)})
+            print(f"  ⚠️ {sub['name']} 获取节点失败: {e}，跳过")
     
-    # 检查是否有节点为空的订阅
-    if empty_subs:
-        print(f"\n✗ 错误: {len(empty_subs)} 个订阅节点为空，将不上传配置文件")
-        for name in empty_subs:
-            print(f"  - {name}")
-        sys.exit(1)
+    # 显示跳过的订阅
+    if skipped_subs:
+        print(f"\n⚠️ {len(skipped_subs)} 个订阅跳过: {', '.join([s['name'] for s in skipped_subs])}")
     
+    # 检查是否有有效的订阅
     if not subs_nodes_dict:
         print("\n✗ 错误: 没有有效的订阅节点，将不上传配置文件")
         sys.exit(1)
+    
+    print(f"\n✓ 有效订阅: {len(subs_nodes_dict)}/{len(subscriptions)}")
     
     # 遍历所有模板文件生成配置文件
     merged_configs = merge_all_templates(subs_nodes_dict, script_dir)
