@@ -396,8 +396,8 @@ def generate_provider_configs(subscriptions, script_dir):
             else:
                 base_name = template_file
             
-            # 替换 template -> config，并在 sing-box 后插入 _with_providers
-            config_filename = base_name.replace('template', 'config') + '_with_providers.json'
+            # 替换 template -> with_providers_config，将 _with_providers 插入到 sing-box 后面
+            config_filename = base_name.replace('template', 'with_providers_config') + '.json'
             
             provider_configs[config_filename] = json.dumps(template, indent=2, ensure_ascii=False)
             print(f"  → 处理模板: {template_file} -> {config_filename} ({filled_count} 个 providers 已填充)")
