@@ -160,9 +160,8 @@ def process_providers(config, subscriptions_nodes):
         else:
             continue
         
-        # 追加到原有 outbounds（保留固定项）
-        expanded.extend(fixed_outbounds)
-        outbound['outbounds'] = expanded
+        # 追加到原有 outbounds（固定项在前，订阅节点在后）
+        outbound['outbounds'] = fixed_outbounds + expanded
     
     # 移除顶层 providers
     del config['providers']
