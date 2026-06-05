@@ -349,6 +349,62 @@ def merge_all_templates(subs_nodes_dict, script_dir):
     return merged_configs
 
 
+def generate_provider_configs(subscriptions, script_dir):
+    """生成 providers 版本的配置文件（直接填充 url，不做其他处理）"""
+    template_dir = os.path.join(script_dir, '..', 'template')
+    if not os.path.exists(template_dir):
+        print(f"  ✗ 模板目录不存在: {template_dir}")
+        return {}
+    
+    # 构建订阅名到 URL 的映射
+    sub_url_map = {sub['name']: sub['url'] for sub in subscriptions}
+    
+    provider_configs = {}
+    template_files = [f for f in os.listdir(template_dir) if f.endswith(('.jsonc', '.json'))]
+    
+    if not template_files:
+        print(f"  ✗ 模板目录中没有找到模板文件")
+        return {}
+    
+    print(f"  找到 {len(template_files)} 个模板文件")
+    
+    for template_file in template_files:
+        template_path = os.path.join(template_dir, template_file)
+        
+        # 加载模板
+        if template_file.endswith('.jsonc'):
+            template = load_jsonc(template_path)
+        else:
+            with open(template_path, 'r', encoding='utf-8') as f:
+                template = json.load(f)
+        
+        # 填充 providers 的 url
+        filled_count = 0
+        for provider in template.get('providers', []):
+            provider_tag = provider.get('tag', '')
+            if provider_tag in sub_url_map:
+                provider['url'] = sub_url_map[provider_tag]
+                filled_count += 1
+        
+        if filled_count > 0:
+            # 生成带 _with_providers 后缀的文件名
+            # 先分离扩展名
+            if template_file.endswith('.jsonc'):
+                base_name = template_file[:-6]
+            elif template_file.endswith('.json'):
+                base_name = template_file[:-5]
+            else:
+                base_name = template_file
+            
+            # 替换 template -> config，并在 sing-box 后插入 _with_providers
+            config_filename = base_name.replace('template', 'config') + '_with_providers.json'
+            
+            provider_configs[config_filename] = json.dumps(template, indent=2, ensure_ascii=False)
+            print(f"  → 处理模板: {template_file} -> {config_filename} ({filled_count} 个 providers 已填充)")
+    
+    return provider_configs
+
+
 def load_jsonc(filepath):
     """加载 JSONC 文件（支持注释）"""
     with open(filepath, 'r', encoding='utf-8') as f:
@@ -547,6 +603,14 @@ def main():
         files[filename] = content
     if merged_configs:
         print(f"  ✓ 共生成 {len(merged_configs)} 个配置文件")
+    
+    # 生成 providers 版本的配置文件
+    print(f"\n→ 生成 providers 版本配置文件...")
+    provider_configs = generate_provider_configs(subscriptions, script_dir)
+    for filename, content in provider_configs.items():
+        files[filename] = content
+    if provider_configs:
+        print(f"  ✓ 共生成 {len(provider_configs)} 个 providers配置文件")
     
     readme_content = generate_readme(subscription_info)
     with open("README.md", "w", encoding="utf-8") as f:

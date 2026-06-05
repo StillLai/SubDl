@@ -446,7 +446,6 @@
     {
       "type": "selector",
       "tag": "🐦 Twitter(X)",
-      "use_all_providers": true,
       "outbounds": ["🚀 节点选择", "🎈 自动选择", "🗂️ 备用自动", "🇭🇰 香港节点", "🇹🇼 台湾节点", "🇸🇬 新加坡节点", "🇯🇵 日本节点", "🇺🇸 美国节点", "🇪🇺 欧洲节点", "🇺🇳 其它地区", "🎯 全球直连"]
     },
     {
@@ -468,7 +467,6 @@
       "tag": "🇭🇰 香港节点",
       "url": "https://cp.cloudflare.com",
       "interrupt_exist_connections": true,
-      "use_all_providers": true,
       "providers": ["飞鸟云"],
       "include": "港|HK|hk|Hong Kong|HongKong|hongkong"
     },
