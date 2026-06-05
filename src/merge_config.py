@@ -6,8 +6,8 @@ Sing-box 配置合并脚本
 
 功能：
 1. 读取配置模板
-2. 处理 outbounds 中的 Subscription 占位符
-3. 根据 include 正则筛选节点
+2. 处理 providers 配置（将 providers 数组展开为节点标签）
+3. 根据 include/exclude 正则筛选节点
 4. 设置 tls.insecure = true 以支持自签名证书
 5. 处理空 outbound 的兼容性问题
 """
@@ -54,120 +54,98 @@ def fix_tls_insecure(proxies):
     return fixed_count
 
 
-def expand_subscription_item(item, subscriptions_nodes, include_regex=None, exclude_regex=None):
+def filter_nodes_by_regex(node_tags, include_regex, exclude_regex):
     """
-    展开 Subscription 占位符为实际节点标签列表
+    根据 include/exclude 正则筛选节点标签
     
     Args:
-        item: Subscription 对象 {"type": "Subscription", "tag": "xxx"} 或 {"type": "Subscription", "tag": ["sub1", "sub2"]}
-        subscriptions_nodes: dict，键为订阅名，值为节点列表
+        node_tags: 节点标签列表
         include_regex: include 正则表达式（可能为 None）
-        exclude_regex: exclude 正则表达式（可能为 None），匹配该正则的节点将被排除
+        exclude_regex: exclude 正则表达式（可能为 None）
     
     Returns:
-        展开后的节点标签列表
+        筛选后的节点标签列表
     """
-    if not isinstance(item, dict) or item.get('type') != 'Subscription':
-        return [item]
+    if not include_regex and not exclude_regex:
+        return node_tags
     
-    tag_value = item.get('tag', '')
+    include_pattern = re.compile(include_regex, re.IGNORECASE) if include_regex else None
+    exclude_pattern = re.compile(exclude_regex, re.IGNORECASE) if exclude_regex else None
     
-    # 确定要插入的订阅列表
-    if tag_value == '' or tag_value is None:
-        # 空值表示插入所有订阅
-        sub_names = list(subscriptions_nodes.keys())
-    elif isinstance(tag_value, list):
-        # 数组：插入多个订阅
-        sub_names = tag_value
-    else:
-        # 字符串：单个订阅
-        sub_names = [tag_value]
+    filtered = []
+    for tag in node_tags:
+        if include_pattern and not include_pattern.search(tag):
+            continue
+        if exclude_pattern and exclude_pattern.search(tag):
+            continue
+        filtered.append(tag)
     
-    result_tags = []
+    return filtered
+
+
+def process_providers(config, subscriptions_nodes):
+    """
+    处理 providers 配置，将 providers 数组展开为节点标签
     
-    for sub_name in sub_names:
-        if sub_name not in subscriptions_nodes:
-            log(f"  警告: 未找到订阅 '{sub_name}'，跳过")
+    1. 检测模板是否有 providers 数组
+    2. 遍历 providers，将订阅节点展开为标签列表
+    3. 遍历 outbounds，找到有 providers 字段的项
+    4. 应用 include/exclude 筛选
+    5. 将 providers 字段替换为展开的节点标签列表
+    6. 从最终配置中移除 providers 字段
+    
+    Args:
+        config: 配置字典
+        subscriptions_nodes: dict，键为订阅名，值为节点列表
+    
+    Returns:
+        处理后的配置字典
+    """
+    if 'providers' not in config or not isinstance(config['providers'], list):
+        return config
+    
+    providers = config['providers']
+    provider_nodes = {}  # provider_tag -> [节点标签列表]
+    
+    # 展开每个 provider 的节点
+    for provider in providers:
+        tag = provider.get('tag', '')
+        if tag in subscriptions_nodes:
+            tags = []
+            for node in subscriptions_nodes[tag]:
+                if isinstance(node, dict) and 'tag' in node:
+                    tags.append(node['tag'])
+            provider_nodes[tag] = tags
+    
+    # 遍历 outbounds，展开 providers 引用
+    for outbound in config['outbounds']:
+        if not isinstance(outbound, dict):
             continue
         
-        nodes = subscriptions_nodes[sub_name]
+        if 'providers' not in outbound:
+            continue
         
-        # 如果有 include 或 exclude 正则，筛选节点
-        if include_regex or exclude_regex:
-            try:
-                include_pattern = re.compile(include_regex, re.IGNORECASE) if include_regex else None
-                exclude_pattern = re.compile(exclude_regex, re.IGNORECASE) if exclude_regex else None
-                
-                filtered = []
-                for node in nodes:
-                    tag = node.get('tag', '')
-                    # 先按 include 筛选（保留匹配项）
-                    if include_pattern and not include_pattern.search(tag):
-                        continue
-                    # 再按 exclude 排除（移除匹配项）
-                    if exclude_pattern and exclude_pattern.search(tag):
-                        continue
-                    filtered.append(node)
-                
-                filter_desc = []
-                if include_regex:
-                    filter_desc.append(f"include({include_regex})")
-                if exclude_regex:
-                    filter_desc.append(f"exclude({exclude_regex})")
-                log(f"    订阅 '{sub_name}': {len(nodes)} 个节点，筛选后 {len(filtered)} 个 ({', '.join(filter_desc)})")
-                
-                for node in filtered:
-                    new_tag = node['tag']
-                    result_tags.append(new_tag)
-            except re.error as e:
-                log(f"    错误: 正则无效: {e}")
-                for node in nodes:
-                    new_tag = node['tag']
-                    result_tags.append(new_tag)
-        else:
-            for node in nodes:
-                new_tag = node['tag']
-                result_tags.append(new_tag)
-
-    return result_tags
-
-
-def process_outbounds(outbounds, subscriptions_nodes, default_include_regex=None, default_exclude_regex=None):
-    """
-    处理 outbounds 数组，展开 Subscription 占位符
+        # 获取 include/exclude 正则
+        include_regex = outbound.get('include')
+        exclude_regex = outbound.get('exclude')
+        
+        # 展开 providers
+        expanded = []
+        for provider_tag in outbound['providers']:
+            if provider_tag in provider_nodes:
+                # 应用筛选
+                filtered = filter_nodes_by_regex(
+                    provider_nodes[provider_tag], include_regex, exclude_regex
+                )
+                expanded.extend(filtered)
+        
+        outbound['outbounds'] = expanded
+        del outbound['providers']  # 移除 providers 字段
     
-    Args:
-        outbounds: outbounds 数组
-        subscriptions_nodes: dict，键为订阅名，值为节点列表
-        default_include_regex: 当前 outbound 的默认 include 正则（用于没有自己 include 的 Subscription）
-        default_exclude_regex: 当前 outbound 的默认 exclude 正则（用于没有自己 exclude 的 Subscription）
+    # 移除顶层 providers
+    del config['providers']
     
-    Returns:
-        处理后的 outbounds 数组
-    """
-    if not isinstance(outbounds, list):
-        return outbounds
-    
-    result = []
-    for item in outbounds:
-        if isinstance(item, dict) and item.get('type') == 'Subscription':
-            # 每个 Subscription 使用自己的 include/exclude 正则（如果有）
-            # 如果 Subscription 没有自己的 include/exclude，使用父级 outbound 的默认值
-            sub_include_regex = item.get('include')
-            sub_exclude_regex = item.get('exclude')
-            effective_include_regex = sub_include_regex if sub_include_regex else default_include_regex
-            effective_exclude_regex = sub_exclude_regex if sub_exclude_regex else default_exclude_regex
-            
-            # 展开 Subscription，插入节点标签
-            expanded = expand_subscription_item(
-                item, subscriptions_nodes, effective_include_regex, effective_exclude_regex
-            )
-            result.extend(expanded)
-        else:
-            # 保留其他项（字符串、对象等）
-            result.append(item)
-    
-    return result
+    return config
 
 
 def remove_filter_fields(obj):
@@ -214,38 +192,10 @@ def merge_config(template_config, subscriptions_nodes):
     fixed = fix_tls_insecure(all_nodes)
     log(f"已设置 {fixed} 个节点的 tls.insecure = true")
     
-    # ========== 步骤 3: 处理所有 outbounds（展开 Subscription）==========
-    total_subscription_count = 0
-    
-    for outbound in config['outbounds']:
-        if not isinstance(outbound, dict):
-            continue
-        
-        # 只有 selector 和 urltest 类型需要处理 outbounds 列表
-        outbound_type = outbound.get('type', '')
-        if outbound_type not in ('selector', 'urltest'):
-            continue
-        
-        outbounds_list = outbound.get('outbounds', [])
-        if not isinstance(outbounds_list, list):
-            continue
-        
-        # 获取当前 outbound 的 include 和 exclude 正则
-        include_regex = outbound.get('include')
-        exclude_regex = outbound.get('exclude')
-        
-        # 展开 Subscription
-        processed = process_outbounds(
-            outbounds_list, subscriptions_nodes, include_regex, exclude_regex
-        )
-        outbound['outbounds'] = processed
-        
-        # 统计 Subscription 展开的节点数
-        subscription_count = sum(1 for item in outbounds_list 
-                                  if isinstance(item, dict) and item.get('type') == 'Subscription')
-        total_subscription_count += subscription_count
-    
-    log(f"处理了 {total_subscription_count} 个 Subscription 占位符")
+    # ========== 步骤 3: 处理 providers 配置 ==========
+    if 'providers' in config:
+        process_providers(config, subscriptions_nodes)
+        log("已处理 providers 配置")
     
     # ========== 步骤 4: 移除所有 include 和 exclude 字段 ==========
     remove_filter_fields(config)
