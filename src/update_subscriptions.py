@@ -480,19 +480,14 @@ def generate_tproxy_template(script_dir):
 
 
 def generate_tun_for_win_template(script_dir):
-    """生成适用于 Windows 的 tun模板（删除 auto_redirect，添加 log output）"""
+    """生成适用于 Windows 的 tun模板（删除 auto_redirect）"""
     try:
         template_path = os.path.join(script_dir, '..', 'template', 'sing-box_template.jsonc')
         output_path = os.path.join(script_dir, '..', 'template', 'sing-box_template_tun_for_win.jsonc')
         
         template = load_jsonc(template_path)
         
-        #1. 在 log 配置中添加 output字段
-        if 'log' in template and isinstance(template['log'], dict):
-            template['log']['output'] = './sing-box.log'
-            print(f"  ✓已在 log 中添加 output 配置")
-        
-        # 2. 在 inbounds 中删除 tun inbound 的 auto_redirect 字段
+        # 在 inbounds 中删除 tun inbound 的 auto_redirect 字段
         if 'inbounds' in template and isinstance(template['inbounds'], list):
             for i, inbound in enumerate(template['inbounds']):
                 if isinstance(inbound, dict) and inbound.get('type') == 'tun':
