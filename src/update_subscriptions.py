@@ -479,6 +479,38 @@ def generate_tproxy_template(script_dir):
         return None
 
 
+def generate_tun_for_win_template(script_dir):
+    """生成适用于 Windows 的 tun模板（删除 auto_redirect，添加 log output）"""
+    try:
+        template_path = os.path.join(script_dir, '..', 'template', 'sing-box_template.jsonc')
+        output_path = os.path.join(script_dir, '..', 'template', 'sing-box_template_tun_for_win.jsonc')
+        
+        template = load_jsonc(template_path)
+        
+        #1. 在 log 配置中添加 output字段
+        if 'log' in template and isinstance(template['log'], dict):
+            template['log']['output'] = './sing-box.log'
+            print(f"  ✓已在 log 中添加 output 配置")
+        
+        # 2. 在 inbounds 中删除 tun inbound 的 auto_redirect 字段
+        if 'inbounds' in template and isinstance(template['inbounds'], list):
+            for i, inbound in enumerate(template['inbounds']):
+                if isinstance(inbound, dict) and inbound.get('type') == 'tun':
+                    if 'auto_redirect' in template['inbounds'][i]:
+                        del template['inbounds'][i]['auto_redirect']
+                        print(f"  ✓ 已在 tun inbound 中删除 auto_redirect 字段")
+                    break
+        
+        output_content = json.dumps(template, indent=2, ensure_ascii=False)
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write(output_content)
+        print(f"  ✓ 已生成 tun_for_win 模板: template/sing-box_template_tun_for_win.jsonc")
+        return output_content
+    except Exception as e:
+        print(f"  ✗ 生成 tun_for_win 模板异常: {e}")
+        return None
+
+
 def main():
     print("=" * 60)
     print("SubDl - Subscription Downloader")
@@ -495,6 +527,9 @@ def main():
     
     print("\n→ 生成 tproxy inbound 的模板...")
     tproxy_template = generate_tproxy_template(script_dir)
+    
+    print("\n→ 生成适用于 Windows 的 tun 模板...")
+    tun_for_win_template = generate_tun_for_win_template(script_dir)
     
     subscriptions = parse_subscriptions()
     if not subscriptions:
