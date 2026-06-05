@@ -118,6 +118,7 @@ def process_providers(config, subscriptions_nodes):
             provider_nodes[tag] = tags
     
     # 遍历 outbounds，展开 providers 引用
+    expanded = []
     for outbound in config['outbounds']:
         if not isinstance(outbound, dict):
             continue
