@@ -919,7 +919,6 @@
     {
       "type": "selector",
       "tag": "🐦 Twitter(X)",
-      "use_all_providers": true,
       "outbounds": [
         "🚀 节点选择",
         "🎈 自动选择",
@@ -957,7 +956,6 @@
       "tag": "🇭🇰 香港节点",
       "url": "https://cp.cloudflare.com",
       "interrupt_exist_connections": true,
-      "use_all_providers": true,
       "providers": [
         "飞鸟云"
       ],
