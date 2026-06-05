@@ -122,25 +122,36 @@ def process_providers(config, subscriptions_nodes):
         if not isinstance(outbound, dict):
             continue
         
-        if 'providers' not in outbound:
-            continue
-        
         # 获取 include/exclude 正则
         include_regex = outbound.get('include')
         exclude_regex = outbound.get('exclude')
         
-        # 展开 providers
-        expanded = []
-        for provider_tag in outbound['providers']:
-            if provider_tag in provider_nodes:
-                # 应用筛选
+        # 判断是 use_all_providers 还是 providers 列表
+        use_all = outbound.get('use_all_providers', False)
+        
+        if use_all:
+            # use_all_providers: true - 展开所有订阅节点
+            expanded = []
+            for provider_tag in provider_nodes.keys():
                 filtered = filter_nodes_by_regex(
                     provider_nodes[provider_tag], include_regex, exclude_regex
                 )
                 expanded.extend(filtered)
-        
-        outbound['outbounds'] = expanded
-        del outbound['providers']  # 移除 providers 字段
+            del outbound['use_all_providers']  # 移除 use_all_providers 字段
+        elif 'providers' in outbound:
+            # providers 列表 - 展开指定的 providers
+            expanded = []
+            for provider_tag in outbound['providers']:
+                if provider_tag in provider_nodes:
+                    # 应用筛选
+                    filtered = filter_nodes_by_regex(
+                        provider_nodes[provider_tag], include_regex, exclude_regex
+                    )
+                    expanded.extend(filtered)
+            outbound['outbounds'] = expanded
+            del outbound['providers']  # 移除 providers 字段
+        else:
+            continue
     
     # 移除顶层 providers
     del config['providers']
