@@ -129,18 +129,25 @@ def process_providers(config, subscriptions_nodes):
         # 判断是 use_all_providers 还是 providers 列表
         use_all = outbound.get('use_all_providers', False)
         
+        # 获取原有 outbounds（仅字符串元素，用于保留如 "🎯 全球直连" 等固定项）
+        existing_outbounds = outbound.get('outbounds', [])
+        fixed_outbounds = []
+        if isinstance(existing_outbounds, list):
+            # 保留非订阅节点（字符串项，如 "🎯 全球直连"）
+            fixed_outbounds = [o for o in existing_outbounds if isinstance(o, str)]
+        
         if use_all:
             # use_all_providers: true - 展开所有订阅节点
-            expanded = []
             for provider_tag in provider_nodes.keys():
                 filtered = filter_nodes_by_regex(
                     provider_nodes[provider_tag], include_regex, exclude_regex
                 )
                 expanded.extend(filtered)
             del outbound['use_all_providers']  # 移除 use_all_providers 字段
+            if 'providers' in outbound:
+                del outbound['providers']  # 也要删除 providers
         elif 'providers' in outbound:
             # providers 列表 - 展开指定的 providers
-            expanded = []
             for provider_tag in outbound['providers']:
                 if provider_tag in provider_nodes:
                     # 应用筛选
@@ -148,10 +155,13 @@ def process_providers(config, subscriptions_nodes):
                         provider_nodes[provider_tag], include_regex, exclude_regex
                     )
                     expanded.extend(filtered)
-            outbound['outbounds'] = expanded
             del outbound['providers']  # 移除 providers 字段
         else:
             continue
+        
+        # 追加到原有 outbounds（保留固定项）
+        expanded.extend(fixed_outbounds)
+        outbound['outbounds'] = expanded
     
     # 移除顶层 providers
     del config['providers']
