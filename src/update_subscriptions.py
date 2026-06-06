@@ -494,6 +494,8 @@ def generate_tun_for_win_template(script_dir):
                     if 'auto_redirect' in template['inbounds'][i]:
                         del template['inbounds'][i]['auto_redirect']
                         print(f"  ✓ 已在 tun inbound 中删除 auto_redirect 字段")
+                    template['inbounds'][i]['stack'] = 'gvisor'
+                    print(f"  ✓ 已将 tun inbound 的 stack 设置为 gvisor")
                     break
         
         output_content = json.dumps(template, indent=2, ensure_ascii=False)
