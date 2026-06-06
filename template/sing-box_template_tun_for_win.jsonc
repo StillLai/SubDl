@@ -452,7 +452,7 @@
         "172.19.0.1/30"
       ],
       "mtu": 1500,
-      "stack": "gvisor",
+      "stack": "system",
       "auto_route": true,
       "strict_route": true
     },
