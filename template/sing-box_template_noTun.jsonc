@@ -435,8 +435,7 @@
             "rule_set": "geoip-cn"
           }
         ],
-        "server": "Google-DNS",
-        "client_subnet": "113.84.0.1/24"
+        "server": "Tencent-DNS"
       },
       {
         "rule_set": [
@@ -937,7 +936,6 @@
       "type": "urltest",
       "tag": "🎈 自动选择",
       "url": "https://cp.cloudflare.com",
-      "interrupt_exist_connections": true,
       "providers": [
         "飞鸟云"
       ]
@@ -946,7 +944,6 @@
       "type": "urltest",
       "tag": "🗂️ 备用自动",
       "url": "https://cp.cloudflare.com",
-      "interrupt_exist_connections": true,
       "providers": [
         "山海"
       ]
@@ -955,7 +952,6 @@
       "type": "urltest",
       "tag": "🇭🇰 香港节点",
       "url": "https://cp.cloudflare.com",
-      "interrupt_exist_connections": true,
       "providers": [
         "飞鸟云"
       ],
@@ -965,7 +961,6 @@
       "type": "urltest",
       "tag": "🇹🇼 台湾节点",
       "url": "https://cp.cloudflare.com",
-      "interrupt_exist_connections": true,
       "providers": [
         "飞鸟云"
       ],
@@ -975,7 +970,6 @@
       "type": "urltest",
       "tag": "🇸🇬 新加坡节点",
       "url": "https://cp.cloudflare.com",
-      "interrupt_exist_connections": true,
       "providers": [
         "飞鸟云"
       ],
@@ -985,7 +979,6 @@
       "type": "urltest",
       "tag": "🇯🇵 日本节点",
       "url": "https://cp.cloudflare.com",
-      "interrupt_exist_connections": true,
       "providers": [
         "飞鸟云"
       ],
@@ -995,7 +988,6 @@
       "type": "urltest",
       "tag": "🇺🇸 美国节点",
       "url": "https://cp.cloudflare.com",
-      "interrupt_exist_connections": true,
       "providers": [
         "飞鸟云"
       ],
@@ -1005,7 +997,6 @@
       "type": "urltest",
       "tag": "🇪🇺 欧洲节点",
       "url": "https://cp.cloudflare.com",
-      "interrupt_exist_connections": true,
       "providers": [
         "飞鸟云"
       ],
@@ -1015,7 +1006,6 @@
       "type": "urltest",
       "tag": "🇺🇳 其它地区",
       "url": "https://cp.cloudflare.com",
-      "interrupt_exist_connections": true,
       "providers": [
         "飞鸟云"
       ],
@@ -1093,12 +1083,6 @@
         "tag": "WebRTC",
         "type": "remote",
         "url": "https://gh-proxy.org/https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/ruleset_srs/WebRTC.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geosite-tracker",
-        "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/tracker.srs",
         "update_interval": "6h"
       },
       {
@@ -1285,12 +1269,6 @@
         "tag": "geoip-cloudflare",
         "type": "remote",
         "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geoip/cloudflare.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "GoogleFCM",
-        "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/ruleset_srs/GoogleFCM.srs",
         "update_interval": "6h"
       },
       {
@@ -1735,6 +1713,23 @@
         "rule_set": [
           "geosite-geolocation-cn",
           "custom_direct"
+        ],
+        "outbound": "🎯 全球直连"
+      },
+      {
+        "type": "logical",
+        "mode": "and",
+        "rules": [
+          {
+            "rule_set": [
+              "geosite-geolocation-!cn",
+              "custom_proxy"
+            ],
+            "invert": true
+          },
+          {
+            "rule_set": "geoip-cn"
+          }
         ],
         "outbound": "🎯 全球直连"
       },
