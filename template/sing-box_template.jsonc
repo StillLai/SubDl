@@ -271,8 +271,7 @@
           {"rule_set": ["geosite-geolocation-!cn", "custom_proxy"], "invert": true},
           {"rule_set": "geoip-cn"}
         ],
-        "server": "Google-DNS",
-        "client_subnet": "113.84.0.1/24"
+        "server": "Tencent-DNS"
       },
       {
         "rule_set": ["geosite-geolocation-!cn", "custom_proxy"],
@@ -452,21 +451,18 @@
       "type": "urltest",
       "tag": "🎈 自动选择",
       "url": "https://cp.cloudflare.com",
-      "interrupt_exist_connections": true,
       "providers": ["飞鸟云"]
     },
     {
       "type": "urltest",
       "tag": "🗂️ 备用自动",
       "url": "https://cp.cloudflare.com",
-      "interrupt_exist_connections": true,
       "providers": ["山海"]
     },
     {
       "type": "urltest",
       "tag": "🇭🇰 香港节点",
       "url": "https://cp.cloudflare.com",
-      "interrupt_exist_connections": true,
       "providers": ["飞鸟云"],
       "include": "港|HK|hk|Hong Kong|HongKong|hongkong"
     },
@@ -474,7 +470,6 @@
       "type": "urltest",
       "tag": "🇹🇼 台湾节点",
       "url": "https://cp.cloudflare.com",
-      "interrupt_exist_connections": true,
       "providers": ["飞鸟云"],
       "include": "台|新北|彰化|TW|Taiwan"
     },
@@ -482,7 +477,6 @@
       "type": "urltest",
       "tag": "🇸🇬 新加坡节点",
       "url": "https://cp.cloudflare.com",
-      "interrupt_exist_connections": true,
       "providers": ["飞鸟云"],
       "include": "新加坡|坡|狮城|SG|Singapore"
     },
@@ -490,7 +484,6 @@
       "type": "urltest",
       "tag": "🇯🇵 日本节点",
       "url": "https://cp.cloudflare.com",
-      "interrupt_exist_connections": true,
       "providers": ["飞鸟云"],
       "include": "日本|川日|东京|大阪|泉日|埼玉|沪日|深日|[^-]日|JP|Japan"
     },
@@ -498,7 +491,6 @@
       "type": "urltest",
       "tag": "🇺🇸 美国节点",
       "url": "https://cp.cloudflare.com",
-      "interrupt_exist_connections": true,
       "providers": ["飞鸟云"],
       "include": "美|波特兰|达拉斯|俄勒冈|凤凰城|费利蒙|硅谷|拉斯维加斯|洛杉矶|圣何塞|圣克拉拉|西雅图|芝加哥|US|United States"
     },
@@ -506,7 +498,6 @@
       "type": "urltest",
       "tag": "🇪🇺 欧洲节点",
       "url": "https://cp.cloudflare.com",
-      "interrupt_exist_connections": true,
       "providers": ["飞鸟云"],
       "include": "奥|比|保|克罗地亚|塞|捷|丹|爱沙|芬|法|德|希|匈|爱尔|意|拉|立|卢|马耳他|荷|波|葡|西班牙|俄罗斯|斯洛伐|斯洛文|瑞|英|冰岛|挪威|瑞士|列支|摩纳|梵蒂|圣马|黑山|阿尔巴|北马其|波斯尼|科索沃|🇷🇺|🇦🇹|🇧🇪|🇧🇬|🇭🇷|🇨🇾|🇨🇿|🇩🇰|🇪🇪|🇫🇮|🇫🇷|🇩🇪|🇬🇷|🇭🇺|🇮🇪|🇮🇹|🇱🇻|🇱🇹|🇱🇺|🇲🇹|🇳🇱|🇳🇴|🇵🇱|🇵🇹|🇷🇴|🇷🇸|🇸🇰|🇸🇮|🇪🇸|🇸🇪|🇨🇭|🇬🇧|🇮🇸|🇦🇱|🇲🇰|🇲🇪|🇽🇰|🇸🇲|🇻🇦|🇱🇮|🇧🇦|MOW|LED|SVO|CDG|FRA|AMS|MAD|BCN|FCO|MUC|BRU|VIE|ZRH|OSL|CPH|ARN|HEL|DUB"
     },
@@ -514,7 +505,6 @@
       "type": "urltest",
       "tag": "🇺🇳 其它地区",
       "url": "https://cp.cloudflare.com",
-      "interrupt_exist_connections": true,
       "providers": ["飞鸟云"],
       "exclude": "港|HK|hk|Hong Kong|HongKong|hongkong|台|新北|彰化|TW|Taiwan|新加坡|坡|狮城|SG|Singapore|日本|川日|东京|大阪|泉日|埼玉|沪日|深日|[^-]日|JP|Japan|美|波特兰|达拉斯|俄勒冈|凤凰城|费利蒙|硅谷|拉斯维加斯|洛杉矶|圣何塞|圣克拉拉|西雅图|芝加哥|US|United States|奥|比|保|克罗地亚|塞|捷|丹|爱沙|芬|法|德|希|匈|爱尔|意|拉|立|卢|马耳他|荷|波|葡|西班牙|俄罗斯|斯洛伐|斯洛文|瑞|英|冰岛|挪威|瑞士|列支|摩纳|梵蒂|圣马|黑山|阿尔巴|北马其|波斯尼|科索沃|🇷🇺|🇦🇹|🇧🇪|🇧🇬|🇭🇷|🇨🇾|🇨🇿|🇩🇰|🇪🇪|🇫🇮|🇫🇷|🇩🇪|🇬🇷|🇭🇺|🇮🇪|🇮🇹|🇱🇻|🇱🇹|🇱🇺|🇲🇹|🇳🇱|🇳🇴|🇵🇱|🇵🇹|🇷🇴|🇷🇸|🇸🇰|🇸🇮|🇪🇸|🇸🇪|🇨🇭|🇬🇧|🇮🇸|🇦🇱|🇲🇰|🇲🇪|🇽🇰|🇸🇲|🇻🇦|🇱🇮|🇧🇦|MOW|LED|SVO|CDG|FRA|AMS|MAD|BCN|FCO|MUC|BRU|VIE|ZRH|OSL|CPH|ARN|HEL|DUB|剩余|重置|到期|有效期|时间|订阅|账户|客户端|官网|电报群|防失联"
     },
@@ -579,12 +569,6 @@
         "tag": "WebRTC",
         "type": "remote",
         "url": "https://gh-proxy.org/https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/ruleset_srs/WebRTC.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geosite-tracker",
-        "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/tracker.srs",
         "update_interval": "6h"
       },
       {
@@ -771,12 +755,6 @@
         "tag": "geoip-cloudflare",
         "type": "remote",
         "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geoip/cloudflare.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "GoogleFCM",
-        "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/ruleset_srs/GoogleFCM.srs",
         "update_interval": "6h"
       },
       {
@@ -1057,6 +1035,15 @@
       },
       {
         "rule_set": ["geosite-geolocation-cn", "custom_direct"],
+        "outbound": "🎯 全球直连"
+      },
+      {
+        "type": "logical",
+        "mode": "and",
+        "rules": [
+          {"rule_set": ["geosite-geolocation-!cn", "custom_proxy"], "invert": true},
+          {"rule_set": "geoip-cn"}
+        ],
         "outbound": "🎯 全球直连"
       },
       {
