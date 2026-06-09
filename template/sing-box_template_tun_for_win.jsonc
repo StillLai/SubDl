@@ -18,6 +18,33 @@
       "store_rdrc": true
     }
   },
+  "inbounds": [
+    {
+      "type": "tun",
+      "tag": "tun-in",
+      "interface_name": "net9",
+      "address": [
+        "fdfe:dcba:9876::1/126",
+        "172.19.0.1/30"
+      ],
+      "mtu": 1500,
+      "stack": "system",
+      "auto_route": true,
+      "strict_route": true
+    },
+    {
+      "type": "mixed",
+      "tag": "mixed-in",
+      "listen": "127.0.0.1",
+      "listen_port": 5297
+    },
+    {
+      "type": "mixed",
+      "tag": "mixed-in-global",
+      "listen": "127.0.0.1",
+      "listen_port": 43210
+    }
+  ],
   "dns": {
     "strategy": "prefer_ipv4",
     "servers": [
@@ -442,33 +469,6 @@
     ],
     "final": "Tencent-DNS"
   },
-  "inbounds": [
-    {
-      "type": "tun",
-      "tag": "tun-in",
-      "interface_name": "net9",
-      "address": [
-        "fdfe:dcba:9876::1/126",
-        "172.19.0.1/30"
-      ],
-      "mtu": 1500,
-      "stack": "system",
-      "auto_route": true,
-      "strict_route": true
-    },
-    {
-      "type": "mixed",
-      "tag": "mixed-in",
-      "listen": "127.0.0.1",
-      "listen_port": 5297
-    },
-    {
-      "type": "mixed",
-      "tag": "mixed-in-global",
-      "listen": "127.0.0.1",
-      "listen_port": 43210
-    }
-  ],
   "providers": [
     {
       "type": "remote",

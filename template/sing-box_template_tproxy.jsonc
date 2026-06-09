@@ -18,6 +18,26 @@
       "store_rdrc": true
     }
   },
+  "inbounds": [
+    {
+      "type": "tproxy",
+      "tag": "tproxy-in",
+      "listen": "::",
+      "listen_port": 1536
+    },
+    {
+      "type": "mixed",
+      "tag": "mixed-in",
+      "listen": "127.0.0.1",
+      "listen_port": 5297
+    },
+    {
+      "type": "mixed",
+      "tag": "mixed-in-global",
+      "listen": "127.0.0.1",
+      "listen_port": 43210
+    }
+  ],
   "dns": {
     "strategy": "prefer_ipv4",
     "servers": [
@@ -442,26 +462,6 @@
     ],
     "final": "Tencent-DNS"
   },
-  "inbounds": [
-    {
-      "type": "tproxy",
-      "tag": "tproxy-in",
-      "listen": "::",
-      "listen_port": 1536
-    },
-    {
-      "type": "mixed",
-      "tag": "mixed-in",
-      "listen": "127.0.0.1",
-      "listen_port": 5297
-    },
-    {
-      "type": "mixed",
-      "tag": "mixed-in-global",
-      "listen": "127.0.0.1",
-      "listen_port": 43210
-    }
-  ],
   "providers": [
     {
       "type": "remote",
