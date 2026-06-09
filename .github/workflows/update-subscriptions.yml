@@ -52,6 +52,7 @@ jobs:
         git sparse-checkout set docs
         rm -rf $GITHUB_WORKSPACE/sing-box-reF1nd-docs
         cp -r docs $GITHUB_WORKSPACE/sing-box-reF1nd-docs
+        cd $GITHUB_WORKSPACE
         rm -rf /tmp/sing-box-reF1nd
 
         # 2. 同步 SagerNet/sing-box docs（stable 分支）
@@ -60,6 +61,7 @@ jobs:
         git sparse-checkout set docs
         rm -rf $GITHUB_WORKSPACE/sing-box-docs
         cp -r docs $GITHUB_WORKSPACE/sing-box-docs
+        cd $GITHUB_WORKSPACE
         rm -rf /tmp/sing-box-official
 
     - name: Commit changes
