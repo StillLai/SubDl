@@ -47,19 +47,17 @@ jobs:
     - name: Sync sing-box docs
       run: |
         # 1. 同步 reF1nd/sing-box docs（reF1nd-stable 分支）
-        git clone --depth 1 --filter=blob:none --sparse https://github.com/reF1nd/sing-box.git /tmp/sing-box-reF1nd
+        git clone --depth 1 --filter=blob:none --sparse --branch reF1nd-stable https://github.com/reF1nd/sing-box.git /tmp/sing-box-reF1nd
         cd /tmp/sing-box-reF1nd
         git sparse-checkout set docs
-        git checkout reF1nd-stable
         rm -rf $GITHUB_WORKSPACE/sing-box-reF1nd-docs
         cp -r docs $GITHUB_WORKSPACE/sing-box-reF1nd-docs
         rm -rf /tmp/sing-box-reF1nd
 
         # 2. 同步 SagerNet/sing-box docs（stable 分支）
-        git clone --depth 1 --filter=blob:none --sparse https://github.com/SagerNet/sing-box.git /tmp/sing-box-official
+        git clone --depth 1 --filter=blob:none --sparse --branch stable https://github.com/SagerNet/sing-box.git /tmp/sing-box-official
         cd /tmp/sing-box-official
         git sparse-checkout set docs
-        git checkout stable
         rm -rf $GITHUB_WORKSPACE/sing-box-docs
         cp -r docs $GITHUB_WORKSPACE/sing-box-docs
         rm -rf /tmp/sing-box-official
