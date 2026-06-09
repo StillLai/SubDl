@@ -44,10 +44,30 @@ jobs:
         SUB_URL_5: ${{ secrets.SUB_URL_5 }}
       run: python src/update_subscriptions.py
       
+    - name: Sync sing-box docs
+      run: |
+        # 1. 同步 reF1nd/sing-box docs（reF1nd-stable 分支）
+        git clone --depth 1 --filter=blob:none --sparse https://github.com/reF1nd/sing-box.git /tmp/sing-box-reF1nd
+        cd /tmp/sing-box-reF1nd
+        git sparse-checkout set docs
+        git checkout reF1nd-stable
+        rm -rf $GITHUB_WORKSPACE/sing-box-reF1nd-docs
+        cp -r docs $GITHUB_WORKSPACE/sing-box-reF1nd-docs
+        rm -rf /tmp/sing-box-reF1nd
+
+        # 2. 同步 SagerNet/sing-box docs（stable 分支）
+        git clone --depth 1 --filter=blob:none --sparse https://github.com/SagerNet/sing-box.git /tmp/sing-box-official
+        cd /tmp/sing-box-official
+        git sparse-checkout set docs
+        git checkout stable
+        rm -rf $GITHUB_WORKSPACE/sing-box-docs
+        cp -r docs $GITHUB_WORKSPACE/sing-box-docs
+        rm -rf /tmp/sing-box-official
+
     - name: Commit changes
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
-        git add README.md template/sing-box_template_noTun.jsonc template/sing-box_template_tproxy.jsonc template/sing-box_template_tun_for_win.jsonc
+        git add README.md template/sing-box_template_noTun.jsonc template/sing-box_template_tproxy.jsonc template/sing-box_template_tun_for_win.jsonc sing-box-reF1nd-docs/ sing-box-docs/
         git diff --quiet && git diff --staged --quiet || git commit -m "Update subscription info [skip ci]"
         git push
