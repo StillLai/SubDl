@@ -243,7 +243,7 @@
         "type": "logical",
         "mode": "or",
         "rules": [
-          {"rule_set": ["geosite-google", "geoip-google", "geosite-google-play", "geosite-youtube"]},
+          {"rule_set": ["geosite-google", "geoip-google", "geosite-google-play"]},
           {"package_name": ["com.android.vending", "com.google.android.gms", "com.google.android.gsf", "com.google.android.onetimeinitializer"]}
         ],
         "server": "Google-DNS"
@@ -510,7 +510,8 @@
     },
     {
       "type": "direct",
-      "tag": "🎯 全球直连"
+      "tag": "🎯 全球直连",
+      "tcp_fast_open": true
     },
     {
       "type": "selector",
@@ -1016,7 +1017,7 @@
         "type": "logical",
         "mode": "or",
         "rules": [
-          {"rule_set": ["geosite-google", "geoip-google", "geosite-google-play", "geosite-youtube"]},
+          {"rule_set": ["geosite-google", "geoip-google", "geosite-google-play"]},
           {"package_name": ["com.android.vending", "com.google.android.gms", "com.google.android.gsf", "com.google.android.onetimeinitializer"]}
         ],
         "outbound": "🇬 Google"
