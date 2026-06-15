@@ -1,0 +1,11 @@
+{
+  "version": 4,
+  "rules": [
+    {
+      "domain": [
+        "miav-cse.avlyun.com",
+        "vanced.to"
+      ]
+    }
+  ]
+}
