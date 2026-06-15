@@ -1,4 +1,4 @@
-name: Config Update
+name: Ruleset Update
 
 on:
   push:
