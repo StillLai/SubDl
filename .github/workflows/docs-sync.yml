@@ -1,4 +1,4 @@
-name: Sync Docs
+name: Docs Sync
 
 on:
   schedule:

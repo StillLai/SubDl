@@ -249,7 +249,7 @@ def generate_readme(subscription_info):
         "   - `GIST_ID`: Gist ID（可选，首次运行后会自动创建并输出）",
         "   - `SUB_URL`: 订阅链接 (`名称|URL` 格式)",
         "   - `SUB_URL_1`, `SUB_URL_2`...: 更多订阅（可选）",
-        "3. 在 Actions → Update Subscriptions 中点击 Run workflow", "",
+        "3. 在 Actions → Subscriptions Update 中点击 Run workflow", "",
         "## 说明", "",
         f"- {interval}自动更新订阅",
         "- 订阅内容上传到 Gist，不保存在仓库",
