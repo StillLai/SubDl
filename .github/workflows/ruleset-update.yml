@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'custom_rule/**'
+      - 'ruleset/custom_rule/**'
       - 'ruleset/ruleset_source.txt'
   workflow_dispatch:
   schedule:
