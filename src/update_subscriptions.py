@@ -296,7 +296,7 @@ def merge_singbox_config(subs_nodes_dict, script_dir, template_path=None):
     """将多个sing-box订阅节点合并到配置模板"""
     try:
         if template_path is None:
-            template_path = os.path.join(script_dir, '..', 'template', 'sing-box_template.jsonc')
+            template_path = os.path.join(script_dir, '..', 'config_template', 'sing-box_template.jsonc')
         if not os.path.exists(template_path):
             print(f"  ✗ 配置模板不存在: {template_path}")
             return None
@@ -325,7 +325,7 @@ def merge_singbox_config(subs_nodes_dict, script_dir, template_path=None):
 
 def merge_all_templates(subs_nodes_dict, script_dir):
     """遍历所有模板文件并生成配置文件"""
-    template_dir = os.path.join(script_dir, '..', 'template')
+    template_dir = os.path.join(script_dir, '..', 'config_template')
     if not os.path.exists(template_dir):
         print(f"  ✗ 模板目录不存在: {template_dir}")
         return {}
@@ -350,7 +350,7 @@ def merge_all_templates(subs_nodes_dict, script_dir):
         else:
             base_name = template_file
         # 替换 template -> config
-        config_filename = base_name.replace('template', 'config') + '.json'
+        config_filename = base_name.replace('config_template', 'config') + '.json'
         
         print(f"  → 处理模板: {template_file}")
         merged_config = merge_singbox_config(subs_nodes_dict, script_dir, template_path)
@@ -364,7 +364,7 @@ def merge_all_templates(subs_nodes_dict, script_dir):
 
 def generate_provider_configs(subscriptions, script_dir):
     """生成 providers 版本的配置文件（直接填充 url，不做其他处理）"""
-    template_dir = os.path.join(script_dir, '..', 'template')
+    template_dir = os.path.join(script_dir, '..', 'config_template')
     if not os.path.exists(template_dir):
         print(f"  ✗ 模板目录不存在: {template_dir}")
         return {}
@@ -410,7 +410,7 @@ def generate_provider_configs(subscriptions, script_dir):
                 base_name = template_file
             
             # 替换 template -> with_providers_config，将 _with_providers 插入到 sing-box 后面
-            config_filename = base_name.replace('template', 'with_providers_config') + '.json'
+            config_filename = base_name.replace('config_template', 'with_providers_config') + '.json'
             
             provider_configs[config_filename] = json.dumps(template, indent=2, ensure_ascii=False)
             print(f"  → 处理模板: {template_file} -> {config_filename} ({filled_count} 个 providers 已填充)")
@@ -436,8 +436,8 @@ def load_jsonc(filepath):
 def generate_notun_template(script_dir):
     """生成不含 tun inbound 的模板文件"""
     try:
-        template_path = os.path.join(script_dir, '..', 'template', 'sing-box_template.jsonc')
-        output_path = os.path.join(script_dir, '..', 'template', 'sing-box_template_noTun.jsonc')
+        template_path = os.path.join(script_dir, '..', 'config_template', 'sing-box_template.jsonc')
+        output_path = os.path.join(script_dir, '..', 'config_template', 'sing-box_template_noTun.jsonc')
         
         template = load_jsonc(template_path)
         
@@ -453,7 +453,7 @@ def generate_notun_template(script_dir):
         output_content = json.dumps(template, indent=2, ensure_ascii=False)
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(output_content)
-        print(f"  ✓ 已生成 noTun 模板: template/sing-box_template_noTun.jsonc")
+        print(f"  ✓ 已生成 noTun 模板: config_template/sing-box_template_noTun.jsonc")
         return output_content
     except Exception as e:
         print(f"  ✗ 生成 noTun 模板异常: {e}")
@@ -463,8 +463,8 @@ def generate_notun_template(script_dir):
 def generate_tproxy_template(script_dir):
     """生成 tproxy inbound 的模板文件"""
     try:
-        template_path = os.path.join(script_dir, '..', 'template', 'sing-box_template.jsonc')
-        output_path = os.path.join(script_dir, '..', 'template', 'sing-box_template_tproxy.jsonc')
+        template_path = os.path.join(script_dir, '..', 'config_template', 'sing-box_template.jsonc')
+        output_path = os.path.join(script_dir, '..', 'config_template', 'sing-box_template_tproxy.jsonc')
         
         template = load_jsonc(template_path)
         
@@ -485,7 +485,7 @@ def generate_tproxy_template(script_dir):
         output_content = json.dumps(template, indent=2, ensure_ascii=False)
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(output_content)
-        print(f"  ✓ 已生成 tproxy 模板: template/sing-box_template_tproxy.jsonc")
+        print(f"  ✓ 已生成 tproxy 模板: config_template/sing-box_template_tproxy.jsonc")
         return output_content
     except Exception as e:
         print(f"  ✗ 生成 tproxy 模板异常: {e}")
@@ -495,8 +495,8 @@ def generate_tproxy_template(script_dir):
 def generate_tun_for_win_template(script_dir):
     """生成适用于 Windows 的 tun模板（删除 auto_redirect）"""
     try:
-        template_path = os.path.join(script_dir, '..', 'template', 'sing-box_template.jsonc')
-        output_path = os.path.join(script_dir, '..', 'template', 'sing-box_template_tun_for_win.jsonc')
+        template_path = os.path.join(script_dir, '..', 'config_template', 'sing-box_template.jsonc')
+        output_path = os.path.join(script_dir, '..', 'config_template', 'sing-box_template_tun_for_win.jsonc')
         
         template = load_jsonc(template_path)
         
@@ -512,7 +512,7 @@ def generate_tun_for_win_template(script_dir):
         output_content = json.dumps(template, indent=2, ensure_ascii=False)
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(output_content)
-        print(f"  ✓ 已生成 tun_for_win 模板: template/sing-box_template_tun_for_win.jsonc")
+        print(f"  ✓ 已生成 tun_for_win 模板: config_template/sing-box_template_tun_for_win.jsonc")
         return output_content
     except Exception as e:
         print(f"  ✗ 生成 tun_for_win 模板异常: {e}")
