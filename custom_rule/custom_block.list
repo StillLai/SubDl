@@ -1,0 +1,5 @@
+# 补充广告拦截规则
+DOMAIN-SUFFIX,ctc
+DOMAIN,s.yunmengdata.com
+DOMAIN,cdn.palm-ad.com
+DOMAIN-SUFFIX,yingt.fun

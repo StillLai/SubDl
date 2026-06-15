@@ -255,6 +255,19 @@ def generate_readme(subscription_info):
         "- 订阅内容上传到 Gist，不保存在仓库",
         "- `sing-box-config.json` 是可直接使用的完整sing-box配置文件",
         "- 参考 [sub-store](https://github.com/sub-store-org/Sub-Store) 实现", "",
+        "## 🚀 sing-box 路由规则集", "",
+        "本项目自动将多种格式的规则源（Clash、Surge 等）转换为 sing-box 支持的规则集格式，支持：", "",
+        "- 🔄 **自动更新**：每 6 小时自动抓取最新规则并重新生成",
+        "- 📦 **双格式输出**：同时生成 JSON 格式（`ruleset_json/`）和 SRS 二进制格式（`ruleset_srs/`）",
+        "- ⚡ **性能优化**：SRS 格式加载更快，推荐使用",
+        "- 🛠️ **自定义规则**：修改 `custom_rule/` 目录下的文件即可添加个人规则", "",
+        "### 自定义规则", "",
+        "| 文件 | 用途 |",
+        "|------|------|",
+        "| `custom_direct.list` | 直连域名/IP |",
+        "| `custom_proxy.list` | 代理域名/IP |",
+        "| `custom_block.list` | 屏蔽域名/IP |",
+        "| `custom_whitelist.list` | 白名单（强制直连） |", "",
     ])
     return "\n".join(lines)
 

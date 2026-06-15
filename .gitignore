@@ -51,3 +51,8 @@ config.local.*
 
 # Sub-Store dependency (auto-downloaded)
 src/deps/
+
+# 自动生成的规则集文件（由 GitHub Action 生成，不需要本地跟踪）
+ruleset_json/
+ruleset_srs/
+data/rules_archive.tar

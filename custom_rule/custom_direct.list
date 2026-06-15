@@ -1,0 +1,11 @@
+# 补充直连规则，置于漏网之鱼前面
+DOMAIN,c.viayoo.com
+DOMAIN,subconverters.com
+DOMAIN,ghfast.top
+DOMAIN-SUFFIX,gh-proxy.org
+DOMAIN-SUFFIX,gh-proxy.com
+DOMAIN-SUFFIX,aliyuncs.com
+DOMAIN-SUFFIX,getui.com
+DOMAIN-SUFFIX,omarea.com
+DOMAIN-SUFFIX,gerpgo.com
+DOMAIN-SUFFIX,sellersprite.com
