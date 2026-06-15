@@ -153,10 +153,10 @@ def parse_list_file(link, output_directory):
                 with open(file_name, 'w', encoding='utf-8') as output_file:
                     json.dump(sort_dict(json_data), output_file, ensure_ascii=False, indent=2)
                 
-                # SRS 输出到 ruleset_srs 目录
+                # SRS 输出到 ruleset/srs 目录
                 srs_filename = os.path.basename(file_name).replace(".json", ".srs")
-                srs_path = os.path.join("./ruleset_srs/", srs_filename)
-                os.makedirs("./ruleset_srs/", exist_ok=True)
+                srs_path = os.path.join("./ruleset/srs/", srs_filename)
+                os.makedirs("./ruleset/srs/", exist_ok=True)
                 os.system(f"sing-box rule-set compile --output {srs_path} {file_name}")
                 return file_name
         except Exception as e:
@@ -249,19 +249,19 @@ def parse_list_file(link, output_directory):
     with open(file_name, 'w', encoding='utf-8') as output_file:
         json.dump(sort_dict(result_rules), output_file, ensure_ascii=False, indent=2)
 
-    # SRS 输出到 ruleset_srs 目录
+    # SRS 输出到 ruleset/srs 目录
     srs_filename = os.path.basename(file_name).replace(".json", ".srs")
-    srs_path = os.path.join("./ruleset_srs/", srs_filename)
-    os.makedirs("./ruleset_srs/", exist_ok=True)
+    srs_path = os.path.join("./ruleset/srs/", srs_filename)
+    os.makedirs("./ruleset/srs/", exist_ok=True)
     os.system(f"sing-box rule-set compile --output {srs_path} {file_name}")
     return file_name
 
-with open("ruleset_source.txt", 'r') as links_file:
+with open("ruleset/ruleset_source.txt", 'r') as links_file:
     links = links_file.read().splitlines()
 
 links = [l for l in links if l.strip() and not l.strip().startswith("#")]
 
-output_dir = "./ruleset_json/"
+output_dir = "./ruleset/json/"
 result_file_names = []
 
 for link in links:

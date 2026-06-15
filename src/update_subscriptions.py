@@ -258,7 +258,7 @@ def generate_readme(subscription_info):
         "## 🚀 sing-box 路由规则集", "",
         "本项目自动将多种格式的规则源（Clash、Surge 等）转换为 sing-box 支持的规则集格式，支持：", "",
         "- 🔄 **自动更新**：每 6 小时自动抓取最新规则并重新生成",
-        "- 📦 **双格式输出**：同时生成 JSON 格式（`ruleset_json/`）和 SRS 二进制格式（`ruleset_srs/`）",
+        "- 📦 **双格式输出**：同时生成 JSON 格式（`ruleset/json/`）和 SRS 二进制格式（`ruleset/srs/`）",
         "- ⚡ **性能优化**：SRS 格式加载更快，推荐使用",
         "- 🛠️ **自定义规则**：修改 `custom_rule/` 目录下的文件即可添加个人规则", "",
         "### 自定义规则", "",
@@ -350,7 +350,7 @@ def merge_all_templates(subs_nodes_dict, script_dir):
         else:
             base_name = template_file
         # 替换 template -> config
-        config_filename = base_name.replace('config_template', 'config') + '.json'
+        config_filename = base_name.replace('template', 'config') + '.json'
         
         print(f"  → 处理模板: {template_file}")
         merged_config = merge_singbox_config(subs_nodes_dict, script_dir, template_path)
@@ -410,7 +410,7 @@ def generate_provider_configs(subscriptions, script_dir):
                 base_name = template_file
             
             # 替换 template -> with_providers_config，将 _with_providers 插入到 sing-box 后面
-            config_filename = base_name.replace('config_template', 'with_providers_config') + '.json'
+            config_filename = base_name.replace('template', 'with_providers_config') + '.json'
             
             provider_configs[config_filename] = json.dumps(template, indent=2, ensure_ascii=False)
             print(f"  → 处理模板: {template_file} -> {config_filename} ({filled_count} 个 providers 已填充)")

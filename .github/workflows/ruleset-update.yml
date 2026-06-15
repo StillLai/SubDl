@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths:
       - 'custom_rule/**'
-      - 'ruleset_source.txt'
+      - 'ruleset/ruleset_source.txt'
   workflow_dispatch:
   schedule:
     - cron: '0 */6 * * *'
@@ -44,8 +44,8 @@ jobs:
       run: |
         git config --global user.email "action@github.com"
         git config --global user.name "GitHub Action"
-        git add -f ./ruleset_json/*.json
-        git add -f ./ruleset_srs/*.srs
+        git add -f ./ruleset/json/*.json
+        git add -f ./ruleset/srs/*.srs
 
         if git diff --staged --quiet; then
           echo "No changes to commit"
