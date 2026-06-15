@@ -1,7 +1,7 @@
-https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/custom_rule/custom_direct.list
-https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/custom_rule/custom_block.list
-https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/custom_rule/custom_proxy.list
-https://github.com/StillLai/sing-box_Route-rules/raw/refs/heads/main/custom_rule/custom_whitelist.list
+https://github.com/StillLai/SubDl/raw/refs/heads/main/custom_rule/custom_direct.list
+https://github.com/StillLai/SubDl/raw/refs/heads/main/custom_rule/custom_block.list
+https://github.com/StillLai/SubDl/raw/refs/heads/main/custom_rule/custom_proxy.list
+https://github.com/StillLai/SubDl/raw/refs/heads/main/custom_rule/custom_whitelist.list
 https://github.com/Accademia/Additional_Rule_For_Clash/raw/refs/heads/main/GeositeCN/GeositeCN.yaml
 https://github.com/Accademia/Additional_Rule_For_Clash/raw/refs/heads/main/ChinaMax/ChinaMax.yaml
 https://github.com/Accademia/Additional_Rule_For_Clash/raw/refs/heads/main/Apple/Apple.yaml
