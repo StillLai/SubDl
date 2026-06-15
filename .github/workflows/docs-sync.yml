@@ -1,0 +1,37 @@
+name: Sync Docs
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/docs-sync.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Sync sing-box docs
+      run: |
+        git clone --depth 1 --filter=blob:none --sparse --branch reF1nd-stable https://github.com/reF1nd/sing-box.git /tmp/sing-box-reF1nd
+        cd /tmp/sing-box-reF1nd
+        git sparse-checkout set docs
+        rm -rf $GITHUB_WORKSPACE/sing-box-reF1nd-docs
+        cp -r docs $GITHUB_WORKSPACE/sing-box-reF1nd-docs
+        cd $GITHUB_WORKSPACE
+        rm -rf /tmp/sing-box-reF1nd
+
+    - name: Commit changes
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add sing-box-reF1nd-docs/
+        git diff --quiet && git diff --staged --quiet || git commit -m "Sync sing-box docs [skip ci]"
+        git push

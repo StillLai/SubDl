@@ -201,7 +201,7 @@ def upload_to_gist(github_token, gist_id, files):
 
 def parse_cron_interval():
     """从 workflow 文件解析 cron 间隔"""
-    workflow_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.github', 'workflows', 'update-subscriptions.yml')
+    workflow_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.github', 'workflows', 'subscriptions-update.yml')
     try:
         with open(workflow_path, 'r', encoding='utf-8') as f:
             content = f.read()
