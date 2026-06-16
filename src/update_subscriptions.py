@@ -65,7 +65,7 @@ def format_expire(timestamp):
     try:
         dt = datetime.fromtimestamp(timestamp)
         return dt.strftime("%Y-%m-%d")
-    except:
+    except Exception:
         return "无"
 
 
@@ -169,7 +169,7 @@ def extract_name_from_url(url):
         domain = urlparse(url).netloc.replace("www.", "").split(":")[0]
         name = re.sub(r'[^a-zA-Z0-9_-]', '_', domain)
         return name[:50]
-    except:
+    except Exception:
         return f"sub_{int(time.time())}"
 
 
@@ -217,7 +217,7 @@ def parse_cron_interval():
                     return "每分钟"
                 elif hour.startswith('*/'):
                     return f"每 {hour[2:]} 小时"
-    except:
+    except Exception:
         pass
     return "每小时"
 

@@ -126,6 +126,17 @@ async function checkAndUpdateDeps(githubToken) {
  * 关键：在全局注入require，因为proxy-utils.esm.mjs内部有eval使用require
  */
 async function loadProxyUtils() {
+    // 保存原始值，便于加载后清理
+    const GLOBAL_KEYS = ['require', 'window', 'document', 'self', 'navigator', 'location'];
+    const originals = {};
+    for (const key of GLOBAL_KEYS) {
+        if (key in global) {
+            originals[key] = global[key];
+        } else {
+            originals[key] = undefined;  // 标记为原本不存在
+        }
+    }
+
     // 在全局注入require（这是proxy-utils.esm.mjs需要的）
     const { createRequire } = await import('module');
     global.require = createRequire(PROXY_UTILS_FILE);
@@ -136,16 +147,13 @@ async function loadProxyUtils() {
         pretendToBeVisual: true
     });
     
-    // 先删除可能存在的只读属性，再重新设置
-    const setupGlobal = (name, value) => {
-        try {
+    // 注入浏览器API
+    const injectGlobal = (name, value) => {
+        if (originals[name] !== undefined || (name in global)) {
+            // 已有值，直接覆盖
             global[name] = value;
-        } catch (e) {
-            try {
-                delete global[name];
-            } catch (err) {
-                // 忽略删除错误
-            }
+        } else {
+            // 原本不存在，用 defineProperty 创建
             Object.defineProperty(global, name, {
                 value: value,
                 configurable: true,
@@ -154,19 +162,28 @@ async function loadProxyUtils() {
             });
         }
     };
-    
-    // 暴露浏览器API
-    setupGlobal('window', dom.window);
-    setupGlobal('document', dom.window.document);
-    setupGlobal('self', dom.window);
-    setupGlobal('navigator', dom.window.navigator);
-    setupGlobal('location', dom.window.location);
+
+    injectGlobal('window', dom.window);
+    injectGlobal('document', dom.window.document);
+    injectGlobal('self', dom.window);
+    injectGlobal('navigator', dom.window.navigator);
+    injectGlobal('location', dom.window.location);
     
     // 直接用file://协议导入
     const modulePath = 'file://' + PROXY_UTILS_FILE;
     
     const mod = await import(modulePath);
     console.log('[Convert] 模块加载成功');
+
+    // 清理注入的全局变量，恢复原始状态
+    for (const key of GLOBAL_KEYS) {
+        if (originals[key] === undefined) {
+            delete global[key];
+        } else {
+            global[key] = originals[key];
+        }
+    }
+    
     return mod;
 }
 
