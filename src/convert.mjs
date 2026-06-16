@@ -128,15 +128,19 @@ async function checkAndUpdateDeps(githubToken) {
 async function loadProxyUtils() {
     // 保存原始值，便于加载后清理
     const GLOBAL_KEYS = ['require', 'window', 'document', 'self', 'navigator', 'location'];
-    const NOT_EXIST = Symbol('not-exist');
     const originals = {};
+    const existed = new Set();
     for (const key of GLOBAL_KEYS) {
-        originals[key] = (key in global) ? global[key] : NOT_EXIST;
+        if (key in global) {
+            originals[key] = global[key];
+            existed.add(key);
+        }
     }
 
     // 在全局注入require（这是proxy-utils.esm.mjs需要的）
     const { createRequire } = await import('module');
     global.require = createRequire(PROXY_UTILS_FILE);
+    existed.add('require');
     
     // 创建jsdom环境，使用 pretendToBeVisual 避免 navigator 只读问题
     const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
@@ -144,18 +148,13 @@ async function loadProxyUtils() {
         pretendToBeVisual: true
     });
     
-    // 注入浏览器API
+    // 注入浏览器API — 用 try-catch 兼容 getter-only 属性
     const injectGlobal = (name, value) => {
-        if (originals[name] !== NOT_EXIST) {
-            // 原本已存在（即使是 undefined），直接覆盖
+        try {
             global[name] = value;
-        } else {
-            // 原本不存在，用 defineProperty 创建
+        } catch {
             Object.defineProperty(global, name, {
-                value: value,
-                configurable: true,
-                writable: true,
-                enumerable: true
+                value: value, configurable: true, writable: true, enumerable: true
             });
         }
     };
@@ -174,10 +173,16 @@ async function loadProxyUtils() {
 
     // 清理注入的全局变量，恢复原始状态
     for (const key of GLOBAL_KEYS) {
-        if (originals[key] === NOT_EXIST) {
-            delete global[key];
+        if (existed.has(key)) {
+            try {
+                global[key] = originals[key];
+            } catch {
+                Object.defineProperty(global, key, {
+                    value: originals[key], configurable: true, writable: true, enumerable: true
+                });
+            }
         } else {
-            global[key] = originals[key];
+            delete global[key];
         }
     }
     
