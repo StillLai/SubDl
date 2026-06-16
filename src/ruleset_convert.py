@@ -62,11 +62,11 @@ def read_list_from_url(url):
 
 def is_ipv4_or_ipv6(address):
     try:
-        ipaddress.IPv4Network(address)
+        ipaddress.IPv4Network(address, strict=False)
         return 'ipv4'
     except ValueError:
         try:
-            ipaddress.IPv6Network(address)
+            ipaddress.IPv6Network(address, strict=False)
             return 'ipv6'
         except ValueError:
             return None
@@ -290,8 +290,11 @@ def main():
     result_file_names = []
 
     for link in links:
-        result_file_name = parse_list_file(link, output_directory=output_dir)
-        result_file_names.append(result_file_name)
+        try:
+            result_file_name = parse_list_file(link, output_directory=output_dir)
+            result_file_names.append(result_file_name)
+        except Exception as e:
+            print(f"✗ 跳过 {link}: {e}")
 
     for file_name in result_file_names:
         print(file_name)
