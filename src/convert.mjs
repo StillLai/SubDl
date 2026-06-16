@@ -27,7 +27,7 @@ const PROXY_UTILS_NAME = 'proxy-utils.esm.mjs';
 function downloadFile(url, dest, headers = {}) {
     return new Promise((resolve, reject) => {
         const file = fs.createWriteStream(dest);
-        https.get(url, { headers }, (response) => {
+        https.get(url, { headers, timeout: 30000 }, (response) => {
             if (response.statusCode === 302 || response.statusCode === 301) {
                 file.close();
                 if (fs.existsSync(dest)) fs.unlinkSync(dest);

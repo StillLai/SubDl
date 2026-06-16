@@ -531,13 +531,13 @@ def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     
     print("\n→ 生成不含 tun inbound 的模板...")
-    notun_template = generate_notun_template(script_dir)
-    
+    generate_notun_template(script_dir)
+
     print("\n→ 生成 tproxy inbound 的模板...")
-    tproxy_template = generate_tproxy_template(script_dir)
-    
+    generate_tproxy_template(script_dir)
+
     print("\n→ 生成适用于 Windows 的 tun 模板...")
-    tun_for_win_template = generate_tun_for_win_template(script_dir)
+    generate_tun_for_win_template(script_dir)
     
     subscriptions = parse_subscriptions()
     if not subscriptions:
@@ -549,96 +549,72 @@ def main():
     files = {}
     subscription_info = []
     failed = []
-    
+    subs_nodes_dict = {}
+    skipped_subs = []
+
     for sub in subscriptions:
         print(f"下载: {sub['name']}")
         content = None
         flow_info = None
         try:
             content, flow_info = download_subscription(sub["url"], user_agent)
-            
+
             # 验证订阅内容
             is_valid, reason = validate_subscription_content(content, sub['name'])
             if not is_valid:
                 print(f"  ⚠️ 内容无效: {reason}，跳过该订阅")
                 failed.append({"name": sub["name"], "error": reason})
                 subscription_info.append({"name": sub["name"], "flow": flow_info, "node_count": 0, "status": "invalid"})
+                skipped_subs.append({"name": sub['name'], "reason": reason})
                 continue
-            
+
             files[sub["filename"]] = content
-            
+
             # 转换为Sing-box格式并获取节点数量
             node_count = 0
             singbox_config = convert_to_singbox(content, script_dir)
             if singbox_config:
-                # 提取 outbounds 和 endpoints（singbox 新格式）
                 singbox_nodes = singbox_config.get('outbounds', []) + singbox_config.get('endpoints', [])
                 node_count = len(singbox_nodes)
                 singbox_filename = f"{sub['name']}-singbox.json"
                 files[singbox_filename] = json.dumps(singbox_config, indent=2, ensure_ascii=False)
                 print(f"  ✓ 转换成功 ({len(files[singbox_filename])} 字节, {node_count} 个节点)")
+
+                # 同时收集节点给后续模板合并使用
+                if node_count > 0:
+                    subs_nodes_dict[sub['name']] = singbox_nodes
+                    print(f"  → 订阅 '{sub['name']}': {node_count} 个节点")
+                else:
+                    skipped_subs.append({"name": sub['name'], "reason": "节点列表为空"})
             else:
                 print(f"  ✓ 成功 ({len(content)} 字节)")
-            
+                skipped_subs.append({"name": sub['name'], "reason": "转换失败"})
+
             subscription_info.append({"name": sub["name"], "flow": flow_info, "node_count": node_count, "status": "ok"})
         except Exception as e:
             print(f"  ✗ 失败: {e}")
             failed.append({"name": sub["name"], "error": str(e)})
             subscription_info.append({"name": sub["name"], "flow": flow_info, "node_count": 0, "status": "error"})
-    
+            skipped_subs.append({"name": sub['name'], "reason": str(e)})
+
+    # 显示跳过的订阅
+    if skipped_subs:
+        print(f"\n⚠️ {len(skipped_subs)} 个订阅跳过: {', '.join([s['name'] for s in skipped_subs])}")
+
     # 温和降级：只要有一个有效订阅就继续
     valid_count = len(files)
     if valid_count == 0:
         print("\n错误: 所有订阅下载失败或内容无效")
         sys.exit(1)
-    
-    # 显示失败的订阅信息（但不阻止继续）
-    if failed:
-        print(f"\n⚠️ {len(failed)} 个订阅跳过: {', '.join([f['name'] for f in failed])}")
-    
+
     print(f"\n✓ 有效订阅: {valid_count}/{len(subscriptions)}")
-    
-    print(f"\n→ 使用 {len(subscriptions)} 个订阅生成sing-box配置...")
-    subs_nodes_dict = {}
-    skipped_subs = []
-    for sub in subscriptions:
-        try:
-            content, _ = download_subscription(sub["url"], user_agent)
-            
-            # 验证内容
-            is_valid, reason = validate_subscription_content(content, sub['name'])
-            if not is_valid:
-                skipped_subs.append({"name": sub['name'], "reason": reason})
-                print(f"  ⚠️ 订阅 '{sub['name']}': {reason}，跳过")
-                continue
-            
-            singbox_config = convert_to_singbox(content, script_dir)
-            if singbox_config:
-                # 提取 outbounds 和 endpoints（singbox 新格式）
-                nodes = singbox_config.get('outbounds', []) + singbox_config.get('endpoints', [])
-                if not nodes:
-                    skipped_subs.append({"name": sub['name'], "reason": "节点列表为空"})
-                    print(f"  ⚠️ 订阅 '{sub['name']}': 节点列表为空，跳过")
-                else:
-                    subs_nodes_dict[sub['name']] = nodes
-                    print(f"  → 订阅 '{sub['name']}': {len(nodes)} 个节点")
-            else:
-                skipped_subs.append({"name": sub['name'], "reason": "转换失败"})
-                print(f"  ⚠️ 订阅 '{sub['name']}': 转换失败，跳过")
-        except Exception as e:
-            skipped_subs.append({"name": sub['name'], "reason": str(e)})
-            print(f"  ⚠️ {sub['name']} 获取节点失败: {e}，跳过")
-    
-    # 显示跳过的订阅
-    if skipped_subs:
-        print(f"\n⚠️ {len(skipped_subs)} 个订阅跳过: {', '.join([s['name'] for s in skipped_subs])}")
-    
-    # 检查是否有有效的订阅
+
+    # 检查是否有有效的合并节点
     if not subs_nodes_dict:
         print("\n✗ 错误: 没有有效的订阅节点，将不上传配置文件")
         sys.exit(1)
-    
-    print(f"\n✓ 有效订阅: {len(subs_nodes_dict)}/{len(subscriptions)}")
+
+    print(f"✓ 合并节点: {len(subs_nodes_dict)}/{len(subscriptions)}")
     
     # 遍历所有模板文件生成配置文件
     merged_configs = merge_all_templates(subs_nodes_dict, script_dir)

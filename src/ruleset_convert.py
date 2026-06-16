@@ -280,17 +280,21 @@ def parse_list_file(link, output_directory):
     _compile_srs(file_name)
     return file_name
 
-with open("ruleset/ruleset_source.txt", 'r') as links_file:
-    links = links_file.read().splitlines()
+def main():
+    with open("ruleset/ruleset_source.txt", 'r') as links_file:
+        links = links_file.read().splitlines()
 
-links = [l for l in links if l.strip() and not l.strip().startswith("#")]
+    links = [l for l in links if l.strip() and not l.strip().startswith("#")]
 
-output_dir = "./ruleset/json/"
-result_file_names = []
+    output_dir = "./ruleset/json/"
+    result_file_names = []
 
-for link in links:
-    result_file_name = parse_list_file(link, output_directory=output_dir)
-    result_file_names.append(result_file_name)
+    for link in links:
+        result_file_name = parse_list_file(link, output_directory=output_dir)
+        result_file_names.append(result_file_name)
 
-for file_name in result_file_names:
-    print(file_name)
+    for file_name in result_file_names:
+        print(file_name)
+
+if __name__ == "__main__":
+    main()
