@@ -3,6 +3,11 @@
  * Clash to Sing-box 转换脚本
  * 使用 Sub-Store 的 proxy-utils.esm.mjs 作为依赖
  * 使用jsdom模拟浏览器环境
+ *
+ * ═══ 架构前提 ═══
+ * 本脚本每次由 Python 侧 subprocess.run 启动为全新的 Node 进程，
+ * 进程退出时所有全局状态（global 变量、console.log 重定向等）自动清理。
+ * 因此全局修改不需要 try-finally / 互斥锁等保护，不存在跨调用污染。
  */
 
 import fs from 'fs';
@@ -142,14 +147,9 @@ async function checkAndUpdateDeps(githubToken) {
 }
 
 /**
- * 加载Sub-Store模块
- *
- * 关键：在全局注入 require 和浏览器 API（window/document/navigator 等），
+ * 加载Sub-Store模块。在全局注入 require 和浏览器 API（window/document/navigator 等），
  * 因为 proxy-utils.esm.mjs 内部有 eval 使用 require，也需要浏览器环境。
- *
- * 注意：此处通过修改 global 对象注入变量，但未使用 try-finally 包裹。
- * 这是安全的，因为 convert.mjs 每次由 subprocess.run 启动为全新 Node 进程，
- * 进程退出时所有全局状态自动清理，不存在跨调用污染的风险。
+ * 未用 try-finally 的理由见文件头部架构说明。
  */
 async function loadProxyUtils() {
     // 保存原始值，便于加载后清理
@@ -232,11 +232,8 @@ async function main() {
     const command = args[0];
     const githubToken = process.env.GH_TOKEN || '';
 
-    // 将所有日志输出到stderr，stdout只输出JSON结果
-    // 注意：必须用全局重定向，不能替换为局部变量(如 const log = console.error)。
-    // 因为 checkAndUpdateDeps/loadProxyUtils 等子函数也在调用 console.log，
-    // 它们不在 main() 作用域内，无法访问局部变量。每次 subprocess.run 启动
-    // 全新 Node 进程，不存在并发竞态，全局重定向在此处是安全且必要的。
+    // 将所有日志输出到stderr，stdout只输出JSON结果。
+    // 必须用全局重定向（不能替换为局部变量），理由见文件头部架构说明。
     const originalLog = console.log;
     console.log = (...args) => console.error(...args);
 
