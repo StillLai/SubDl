@@ -17,6 +17,7 @@ jobs:
 
     - name: Sync sing-box docs
       run: |
+        set -Eeuo pipefail
         git clone --depth 1 --filter=blob:none --sparse --branch reF1nd-stable https://github.com/reF1nd/sing-box.git /tmp/sing-box-reF1nd
         cd /tmp/sing-box-reF1nd
         git sparse-checkout set docs

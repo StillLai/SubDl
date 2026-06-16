@@ -7,6 +7,8 @@ import os
 import sys
 from typing import Any
 
+import json5  # type: ignore[import-untyped]
+
 from typing import IO
 
 
@@ -16,24 +18,9 @@ def log(msg: str, *, file: IO[str] = sys.stderr) -> None:
 
 
 def load_jsonc(filepath: str) -> dict[str, Any]:
-    """加载 JSONC 文件（支持注释）"""
+    """加载 JSONC/JSON5 文件（支持 // 和 /* */ 注释）"""
     with open(filepath, 'r', encoding='utf-8') as f:
-        content = f.read()
-
-    # 移除 JSONC 注释（但要避免误删 URL 中的 //）
-    lines: list[str] = []
-    for line in content.split('\n'):
-        # 移除行首的 // 注释（允许前面有空格）
-        stripped = line.lstrip()
-        if stripped.startswith('//'):
-            # 整行都是注释
-            indent = line[:len(line) - len(line.lstrip())]
-            lines.append(indent)
-        else:
-            lines.append(line)
-
-    content = '\n'.join(lines)
-    return json.loads(content)
+        return json5.load(f)
 
 
 def discover_template_files(template_dir: str) -> list[tuple[str, str]]:

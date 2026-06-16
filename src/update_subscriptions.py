@@ -15,13 +15,45 @@ import subprocess
 import tempfile
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any
+from typing import Any, TypedDict
 from urllib.parse import urlparse
 from datetime import datetime, timezone, timedelta
 
 import requests
 
 from utils import load_jsonc, discover_template_files, log
+
+
+class Subscription(TypedDict):
+    name: str
+    url: str
+    filename: str
+
+
+class FlowInfo(TypedDict, total=False):
+    upload: int
+    download: int
+    total: int
+    expire: int | None
+
+
+class SubscriptionInfo(TypedDict, total=False):
+    name: str
+    flow: FlowInfo | None
+    node_count: int
+    status: str
+
+
+class SubscriptionResult(TypedDict, total=False):
+    name: str
+    status: str
+    flow: FlowInfo | None
+    reason: str
+    filename: str | None
+    raw_content: str
+    node_count: int
+    singbox_nodes: list[dict[str, Any]]
+    singbox_content: str
 
 # ========== 路径常量 ==========
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -101,7 +133,7 @@ def get_status(flow_info: dict[str, int] | None) -> str:
 
 
 def download_subscription(
-    url: str, user_agent: str, timeout: int = 30000, max_retries: int = 3
+    url: str, user_agent: str, timeout: int = 30, max_retries: int = 3
 ) -> tuple[str, dict[str, int] | None]:
     """下载订阅内容，带重试机制"""
     headers = {"User-Agent": user_agent}
@@ -113,7 +145,7 @@ def download_subscription(
                 log(f"    重试 ({attempt}/{max_retries})...")
                 time.sleep(2)  # 重试前等待2秒
 
-            response = requests.get(url, headers=headers, timeout=timeout / 1000, allow_redirects=True)
+            response = requests.get(url, headers=headers, timeout=timeout, allow_redirects=True)
             response.raise_for_status()
             content = response.text
 

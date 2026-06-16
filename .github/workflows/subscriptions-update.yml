@@ -26,7 +26,7 @@ jobs:
       with:
         node-version: '22'
         
-    - run: pip install requests brotli
+    - run: pip install requests brotli json5
         
     # 注意：dotenv 是 Sub-Store proxy-utils.esm.mjs 库的内部依赖，请勿移除
     - run: npm install jsdom dotenv
@@ -42,6 +42,10 @@ jobs:
         SUB_URL_3: ${{ secrets.SUB_URL_3 }}
         SUB_URL_4: ${{ secrets.SUB_URL_4 }}
         SUB_URL_5: ${{ secrets.SUB_URL_5 }}
+        SUB_URL_6: ${{ secrets.SUB_URL_6 }}
+        SUB_URL_7: ${{ secrets.SUB_URL_7 }}
+        SUB_URL_8: ${{ secrets.SUB_URL_8 }}
+        SUB_URL_9: ${{ secrets.SUB_URL_9 }}
       run: python src/update_subscriptions.py
 
     - name: Commit changes

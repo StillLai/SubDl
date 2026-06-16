@@ -83,18 +83,18 @@ function getLatestRelease(githubToken) {
  */
 async function checkAndUpdateDeps(githubToken) {
     try {
-        console.log('[Convert] 检查 Sub-Store 依赖更新...');
+        console.error('[Convert] 检查 Sub-Store 依赖更新...');
         const release = await getLatestRelease(githubToken);
         const tagName = release.tag_name;
         
         let currentVersion = fs.existsSync(VERSION_FILE) ? fs.readFileSync(VERSION_FILE, 'utf8').trim() : '';
 
         if (currentVersion === tagName && fs.existsSync(PROXY_UTILS_FILE)) {
-            console.log(`[Convert] 已是最新版本: ${tagName}`);
+            console.error(`[Convert] 已是最新版本: ${tagName}`);
             return;
         }
 
-        console.log(`[Convert] 发现新版本: ${tagName}`);
+        console.error(`[Convert] 发现新版本: ${tagName}`);
 
         const asset = release.assets.find(a => 
             a.uploader?.login === 'github-actions[bot]' && 
@@ -103,16 +103,16 @@ async function checkAndUpdateDeps(githubToken) {
 
         if (!asset) {
             if (!fs.existsSync(PROXY_UTILS_FILE)) throw new Error('未找到依赖文件');
-            console.log('[Convert] 使用本地缓存版本');
+            console.error('[Convert] 使用本地缓存版本');
             return;
         }
 
-        console.log('[Convert] 下载依赖...');
+        console.error('[Convert] 下载依赖...');
         await downloadFile(asset.browser_download_url, PROXY_UTILS_FILE + '.tmp');
         if (fs.existsSync(PROXY_UTILS_FILE)) fs.unlinkSync(PROXY_UTILS_FILE);
         fs.renameSync(PROXY_UTILS_FILE + '.tmp', PROXY_UTILS_FILE);
         fs.writeFileSync(VERSION_FILE, tagName);
-        console.log('[Convert] 依赖更新成功');
+        console.error('[Convert] 依赖更新成功');
 
     } catch (err) {
         console.error('[Convert] 检查更新失败:', err.message);
@@ -169,7 +169,7 @@ async function loadProxyUtils() {
     const modulePath = 'file://' + PROXY_UTILS_FILE;
     
     const mod = await import(modulePath);
-    console.log('[Convert] 模块加载成功');
+    console.error('[Convert] 模块加载成功');
 
     // 清理注入的全局变量，恢复原始状态
     for (const key of GLOBAL_KEYS) {

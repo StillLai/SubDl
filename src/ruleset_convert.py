@@ -133,39 +133,61 @@ def _try_int(v: str) -> int | str:
         return v
 
 
+def _parse_yaml_rows(yaml_data: Any) -> list[dict[str, str | None]]:
+    """从 YAML 数据解析规则行"""
+    rows: list[dict[str, str | None]] = []
+    if not isinstance(yaml_data, str):
+        items = yaml_data.get('payload', [])
+    else:
+        lines = yaml_data.splitlines()
+        line_content = lines[0]
+        items = line_content.split()
+    for item in items:
+        address_addr = item.strip("'")
+        if ',' not in item:
+            if is_ipv4_or_ipv6(item):
+                pattern = 'IP-CIDR'
+            else:
+                if address_addr.startswith('+') or address_addr.startswith('.'):
+                    pattern = 'DOMAIN-SUFFIX'
+                    if address_addr.startswith('+'):
+                        address_addr = address_addr[1:]
+                else:
+                    pattern = 'DOMAIN'
+        else:
+            pattern, address_addr = item.split(',', 1)
+        rows.append({'pattern': pattern.strip(), 'address': address_addr.strip(), 'other': None})
+    return rows
+
+
+def _parse_csv_rows(data: str) -> list[dict[str, str | None]]:
+    """从 CSV 数据解析规则行"""
+    reader = csv.reader(StringIO(data))
+    rows: list[dict[str, str | None]] = []
+    for row in reader:
+        if not row or not row[0].strip():
+            continue
+        pattern = row[0].strip() if len(row) >= 1 else ""
+        address = row[1].strip() if len(row) >= 2 else ""
+        other = row[2].strip() if len(row) >= 3 else None
+        if pattern and address:
+            rows.append({'pattern': pattern, 'address': address, 'other': other})
+    return rows
+
+
 def parse_and_convert_to_rows(link: str) -> list[dict[str, str | None]]:
     """下载并解析规则链接，返回 list[dict] (pattern, address, other)"""
     if link.endswith('.yaml') or link.endswith('.txt'):
         try:
             yaml_data: Any = read_yaml_from_url(link)
-            rows: list[dict[str, str | None]] = []
-            if not isinstance(yaml_data, str):
-                items = yaml_data.get('payload', [])
-            else:
-                lines = yaml_data.splitlines()
-                line_content = lines[0]
-                items = line_content.split()
-            for item in items:
-                address = item.strip("'")
-                if ',' not in item:
-                    if is_ipv4_or_ipv6(item):
-                        pattern = 'IP-CIDR'
-                    else:
-                        if address.startswith('+') or address.startswith('.'):
-                            pattern = 'DOMAIN-SUFFIX'
-                            if address.startswith('+'):
-                                address = address[1:]
-                        else:
-                            pattern = 'DOMAIN'
-                else:
-                    pattern, address = item.split(',', 1)
-                rows.append({'pattern': pattern.strip(), 'address': address.strip(), 'other': None})
-            return rows
+            return _parse_yaml_rows(yaml_data)
         except Exception as e:
             log(f"  ⚠ YAML 解析失败 {link}: {e}，回退到 CSV 格式解析")
-            return read_list_from_url(link)
+            response = _http_get(link)
+            return _parse_csv_rows(response.text)
     else:
-        return read_list_from_url(link)
+        response = _http_get(link)
+        return _parse_csv_rows(response.text)
 
 
 def _compile_srs(file_name: str, srs_dir: str = "./ruleset/srs/") -> None:
