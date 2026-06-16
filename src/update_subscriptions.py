@@ -19,6 +19,15 @@ import requests
 
 from utils import load_jsonc, discover_template_files
 
+# ========== 路径常量 ==========
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
+TEMPLATE_DIR = os.path.join(PROJECT_ROOT, 'config_template')
+WORKFLOW_PATH = os.path.join(PROJECT_ROOT, '.github', 'workflows', 'subscriptions-update.yml')
+CONVERT_SCRIPT = os.path.join(SCRIPT_DIR, 'convert.mjs')
+MERGE_SCRIPT = os.path.join(SCRIPT_DIR, 'merge_config.py')
+TEMPLATE_BASE = os.path.join(TEMPLATE_DIR, 'sing-box_template.jsonc')
+
 
 def get_env_var(name, default=None, required=False):
     value = os.environ.get(name, default)
@@ -151,10 +160,14 @@ def validate_subscription_content(content, sub_name):
 
 
 def parse_subscriptions():
-    """解析订阅配置"""
+    """解析订阅配置 — 动态发现所有 SUB_URL / SUB_URL_N 环境变量"""
     subscriptions = []
-    for env_name in ["SUB_URL"] + [f"SUB_URL_{i}" for i in range(1, 10)]:
-        value = os.environ.get(env_name, "").strip()
+    sub_keys = sorted(
+        [k for k in os.environ if re.match(r'^SUB_URL(_\d+)?$', k)],
+        key=lambda k: (0, 0) if k == 'SUB_URL' else (1, int(k.split('_')[-1]))
+    )
+    for env_name in sub_keys:
+        value = os.environ[env_name].strip()
         if not value:
             continue
         if "|" in value:
@@ -208,9 +221,8 @@ def upload_to_gist(github_token, gist_id, files):
 
 def parse_cron_interval():
     """从 workflow 文件解析 cron 间隔"""
-    workflow_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.github', 'workflows', 'subscriptions-update.yml')
     try:
-        with open(workflow_path, 'r', encoding='utf-8') as f:
+        with open(WORKFLOW_PATH, 'r', encoding='utf-8') as f:
             content = f.read()
             match = re.search(r"cron:\s*['\"](\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)['\"]", content)
             if match:
@@ -279,15 +291,17 @@ def generate_readme(subscription_info):
     return "\n".join(lines)
 
 
-def convert_to_singbox(clash_content, script_dir):
+def convert_to_singbox(clash_content):
     """将Clash配置转换为Sing-box格式"""
     try:
         with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False, encoding='utf-8') as f:
             f.write(clash_content)
             temp_file = f.name
         try:
-            convert_script = os.path.join(script_dir, 'convert.mjs')
-            result = subprocess.run(['node', convert_script, 'convert', temp_file], capture_output=True, text=True, encoding='utf-8')
+            result = subprocess.run(
+                ['node', CONVERT_SCRIPT, 'convert', temp_file],
+                capture_output=True, text=True, encoding='utf-8'
+            )
             if result.returncode != 0:
                 print(f"  ✗ 转换失败: {result.stderr}")
                 return None
@@ -299,11 +313,11 @@ def convert_to_singbox(clash_content, script_dir):
         return None
 
 
-def merge_singbox_config(subs_nodes_dict, script_dir, template_path=None):
+def merge_singbox_config(subs_nodes_dict, template_path=None):
     """将多个sing-box订阅节点合并到配置模板"""
     try:
         if template_path is None:
-            template_path = os.path.join(script_dir, '..', 'config_template', 'sing-box_template.jsonc')
+            template_path = TEMPLATE_BASE
         if not os.path.exists(template_path):
             print(f"  ✗ 配置模板不存在: {template_path}")
             return None
@@ -313,8 +327,10 @@ def merge_singbox_config(subs_nodes_dict, script_dir, template_path=None):
             sub_temp_file = f.name
         
         try:
-            merge_script = os.path.join(script_dir, 'merge_config.py')
-            result = subprocess.run(['python', merge_script, template_path, sub_temp_file], capture_output=True, text=True, encoding='utf-8')
+            result = subprocess.run(
+                ['python', MERGE_SCRIPT, template_path, sub_temp_file],
+                capture_output=True, text=True, encoding='utf-8'
+            )
             if result.returncode != 0:
                 print(f"  ✗ 合并失败: {result.stderr}")
                 return None
@@ -330,49 +346,128 @@ def merge_singbox_config(subs_nodes_dict, script_dir, template_path=None):
         return None
 
 
-def merge_all_templates(subs_nodes_dict, script_dir):
-    """遍历所有模板文件并生成配置文件"""
-    template_dir = os.path.join(script_dir, '..', 'config_template')
-    templates = discover_template_files(template_dir)
-    
+# ========== 模板生成 — 通用抽象 (#4) ==========
+
+def _generate_template_variant(suffix, label, transform_fn):
+    """通用模板变体生成器
+
+    Args:
+        suffix: 输出文件名后缀，如 'noTun', 'tproxy', 'tun_for_win'
+        label: 日志显示名称
+        transform_fn: 接收 template 字典，原地修改它
+    返回:
+        生成的 JSON 字符串，或 None
+    """
+    try:
+        output_path = os.path.join(TEMPLATE_DIR, f'sing-box_template_{suffix}.jsonc')
+        template = load_jsonc(TEMPLATE_BASE)
+        transform_fn(template)
+        output_content = json.dumps(template, indent=2, ensure_ascii=False)
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write(output_content)
+        print(f"  ✓ 已生成 {label} 模板: config_template/sing-box_template_{suffix}.jsonc")
+        return output_content
+    except Exception as e:
+        print(f"  ✗ 生成 {label} 模板异常: {e}")
+        return None
+
+
+def _generate_all_template_variants():
+    """生成所有模板变体（noTun / tproxy / tun_for_win）"""
+    print("\n→ 生成不含 tun inbound 的模板...")
+    _generate_template_variant('noTun', 'noTun', lambda t: _remove_tun_inbounds(t))
+
+    print("\n→ 生成 tproxy inbound 的模板...")
+    _generate_template_variant('tproxy', 'tproxy', lambda t: _replace_tun_with_tproxy(t))
+
+    print("\n→ 生成适用于 Windows 的 tun 模板...")
+    _generate_template_variant('tun_for_win', 'tun_for_win', lambda t: _remove_auto_redirect(t))
+
+
+def _remove_tun_inbounds(template):
+    """移除所有 type=tun 的 inbound"""
+    if 'inbounds' in template and isinstance(template['inbounds'], list):
+        original_count = len(template['inbounds'])
+        template['inbounds'] = [
+            inbound for inbound in template['inbounds']
+            if not (isinstance(inbound, dict) and inbound.get('type') == 'tun')
+        ]
+        removed_count = original_count - len(template['inbounds'])
+        print(f"  ✓ 已移除 {removed_count} 个 tun inbound")
+
+
+def _replace_tun_with_tproxy(template):
+    """将第一个 type=tun inbound 替换为 tproxy"""
+    tproxy_inbound = {
+        "type": "tproxy", "tag": "tproxy-in", "listen": "::", "listen_port": 1536
+    }
+    if 'inbounds' in template and isinstance(template['inbounds'], list):
+        for i, inbound in enumerate(template['inbounds']):
+            if isinstance(inbound, dict) and inbound.get('type') == 'tun':
+                template['inbounds'][i] = tproxy_inbound
+                print(f"  ✓ 已将 tun inbound 替换为 tproxy inbound")
+                break
+
+
+def _remove_auto_redirect(template):
+    """删除 tun inbound 中的 auto_redirect 字段"""
+    if 'inbounds' in template and isinstance(template['inbounds'], list):
+        for i, inbound in enumerate(template['inbounds']):
+            if isinstance(inbound, dict) and inbound.get('type') == 'tun':
+                if 'auto_redirect' in template['inbounds'][i]:
+                    del template['inbounds'][i]['auto_redirect']
+                    print(f"  ✓ 已在 tun inbound 中删除 auto_redirect 字段")
+                break
+
+
+# ========== 模板遍历 — 共享抽象 (#7) ==========
+
+def _process_templates(process_fn):
+    """遍历所有模板文件，对每个模板执行 process_fn(template_path, base_name)
+
+    Args:
+        process_fn: 接收 (template_path, base_name) 返回 (filename, content)
+                    返回 None 表示跳过该模板
+    Returns:
+        dict: {filename: content}
+    """
+    templates = discover_template_files(TEMPLATE_DIR)
     if not templates:
         print(f"  ✗ 模板目录中没有找到模板文件")
         return {}
     
     print(f"  找到 {len(templates)} 个模板文件")
     
-    merged_configs = {}
+    results = {}
     for template_path, base_name in templates:
+        entry = process_fn(template_path, base_name)
+        if entry:
+            filename, content = entry
+            results[filename] = content
+    return results
+
+
+def merge_all_templates(subs_nodes_dict):
+    """遍历所有模板文件并生成配置文件"""
+    def _merge_one(template_path, base_name):
         template_file = os.path.basename(template_path)
         config_filename = base_name.replace('template', 'config') + '.json'
-        
         print(f"  → 处理模板: {template_file}")
-        merged_config = merge_singbox_config(subs_nodes_dict, script_dir, template_path)
+        merged_config = merge_singbox_config(subs_nodes_dict, template_path)
         if merged_config:
-            merged_configs[config_filename] = json.dumps(merged_config, indent=2, ensure_ascii=False)
+            content = json.dumps(merged_config, indent=2, ensure_ascii=False)
             total_nodes = sum(len(nodes) for nodes in subs_nodes_dict.values())
-            print(f"    ✓ 生成 {config_filename} ({len(merged_configs[config_filename])} 字节, {total_nodes} 个节点)")
+            print(f"    ✓ 生成 {config_filename} ({len(content)} 字节, {total_nodes} 个节点)")
+            return config_filename, content
+        return None
     
-    return merged_configs
+    return _process_templates(_merge_one)
 
 
-def generate_provider_configs(subscriptions, script_dir):
+def generate_provider_configs(sub_url_map):
     """生成 providers 版本的配置文件（直接填充 url，不做其他处理）"""
-    template_dir = os.path.join(script_dir, '..', 'config_template')
-    templates = discover_template_files(template_dir)
-    
-    if not templates:
-        print(f"  ✗ 模板目录中没有找到模板文件")
-        return {}
-    
-    sub_url_map = {sub['name']: sub['url'] for sub in subscriptions}
-    
-    print(f"  找到 {len(templates)} 个模板文件")
-    
-    provider_configs = {}
-    for template_path, base_name in templates:
+    def _fill_one(template_path, base_name):
         template_file = os.path.basename(template_path)
-        
         if template_file.endswith('.jsonc'):
             template = load_jsonc(template_path)
         else:
@@ -388,99 +483,16 @@ def generate_provider_configs(subscriptions, script_dir):
         
         if filled_count > 0:
             config_filename = base_name.replace('template', 'with_providers_config') + '.json'
-            provider_configs[config_filename] = json.dumps(template, indent=2, ensure_ascii=False)
             print(f"  → 处理模板: {template_file} -> {config_filename} ({filled_count} 个 providers 已填充)")
+            return config_filename, json.dumps(template, indent=2, ensure_ascii=False)
+        return None
     
-    return provider_configs
+    return _process_templates(_fill_one)
 
 
-def generate_notun_template(script_dir):
-    """生成不含 tun inbound 的模板文件"""
-    try:
-        template_path = os.path.join(script_dir, '..', 'config_template', 'sing-box_template.jsonc')
-        output_path = os.path.join(script_dir, '..', 'config_template', 'sing-box_template_noTun.jsonc')
-        
-        template = load_jsonc(template_path)
-        
-        if 'inbounds' in template and isinstance(template['inbounds'], list):
-            original_count = len(template['inbounds'])
-            template['inbounds'] = [
-                inbound for inbound in template['inbounds']
-                if not (isinstance(inbound, dict) and inbound.get('type') == 'tun')
-            ]
-            removed_count = original_count - len(template['inbounds'])
-            print(f"  ✓ 已移除 {removed_count} 个 tun inbound")
-        
-        output_content = json.dumps(template, indent=2, ensure_ascii=False)
-        with open(output_path, 'w', encoding='utf-8') as f:
-            f.write(output_content)
-        print(f"  ✓ 已生成 noTun 模板: config_template/sing-box_template_noTun.jsonc")
-        return output_content
-    except Exception as e:
-        print(f"  ✗ 生成 noTun 模板异常: {e}")
-        return None
+# ========== 订阅下载 (#8) ==========
 
-
-def generate_tproxy_template(script_dir):
-    """生成 tproxy inbound 的模板文件"""
-    try:
-        template_path = os.path.join(script_dir, '..', 'config_template', 'sing-box_template.jsonc')
-        output_path = os.path.join(script_dir, '..', 'config_template', 'sing-box_template_tproxy.jsonc')
-        
-        template = load_jsonc(template_path)
-        
-        tproxy_inbound = {
-            "type": "tproxy",
-            "tag": "tproxy-in",
-            "listen": "::",
-            "listen_port": 1536
-        }
-        
-        if 'inbounds' in template and isinstance(template['inbounds'], list):
-            for i, inbound in enumerate(template['inbounds']):
-                if isinstance(inbound, dict) and inbound.get('type') == 'tun':
-                    template['inbounds'][i] = tproxy_inbound
-                    print(f"  ✓ 已将 tun inbound 替换为 tproxy inbound")
-                    break
-        
-        output_content = json.dumps(template, indent=2, ensure_ascii=False)
-        with open(output_path, 'w', encoding='utf-8') as f:
-            f.write(output_content)
-        print(f"  ✓ 已生成 tproxy 模板: config_template/sing-box_template_tproxy.jsonc")
-        return output_content
-    except Exception as e:
-        print(f"  ✗ 生成 tproxy 模板异常: {e}")
-        return None
-
-
-def generate_tun_for_win_template(script_dir):
-    """生成适用于 Windows 的 tun模板（删除 auto_redirect）"""
-    try:
-        template_path = os.path.join(script_dir, '..', 'config_template', 'sing-box_template.jsonc')
-        output_path = os.path.join(script_dir, '..', 'config_template', 'sing-box_template_tun_for_win.jsonc')
-        
-        template = load_jsonc(template_path)
-        
-        # 在 inbounds 中删除 tun inbound 的 auto_redirect 字段
-        if 'inbounds' in template and isinstance(template['inbounds'], list):
-            for i, inbound in enumerate(template['inbounds']):
-                if isinstance(inbound, dict) and inbound.get('type') == 'tun':
-                    if 'auto_redirect' in template['inbounds'][i]:
-                        del template['inbounds'][i]['auto_redirect']
-                        print(f"  ✓ 已在 tun inbound 中删除 auto_redirect 字段")
-                    break
-        
-        output_content = json.dumps(template, indent=2, ensure_ascii=False)
-        with open(output_path, 'w', encoding='utf-8') as f:
-            f.write(output_content)
-        print(f"  ✓ 已生成 tun_for_win 模板: config_template/sing-box_template_tun_for_win.jsonc")
-        return output_content
-    except Exception as e:
-        print(f"  ✗ 生成 tun_for_win 模板异常: {e}")
-        return None
-
-
-def _process_subscription(sub, user_agent, script_dir):
+def _process_subscription(sub, user_agent):
     """处理单个订阅（下载 + 验证 + 转换），返回结果字典"""
     result = {"name": sub["name"], "status": "ok"}
     try:
@@ -499,7 +511,7 @@ def _process_subscription(sub, user_agent, script_dir):
         result["raw_content"] = content
 
         # 转换为 Sing-box 格式
-        singbox_config = convert_to_singbox(content, script_dir)
+        singbox_config = convert_to_singbox(content)
         if singbox_config:
             singbox_nodes = singbox_config.get('outbounds', []) + singbox_config.get('endpoints', [])
             result["node_count"] = len(singbox_nodes)
@@ -514,62 +526,38 @@ def _process_subscription(sub, user_agent, script_dir):
     return result
 
 
-def main():
-    print("=" * 60)
-    print("SubDl - Subscription Downloader")
-    print(f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print("=" * 60)
-    
-    github_token = get_env_var("GH_TOKEN", required=True)
-    gist_id = get_env_var("GIST_ID", default="")
-    user_agent = get_env_var("USER_AGENT", default="clash-verge/v2.4.4")
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    
-    print("\n→ 生成不含 tun inbound 的模板...")
-    generate_notun_template(script_dir)
-
-    print("\n→ 生成 tproxy inbound 的模板...")
-    generate_tproxy_template(script_dir)
-
-    print("\n→ 生成适用于 Windows 的 tun 模板...")
-    generate_tun_for_win_template(script_dir)
-    
-    subscriptions = parse_subscriptions()
-    if not subscriptions:
-        print("错误: 未找到订阅配置")
-        sys.exit(1)
-    
-    print(f"\n找到 {len(subscriptions)} 个订阅")
-    
+def _download_all_subscriptions(subscriptions, user_agent):
+    """并行下载所有订阅，返回 (files, subscription_info, subs_nodes_dict)"""
     files = {}
     subscription_info = []
-    failed = []
     subs_nodes_dict = {}
     skipped_subs = []
-
-    # 并行下载和处理所有订阅
+    
     print(f"→ 并行下载 {len(subscriptions)} 个订阅...")
     with ThreadPoolExecutor(max_workers=len(subscriptions)) as executor:
-        future_to_sub = {executor.submit(_process_subscription, sub, user_agent, script_dir): sub for sub in subscriptions}
+        future_to_sub = {
+            executor.submit(_process_subscription, sub, user_agent): sub
+            for sub in subscriptions
+        }
         for future in as_completed(future_to_sub):
             sub = future_to_sub[future]
             result = future.result()
             name = result["name"]
             status = result["status"]
             flow_info = result.get("flow")
-
+            reason = result.get("reason", "未知")
+            
+            node_count = result.get("node_count", 0)
+            
             if status == "ok":
-                node_count = result.get("node_count", 0)
                 raw_content = result.get("raw_content", "")
                 files[sub["filename"]] = raw_content
-
                 singbox_content = result.get("singbox_content")
                 singbox_nodes = result.get("singbox_nodes")
+                
                 if singbox_content and singbox_nodes is not None:
-                    singbox_filename = f"{name}-singbox.json"
-                    files[singbox_filename] = singbox_content
+                    files[f"{name}-singbox.json"] = singbox_content
                     print(f"  ✓ {name}: 转换成功 ({len(singbox_content)} 字节, {node_count} 个节点)")
-
                     if node_count > 0:
                         subs_nodes_dict[name] = singbox_nodes
                         print(f"    → '{name}': {node_count} 个节点")
@@ -580,44 +568,31 @@ def main():
                     skipped_subs.append({"name": name, "reason": "转换失败"})
                 subscription_info.append({"name": name, "flow": flow_info, "node_count": node_count, "status": "ok"})
             elif status == "invalid":
-                reason = result.get("reason", "未知")
                 print(f"  ⚠️ {name}: 内容无效 - {reason}")
-                failed.append({"name": name, "error": reason})
                 subscription_info.append({"name": name, "flow": flow_info, "node_count": 0, "status": "invalid"})
                 skipped_subs.append({"name": name, "reason": reason})
             elif status == "convert_failed":
-                reason = result.get("reason", "转换失败")
                 print(f"  ⚠️ {name}: {reason}")
                 skipped_subs.append({"name": name, "reason": reason})
                 subscription_info.append({"name": name, "flow": flow_info, "node_count": 0, "status": "ok"})
-            else:  # error
-                reason = result.get("reason", "未知错误")
+            else:
                 print(f"  ✗ {name}: {reason}")
-                failed.append({"name": name, "error": reason})
                 subscription_info.append({"name": name, "flow": flow_info, "node_count": 0, "status": "error"})
                 skipped_subs.append({"name": name, "reason": reason})
-
-    # 显示跳过的订阅
+    
     if skipped_subs:
         print(f"\n⚠️ {len(skipped_subs)} 个订阅跳过: {', '.join([s['name'] for s in skipped_subs])}")
+    
+    return files, subscription_info, subs_nodes_dict
 
-    # 温和降级：只要有一个有效订阅就继续
-    valid_count = len(files)
-    if valid_count == 0:
-        print("\n错误: 所有订阅下载失败或内容无效")
-        sys.exit(1)
 
-    print(f"\n✓ 有效订阅: {valid_count}/{len(subscriptions)}")
+# ========== 配置生成与上传 (#8) ==========
 
-    # 检查是否有有效的合并节点
-    if not subs_nodes_dict:
-        print("\n✗ 错误: 没有有效的订阅节点，将不上传配置文件")
-        sys.exit(1)
-
-    print(f"✓ 合并节点: {len(subs_nodes_dict)}/{len(subscriptions)}")
+def _generate_and_upload(files, subs_nodes_dict, subscriptions, subscription_info, github_token, gist_id):
+    """生成合并配置、providers 配置，并上传到 Gist"""
     
     # 遍历所有模板文件生成配置文件
-    merged_configs = merge_all_templates(subs_nodes_dict, script_dir)
+    merged_configs = merge_all_templates(subs_nodes_dict)
     for filename, content in merged_configs.items():
         files[filename] = content
     if merged_configs:
@@ -625,7 +600,8 @@ def main():
     
     # 生成 providers 版本的配置文件
     print(f"\n→ 生成 providers 版本配置文件...")
-    provider_configs = generate_provider_configs(subscriptions, script_dir)
+    sub_url_map = {sub['name']: sub['url'] for sub in subscriptions}
+    provider_configs = generate_provider_configs(sub_url_map)
     for filename, content in provider_configs.items():
         files[filename] = content
     if provider_configs:
@@ -642,6 +618,45 @@ def main():
     if new_gist_id != gist_id:
         print(f"\n重要提示: 已创建新的 Gist ID: {new_gist_id}")
         print("请在 Repository secrets 中设置 GIST_ID")
+    
+    return new_gist_id
+
+
+# ========== 主入口 (#8) ==========
+
+def main():
+    print("=" * 60)
+    print("SubDl - Subscription Downloader")
+    print(f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("=" * 60)
+    
+    github_token = get_env_var("GH_TOKEN", required=True)
+    gist_id = get_env_var("GIST_ID", default="")
+    user_agent = get_env_var("USER_AGENT", default="clash-verge/v2.4.4")
+    
+    _generate_all_template_variants()
+    
+    subscriptions = parse_subscriptions()
+    if not subscriptions:
+        print("错误: 未找到订阅配置")
+        sys.exit(1)
+    
+    print(f"\n找到 {len(subscriptions)} 个订阅")
+    
+    files, subscription_info, subs_nodes_dict = _download_all_subscriptions(subscriptions, user_agent)
+    
+    valid_count = len(files)
+    if valid_count == 0:
+        print("\n错误: 所有订阅下载失败或内容无效")
+        sys.exit(1)
+    print(f"\n✓ 有效订阅: {valid_count}/{len(subscriptions)}")
+    
+    if not subs_nodes_dict:
+        print("\n✗ 错误: 没有有效的订阅节点，将不上传配置文件")
+        sys.exit(1)
+    print(f"✓ 合并节点: {len(subs_nodes_dict)}/{len(subscriptions)}")
+    
+    _generate_and_upload(files, subs_nodes_dict, subscriptions, subscription_info, github_token, gist_id)
     
     print(f"\n完成! 成功处理 {len(files)} 个订阅")
 
