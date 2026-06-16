@@ -40,17 +40,14 @@ jobs:
     - name: Run script
       run: python src/ruleset_convert.py
 
-    - name: Commit and push config.json
-      run: |
-        git config --global user.email "action@github.com"
-        git config --global user.name "GitHub Action"
-        git add -f ./ruleset/json/*.json
-        git add -f ./ruleset/srs/*.srs
+    - name: Upload JSON to Release
+      uses: softprops/action-gh-release@v3
+      with:
+        tag_name: ruleset-json
+        files: ruleset/json/*.json
 
-        if git diff --staged --quiet; then
-          echo "No changes to commit"
-          exit 0
-        else
-          git commit -m "Update rules"
-          git push
-        fi
+    - name: Upload SRS to Release
+      uses: softprops/action-gh-release@v3
+      with:
+        tag_name: ruleset-srs
+        files: ruleset/srs/*.srs
