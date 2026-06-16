@@ -1,3 +1,7 @@
+"""规则集转换脚本 — 将 Clash/Surge 等规则源转换为 sing-box 格式"""
+
+from __future__ import annotations
+
 import os
 import json
 import csv
@@ -8,18 +12,22 @@ import yaml
 import ipaddress
 import re
 from io import StringIO
+from typing import Any
 
-HTTP_TIMEOUT = 30
-HTTP_RETRY = 3
+from utils import log
+
+HTTP_TIMEOUT: int = 30
+HTTP_RETRY: int = 3
 
 # 预编译正则，避免重复编译开销
-_PACKAGE_PART_RE = re.compile(r'^[a-zA-Z0-9_]+$')
-_IP_LIKE_RE = re.compile(r'^[\d./:a-fA-F]+$')
+_PACKAGE_PART_RE: re.Pattern[str] = re.compile(r'^[a-zA-Z0-9_]+$')
+_IP_LIKE_RE: re.Pattern[str] = re.compile(r'^[\d./:a-fA-F]+$')
 
-def _http_get(url, **kwargs):
+
+def _http_get(url: str, **kwargs: Any) -> requests.Response:
     """HTTP GET with timeout and retry"""
     kwargs.setdefault("timeout", HTTP_TIMEOUT)
-    last_error = None
+    last_error: Exception | None = None
     for attempt in range(1, HTTP_RETRY + 1):
         try:
             if attempt > 1:
@@ -31,29 +39,33 @@ def _http_get(url, **kwargs):
             last_error = e
     raise last_error if last_error else Exception(f"下载失败: {url}")
 
-def read_json_from_url(url):
+
+def read_json_from_url(url: str) -> dict[str, Any]:
     """下载并解析 sing-box JSON 格式的规则集"""
     response = _http_get(url)
-    json_data = json.loads(response.text)
+    json_data: dict[str, Any] = json.loads(response.text)
     return json_data
 
-def is_singbox_ruleset(json_data):
+
+def is_singbox_ruleset(json_data: Any) -> bool:
     """判断 JSON 数据是否为 sing-box 规则集格式"""
     if isinstance(json_data, dict):
         return 'version' in json_data and 'rules' in json_data
     return False
 
-def read_yaml_from_url(url):
+
+def read_yaml_from_url(url: str) -> Any:
     """下载并解析 YAML 格式的规则集"""
     response = _http_get(url)
     yaml_data = yaml.safe_load(response.text)
     return yaml_data
 
-def read_list_from_url(url):
+
+def read_list_from_url(url: str) -> list[dict[str, str | None]]:
     """使用标准库 csv 读取规则列表，返回 list[dict]"""
     response = _http_get(url)
     reader = csv.reader(StringIO(response.text))
-    rows = []
+    rows: list[dict[str, str | None]] = []
     for row in reader:
         if not row or not row[0].strip():
             continue
@@ -64,8 +76,9 @@ def read_list_from_url(url):
             rows.append({'pattern': pattern, 'address': address, 'other': other})
     return rows
 
-def is_ipv4_or_ipv6(address):
-    # 快速初筛：明显不是 IP 格式的域名直接跳过
+
+def is_ipv4_or_ipv6(address: str) -> str | None:
+    """判断地址是 IPv4 还是 IPv6，都不是返回 None"""
     if not _IP_LIKE_RE.match(address):
         return None
     try:
@@ -78,70 +91,54 @@ def is_ipv4_or_ipv6(address):
         except ValueError:
             return None
 
-def is_android_package_name(text):
-    """
-    判断是否为安卓程序包名
-    安卓包名通常符合以下特征：
-    1. 包含点分隔符（如 com.example.app）
-    2. 每部分以字母开头，包含字母、数字、下划线
-    3. 通常以 com., org., net. 等常见域名开头
-    
-    同时排除其他系统的程序特征：
-    - 以 .exe, .dll, .app, .dmg 等结尾的文件
-    - 包含路径分隔符（/ 或 \）的文件路径
-    - 其他明显不是包名的格式
-    """
+
+def is_android_package_name(text: str) -> bool:
+    """判断是否为安卓程序包名"""
     if not text or not isinstance(text, str):
         return False
-    
+
     # 排除明显是其他系统的程序
     other_system_extensions = ['.exe', '.dll', '.app', '.dmg', '.msi', '.deb', '.rpm', '.pkg']
     if any(text.lower().endswith(ext) for ext in other_system_extensions):
         return False
-    
-    # 排除包含路径分隔符的路径
+
     if '/' in text or '\\' in text:
         return False
-    
-    # 排除包含空格的文件名
     if ' ' in text:
         return False
-    
-    # 基本格式检查：包含点分隔符
     if '.' not in text:
         return False
-    
-    # 检查每部分是否符合包名规范
+
     parts = text.split('.')
     for part in parts:
-        if not part:  # 空部分
+        if not part:
             return False
-        if not part[0].isalpha():  # 每部分必须以字母开头
+        if not part[0].isalpha():
             return False
-        if not _PACKAGE_PART_RE.match(part):  # 只包含字母、数字、下划线
+        if not _PACKAGE_PART_RE.match(part):
             return False
-    
-    # 常见的包名前缀
+
     common_prefixes = ['com', 'org', 'net', 'edu', 'gov', 'mil', 'android', 'google']
     if parts[0] in common_prefixes:
         return True
-    
-    # 如果不符合常见前缀，但格式正确，也认为是包名
-    return len(parts) >= 2  # 至少有两部分
 
-def _try_int(v):
+    return len(parts) >= 2
+
+
+def _try_int(v: str) -> int | str:
     """尝试将字符串转为 int，失败返回原值"""
     try:
         return int(v)
     except ValueError:
         return v
 
-def parse_and_convert_to_rows(link):
+
+def parse_and_convert_to_rows(link: str) -> list[dict[str, str | None]]:
     """下载并解析规则链接，返回 list[dict] (pattern, address, other)"""
     if link.endswith('.yaml') or link.endswith('.txt'):
         try:
-            yaml_data = read_yaml_from_url(link)
-            rows = []
+            yaml_data: Any = read_yaml_from_url(link)
+            rows: list[dict[str, str | None]] = []
             if not isinstance(yaml_data, str):
                 items = yaml_data.get('payload', [])
             else:
@@ -161,16 +158,17 @@ def parse_and_convert_to_rows(link):
                         else:
                             pattern = 'DOMAIN'
                 else:
-                    pattern, address = item.split(',', 1)  
+                    pattern, address = item.split(',', 1)
                 rows.append({'pattern': pattern.strip(), 'address': address.strip(), 'other': None})
             return rows
         except Exception as e:
-            print(f"  ⚠ YAML 解析失败 {link}: {e}，回退到 CSV 格式解析")
+            log(f"  ⚠ YAML 解析失败 {link}: {e}，回退到 CSV 格式解析")
             return read_list_from_url(link)
     else:
         return read_list_from_url(link)
 
-def _compile_srs(file_name, srs_dir="./ruleset/srs/"):
+
+def _compile_srs(file_name: str, srs_dir: str = "./ruleset/srs/") -> None:
     """使用 subprocess 安全调用 sing-box 编译 SRS"""
     srs_filename = os.path.basename(file_name).replace(".json", ".srs")
     srs_path = os.path.join(srs_dir, srs_filename)
@@ -180,16 +178,17 @@ def _compile_srs(file_name, srs_dir="./ruleset/srs/"):
             ["sing-box", "rule-set", "compile", "--output", srs_path, file_name],
             check=True, capture_output=True, text=True
         )
-        print(f"  ✓ SRS: {srs_filename}")
+        log(f"  ✓ SRS: {srs_filename}")
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        print(f"  ✗ SRS 编译失败: {srs_filename} - {e}")
+        log(f"  ✗ SRS 编译失败: {srs_filename} - {e}")
     except Exception as e:
-        print(f"  ✗ SRS 错误: {srs_filename} - {e}")
+        log(f"  ✗ SRS 错误: {srs_filename} - {e}")
 
-def sort_dict(obj):
+
+def sort_dict(obj: Any) -> Any:
     """保持原有顺序，仅将 'version' 键置顶"""
     if isinstance(obj, dict):
-        result = {}
+        result: dict[str, Any] = {}
         if "version" in obj:
             result["version"] = sort_dict(obj["version"])
         for k in obj:
@@ -201,18 +200,21 @@ def sort_dict(obj):
     else:
         return obj
 
-def _group_by_mapped(rows, map_dict):
+
+def _group_by_mapped(
+    rows: list[dict[str, str | None]], map_dict: dict[str, str]
+) -> dict[str, list[str]]:
     """将行列表按 mapped_pattern 分组，返回 {mapped_pattern: [address, ...]}"""
-    groups = {}
-    seen = set()
+    groups: dict[str, list[str]] = {}
+    seen: set[tuple[str, str]] = set()
     for row in rows:
-        pattern = row['pattern']
+        pattern: str = row['pattern']  # type: ignore[assignment]
         if pattern not in map_dict:
             continue
         if '#' in pattern:
             continue
-        address = row['address'].strip()
-        mapped = map_dict[pattern]
+        address: str = row['address'].strip()  # type: ignore[union-attr]
+        mapped: str = map_dict[pattern]
         if pattern == 'PROCESS-NAME':
             mapped = 'package_name' if is_android_package_name(address) else 'process_name'
         key = (mapped, address)
@@ -222,7 +224,31 @@ def _group_by_mapped(rows, map_dict):
         groups.setdefault(mapped, []).append(address)
     return groups
 
-def parse_list_file(link, output_directory):
+
+_MAP_DICT: dict[str, str] = {
+    'DOMAIN-SUFFIX': 'domain_suffix',
+    'HOST-SUFFIX': 'domain_suffix',
+    'DOMAIN': 'domain',
+    'HOST': 'domain',
+    'host': 'domain',
+    'DOMAIN-KEYWORD': 'domain_keyword',
+    'HOST-KEYWORD': 'domain_keyword',
+    'host-keyword': 'domain_keyword',
+    'IP-CIDR': 'ip_cidr',
+    'ip-cidr': 'ip_cidr',
+    'IP-CIDR6': 'ip_cidr',
+    'IP6-CIDR': 'ip_cidr',
+    'SRC-IP-CIDR': 'source_ip_cidr',
+    'GEOIP': 'geoip',
+    'DST-PORT': 'port',
+    'SRC-PORT': 'source_port',
+    'URL-REGEX': 'domain_regex',
+    'PROCESS-NAME': 'process_name',
+}
+
+
+def parse_list_file(link: str, output_directory: str) -> str | None:
+    """解析规则链接并生成 JSON/SRS 文件"""
     os.makedirs(output_directory, exist_ok=True)
     file_name = os.path.join(output_directory, f"{os.path.basename(link).split('.')[0]}.json")
 
@@ -236,41 +262,20 @@ def parse_list_file(link, output_directory):
                 _compile_srs(file_name)
                 return file_name
             else:
-                print(f"  ⚠ {link} 不是 sing-box 规则集格式，跳过")
+                log(f"  ⚠ {link} 不是 sing-box 规则集格式，跳过")
                 return None
         except Exception as e:
-            print(f"  ✗ 处理 JSON 文件失败 {link}: {e}")
+            log(f"  ✗ 处理 JSON 文件失败 {link}: {e}")
             return None
 
     rows = parse_and_convert_to_rows(link)
 
-    map_dict = {
-        'DOMAIN-SUFFIX': 'domain_suffix',
-        'HOST-SUFFIX': 'domain_suffix',
-        'DOMAIN': 'domain',
-        'HOST': 'domain',
-        'host': 'domain',
-        'DOMAIN-KEYWORD': 'domain_keyword',
-        'HOST-KEYWORD': 'domain_keyword',
-        'host-keyword': 'domain_keyword',
-        'IP-CIDR': 'ip_cidr',
-        'ip-cidr': 'ip_cidr',
-        'IP-CIDR6': 'ip_cidr',
-        'IP6-CIDR': 'ip_cidr',
-        'SRC-IP-CIDR': 'source_ip_cidr',
-        'GEOIP': 'geoip',
-        'DST-PORT': 'port',
-        'SRC-PORT': 'source_port',
-        'URL-REGEX': 'domain_regex',
-        'PROCESS-NAME': 'process_name'
-    }
+    groups = _group_by_mapped(rows, _MAP_DICT)
 
-    groups = _group_by_mapped(rows, map_dict)
+    result_rules: dict[str, Any] = {"version": 4, "rules": []}
+    domain_suffix_set: set[str] = set(groups.get('domain_suffix', []))
 
-    result_rules = {"version": 4, "rules": []}
-    domain_suffix_set = set(groups.get('domain_suffix', []))
-
-    domain_entries = []
+    domain_entries: list[str] = []
     for mapped, addresses in groups.items():
         if mapped == 'domain_suffix':
             result_rules["rules"].append({'domain_suffix': addresses})
@@ -293,24 +298,27 @@ def parse_list_file(link, output_directory):
     _compile_srs(file_name)
     return file_name
 
-def main():
-    with open("ruleset/ruleset_source.txt", 'r') as links_file:
+
+def main() -> None:
+    with open("ruleset/ruleset_source.txt", 'r', encoding='utf-8') as links_file:
         links = links_file.read().splitlines()
 
     links = [l for l in links if l.strip() and not l.strip().startswith("#")]
 
     output_dir = "./ruleset/json/"
-    result_file_names = []
+    result_file_names: list[str] = []
 
     for link in links:
         try:
             result_file_name = parse_list_file(link, output_directory=output_dir)
-            result_file_names.append(result_file_name)
+            if result_file_name:
+                result_file_names.append(result_file_name)
         except Exception as e:
-            print(f"✗ 跳过 {link}: {e}")
+            log(f"✗ 跳过 {link}: {e}")
 
     for file_name in result_file_names:
-        print(file_name)
+        log(file_name)
+
 
 if __name__ == "__main__":
     main()

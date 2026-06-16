@@ -206,9 +206,8 @@ async function main() {
     const command = args[0];
     const githubToken = process.env.GH_TOKEN || '';
 
-    // 将所有日志输出到stderr，stdout只输出JSON结果
-    const originalLog = console.log;
-    console.log = (...args) => console.error(...args);
+    // 用局部变量替代全局重写，避免并发竞态
+    const log = console.error;
 
     try {
         if (!fs.existsSync(DEPS_DIR)) fs.mkdirSync(DEPS_DIR, { recursive: true });
@@ -217,25 +216,22 @@ async function main() {
         if (command === 'convert') {
             const inputFile = args[1];
             if (!inputFile) {
-                console.error('用法: node convert.mjs convert <input-file>');
+                log('用法: node convert.mjs convert <input-file>');
                 process.exit(1);
             }
 
             const clashContent = fs.readFileSync(inputFile, 'utf8');
             const singboxConfig = await convertClashToSingbox(clashContent);
-            
-            // 恢复console.log，只输出JSON到stdout
-            console.log = originalLog;
-            
+
             // produce 函数返回的 singbox 格式是 JSON 字符串
             console.log(singboxConfig);
         } else {
-            console.error('用法: node convert.mjs convert <input-file>');
+            log('用法: node convert.mjs convert <input-file>');
             process.exit(1);
         }
     } catch (err) {
-        console.error('[Convert] 错误:', err.message);
-        console.error(err.stack);
+        log('[Convert] 错误:', err.message);
+        log(err.stack);
         process.exit(1);
     }
 }
