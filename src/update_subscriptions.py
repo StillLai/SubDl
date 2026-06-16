@@ -11,10 +11,13 @@ import time
 import json
 import subprocess
 import tempfile
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import urlparse
 from datetime import datetime, timezone, timedelta
 
 import requests
+
+from src.utils import load_jsonc, discover_template_files
 
 
 def get_env_var(name, default=None, required=False):
@@ -326,30 +329,17 @@ def merge_singbox_config(subs_nodes_dict, script_dir, template_path=None):
 def merge_all_templates(subs_nodes_dict, script_dir):
     """遍历所有模板文件并生成配置文件"""
     template_dir = os.path.join(script_dir, '..', 'config_template')
-    if not os.path.exists(template_dir):
-        print(f"  ✗ 模板目录不存在: {template_dir}")
-        return {}
+    templates = discover_template_files(template_dir)
     
-    merged_configs = {}
-    template_files = [f for f in os.listdir(template_dir) if f.endswith(('.jsonc', '.json'))]
-    
-    if not template_files:
+    if not templates:
         print(f"  ✗ 模板目录中没有找到模板文件")
         return {}
     
-    print(f"  找到 {len(template_files)} 个模板文件")
+    print(f"  找到 {len(templates)} 个模板文件")
     
-    for template_file in template_files:
-        template_path = os.path.join(template_dir, template_file)
-        # 将文件名中的 "template" 替换为 "config"，扩展名改为 .json
-        # 先分离扩展名，避免处理异常
-        if template_file.endswith('.jsonc'):
-            base_name = template_file[:-6]  # .jsonc 是 6 个字符
-        elif template_file.endswith('.json'):
-            base_name = template_file[:-5]  # .json 是 5 个字符
-        else:
-            base_name = template_file
-        # 替换 template -> config
+    merged_configs = {}
+    for template_path, base_name in templates:
+        template_file = os.path.basename(template_path)
         config_filename = base_name.replace('template', 'config') + '.json'
         
         print(f"  → 处理模板: {template_file}")
@@ -365,33 +355,26 @@ def merge_all_templates(subs_nodes_dict, script_dir):
 def generate_provider_configs(subscriptions, script_dir):
     """生成 providers 版本的配置文件（直接填充 url，不做其他处理）"""
     template_dir = os.path.join(script_dir, '..', 'config_template')
-    if not os.path.exists(template_dir):
-        print(f"  ✗ 模板目录不存在: {template_dir}")
-        return {}
+    templates = discover_template_files(template_dir)
     
-    # 构建订阅名到 URL 的映射
-    sub_url_map = {sub['name']: sub['url'] for sub in subscriptions}
-    
-    provider_configs = {}
-    template_files = [f for f in os.listdir(template_dir) if f.endswith(('.jsonc', '.json'))]
-    
-    if not template_files:
+    if not templates:
         print(f"  ✗ 模板目录中没有找到模板文件")
         return {}
     
-    print(f"  找到 {len(template_files)} 个模板文件")
+    sub_url_map = {sub['name']: sub['url'] for sub in subscriptions}
     
-    for template_file in template_files:
-        template_path = os.path.join(template_dir, template_file)
+    print(f"  找到 {len(templates)} 个模板文件")
+    
+    provider_configs = {}
+    for template_path, base_name in templates:
+        template_file = os.path.basename(template_path)
         
-        # 加载模板
         if template_file.endswith('.jsonc'):
             template = load_jsonc(template_path)
         else:
             with open(template_path, 'r', encoding='utf-8') as f:
                 template = json.load(f)
         
-        # 填充 providers 的 url
         filled_count = 0
         for provider in template.get('providers', []):
             provider_tag = provider.get('tag', '')
@@ -400,37 +383,11 @@ def generate_provider_configs(subscriptions, script_dir):
                 filled_count += 1
         
         if filled_count > 0:
-            # 生成带 _with_providers 后缀的文件名
-            # 先分离扩展名
-            if template_file.endswith('.jsonc'):
-                base_name = template_file[:-6]
-            elif template_file.endswith('.json'):
-                base_name = template_file[:-5]
-            else:
-                base_name = template_file
-            
-            # 替换 template -> with_providers_config，将 _with_providers 插入到 sing-box 后面
             config_filename = base_name.replace('template', 'with_providers_config') + '.json'
-            
             provider_configs[config_filename] = json.dumps(template, indent=2, ensure_ascii=False)
             print(f"  → 处理模板: {template_file} -> {config_filename} ({filled_count} 个 providers 已填充)")
     
     return provider_configs
-
-
-def load_jsonc(filepath):
-    """加载 JSONC 文件（支持注释）"""
-    with open(filepath, 'r', encoding='utf-8') as f:
-        content = f.read()
-    lines = []
-    for line in content.split('\n'):
-        stripped = line.lstrip()
-        if stripped.startswith('//'):
-            indent = line[:len(line) - len(line.lstrip())]
-            lines.append(indent)
-        else:
-            lines.append(line)
-    return json.loads('\n'.join(lines))
 
 
 def generate_notun_template(script_dir):
@@ -519,6 +476,40 @@ def generate_tun_for_win_template(script_dir):
         return None
 
 
+def _process_subscription(sub, user_agent, script_dir):
+    """处理单个订阅（下载 + 验证 + 转换），返回结果字典"""
+    result = {"name": sub["name"], "status": "ok"}
+    try:
+        # 下载
+        content, flow_info = download_subscription(sub["url"], user_agent)
+        result["flow"] = flow_info
+
+        # 验证
+        is_valid, reason = validate_subscription_content(content, sub['name'])
+        if not is_valid:
+            result["status"] = "invalid"
+            result["reason"] = reason
+            result["filename"] = None
+            return result
+
+        result["raw_content"] = content
+
+        # 转换为 Sing-box 格式
+        singbox_config = convert_to_singbox(content, script_dir)
+        if singbox_config:
+            singbox_nodes = singbox_config.get('outbounds', []) + singbox_config.get('endpoints', [])
+            result["node_count"] = len(singbox_nodes)
+            result["singbox_nodes"] = singbox_nodes
+            result["singbox_content"] = json.dumps(singbox_config, indent=2, ensure_ascii=False)
+        else:
+            result["status"] = "convert_failed"
+            result["reason"] = "转换失败"
+    except Exception as e:
+        result["status"] = "error"
+        result["reason"] = str(e)
+    return result
+
+
 def main():
     print("=" * 60)
     print("SubDl - Subscription Downloader")
@@ -544,7 +535,7 @@ def main():
         print("错误: 未找到订阅配置")
         sys.exit(1)
     
-    print(f"\n找到 {len(subscriptions)} 个订阅\n")
+    print(f"\n找到 {len(subscriptions)} 个订阅")
     
     files = {}
     subscription_info = []
@@ -552,50 +543,55 @@ def main():
     subs_nodes_dict = {}
     skipped_subs = []
 
-    for sub in subscriptions:
-        print(f"下载: {sub['name']}")
-        content = None
-        flow_info = None
-        try:
-            content, flow_info = download_subscription(sub["url"], user_agent)
+    # 并行下载和处理所有订阅
+    print(f"→ 并行下载 {len(subscriptions)} 个订阅...")
+    with ThreadPoolExecutor(max_workers=len(subscriptions)) as executor:
+        future_to_sub = {executor.submit(_process_subscription, sub, user_agent, script_dir): sub for sub in subscriptions}
+        for future in as_completed(future_to_sub):
+            sub = future_to_sub[future]
+            result = future.result()
+            name = result["name"]
+            status = result["status"]
+            flow_info = result.get("flow")
 
-            # 验证订阅内容
-            is_valid, reason = validate_subscription_content(content, sub['name'])
-            if not is_valid:
-                print(f"  ⚠️ 内容无效: {reason}，跳过该订阅")
-                failed.append({"name": sub["name"], "error": reason})
-                subscription_info.append({"name": sub["name"], "flow": flow_info, "node_count": 0, "status": "invalid"})
-                skipped_subs.append({"name": sub['name'], "reason": reason})
-                continue
+            if status == "ok":
+                node_count = result.get("node_count", 0)
+                raw_content = result.get("raw_content", "")
+                files[sub["filename"]] = raw_content
 
-            files[sub["filename"]] = content
+                singbox_content = result.get("singbox_content")
+                singbox_nodes = result.get("singbox_nodes")
+                if singbox_content and singbox_nodes is not None:
+                    singbox_filename = f"{name}-singbox.json"
+                    files[singbox_filename] = singbox_content
+                    print(f"  ✓ {name}: 转换成功 ({len(singbox_content)} 字节, {node_count} 个节点)")
 
-            # 转换为Sing-box格式并获取节点数量
-            node_count = 0
-            singbox_config = convert_to_singbox(content, script_dir)
-            if singbox_config:
-                singbox_nodes = singbox_config.get('outbounds', []) + singbox_config.get('endpoints', [])
-                node_count = len(singbox_nodes)
-                singbox_filename = f"{sub['name']}-singbox.json"
-                files[singbox_filename] = json.dumps(singbox_config, indent=2, ensure_ascii=False)
-                print(f"  ✓ 转换成功 ({len(files[singbox_filename])} 字节, {node_count} 个节点)")
-
-                # 同时收集节点给后续模板合并使用
-                if node_count > 0:
-                    subs_nodes_dict[sub['name']] = singbox_nodes
-                    print(f"  → 订阅 '{sub['name']}': {node_count} 个节点")
+                    if node_count > 0:
+                        subs_nodes_dict[name] = singbox_nodes
+                        print(f"    → '{name}': {node_count} 个节点")
+                    else:
+                        skipped_subs.append({"name": name, "reason": "节点列表为空"})
                 else:
-                    skipped_subs.append({"name": sub['name'], "reason": "节点列表为空"})
-            else:
-                print(f"  ✓ 成功 ({len(content)} 字节)")
-                skipped_subs.append({"name": sub['name'], "reason": "转换失败"})
-
-            subscription_info.append({"name": sub["name"], "flow": flow_info, "node_count": node_count, "status": "ok"})
-        except Exception as e:
-            print(f"  ✗ 失败: {e}")
-            failed.append({"name": sub["name"], "error": str(e)})
-            subscription_info.append({"name": sub["name"], "flow": flow_info, "node_count": 0, "status": "error"})
-            skipped_subs.append({"name": sub['name'], "reason": str(e)})
+                    print(f"  ⚠️ {name}: 转换失败")
+                    skipped_subs.append({"name": name, "reason": "转换失败"})
+                subscription_info.append({"name": name, "flow": flow_info, "node_count": node_count, "status": "ok"})
+            elif status == "invalid":
+                reason = result.get("reason", "未知")
+                print(f"  ⚠️ {name}: 内容无效 - {reason}")
+                failed.append({"name": name, "error": reason})
+                subscription_info.append({"name": name, "flow": flow_info, "node_count": 0, "status": "invalid"})
+                skipped_subs.append({"name": name, "reason": reason})
+            elif status == "convert_failed":
+                reason = result.get("reason", "转换失败")
+                print(f"  ⚠️ {name}: {reason}")
+                skipped_subs.append({"name": name, "reason": reason})
+                subscription_info.append({"name": name, "flow": flow_info, "node_count": 0, "status": "ok"})
+            else:  # error
+                reason = result.get("reason", "未知错误")
+                print(f"  ✗ {name}: {reason}")
+                failed.append({"name": name, "error": reason})
+                subscription_info.append({"name": name, "flow": flow_info, "node_count": 0, "status": "error"})
+                skipped_subs.append({"name": name, "reason": reason})
 
     # 显示跳过的订阅
     if skipped_subs:

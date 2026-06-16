@@ -157,7 +157,7 @@ def parse_and_convert_to_rows(link):
                     pattern, address = item.split(',', 1)  
                 rows.append({'pattern': pattern.strip(), 'address': address.strip(), 'other': None})
             return rows
-        except:
+        except Exception:
             return read_list_from_url(link)
     else:
         return read_list_from_url(link)
