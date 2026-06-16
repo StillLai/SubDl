@@ -17,7 +17,7 @@ from datetime import datetime, timezone, timedelta
 
 import requests
 
-from src.utils import load_jsonc, discover_template_files
+from utils import load_jsonc, discover_template_files
 
 
 def get_env_var(name, default=None, required=False):

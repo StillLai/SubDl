@@ -16,7 +16,7 @@ import json
 import re
 import sys
 
-from src.utils import load_jsonc
+from utils import load_jsonc
 
 
 def log(msg):
