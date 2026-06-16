@@ -18,9 +18,13 @@ jobs:
     steps:
     - uses: actions/checkout@v6
       
+    # ⚠️ 请勿添加 actions/cache，本项目无 requirements.txt/pyproject.toml，
+    # setup-python 内置缓存会自动查找这些文件并报错：
+    #   Error: No file matched to [**/requirements.txt or **/pyproject.toml]
     - uses: actions/setup-python@v6
       with:
         python-version: 3.x
+        cache: ''
         
     - uses: actions/setup-node@v6
       with:
@@ -46,6 +50,7 @@ jobs:
         SUB_URL_7: ${{ secrets.SUB_URL_7 }}
         SUB_URL_8: ${{ secrets.SUB_URL_8 }}
         SUB_URL_9: ${{ secrets.SUB_URL_9 }}
+        SUB_URLS: ${{ secrets.SUB_URLS }}
       run: python src/update_subscriptions.py
 
     - name: Commit changes

@@ -18,12 +18,27 @@ import copy
 import json
 import re
 import sys
-from typing import Any
+from typing import Any, TypedDict
 
 from utils import load_jsonc, log
 
 
-def fix_tls_insecure(proxies: list[dict[str, Any]]) -> int:
+class SingBoxNode(TypedDict, total=False):
+    """sing-box 节点的最小公共字段"""
+    tag: str
+    type: str
+    server: str
+    server_port: int
+    tls: dict[str, Any]
+    outbounds: list[str] | list[dict[str, Any]]
+    providers: list[str]
+
+
+NodeList = list[SingBoxNode]
+SubsNodesDict = dict[str, NodeList]
+
+
+def fix_tls_insecure(proxies: NodeList) -> int:
     """遍历所有节点，将 tls.insecure 设为 true"""
     fixed_count = 0
     for proxy in proxies:

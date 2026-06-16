@@ -31,7 +31,7 @@ def _http_get(url: str, **kwargs: Any) -> requests.Response:
     for attempt in range(1, HTTP_RETRY + 1):
         try:
             if attempt > 1:
-                time.sleep(2)
+                time.sleep(2 ** (attempt - 1))  # 指数退避：2s, 4s, 8s...
             resp = requests.get(url, **kwargs)
             resp.raise_for_status()
             return resp
@@ -62,19 +62,9 @@ def read_yaml_from_url(url: str) -> Any:
 
 
 def read_list_from_url(url: str) -> list[dict[str, str | None]]:
-    """使用标准库 csv 读取规则列表，返回 list[dict]"""
+    """下载并解析 CSV 规则列表，复用 _parse_csv_rows()"""
     response = _http_get(url)
-    reader = csv.reader(StringIO(response.text))
-    rows: list[dict[str, str | None]] = []
-    for row in reader:
-        if not row or not row[0].strip():
-            continue
-        pattern = row[0].strip() if len(row) >= 1 else ""
-        address = row[1].strip() if len(row) >= 2 else ""
-        other = row[2].strip() if len(row) >= 3 else None
-        if pattern and address:
-            rows.append({'pattern': pattern, 'address': address, 'other': other})
-    return rows
+    return _parse_csv_rows(response.text)
 
 
 def is_ipv4_or_ipv6(address: str) -> str | None:

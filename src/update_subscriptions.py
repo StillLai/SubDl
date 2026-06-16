@@ -143,7 +143,7 @@ def download_subscription(
         try:
             if attempt > 1:
                 log(f"    重试 ({attempt}/{max_retries})...")
-                time.sleep(2)  # 重试前等待2秒
+                time.sleep(2 ** (attempt - 1))  # 指数退避：2s, 4s, 8s...
 
             response = requests.get(url, headers=headers, timeout=timeout, allow_redirects=True)
             response.raise_for_status()
@@ -198,8 +198,29 @@ def validate_subscription_content(content: str, sub_name: str) -> tuple[bool, st
 
 
 def parse_subscriptions() -> list[dict[str, str]]:
-    """解析订阅配置 — 动态发现所有 SUB_URL / SUB_URL_N 环境变量"""
+    """解析订阅配置 — 支持 SUB_URLS (JSON数组) 和 SUB_URL / SUB_URL_N 环境变量"""
     subscriptions: list[dict[str, str]] = []
+
+    # 优先解析 SUB_URLS（JSON 数组格式，可突破 GitHub Actions secrets 数量限制）
+    sub_urls_json = os.environ.get('SUB_URLS', '').strip()
+    if sub_urls_json:
+        try:
+            items = json.loads(sub_urls_json)
+            if isinstance(items, list):
+                for item in items:
+                    if isinstance(item, dict) and 'url' in item:
+                        name = item.get('name', extract_name_from_url(item['url']))
+                        url = item['url']
+                        subscriptions.append({"name": name, "url": url, "filename": f"{name}.yaml"})
+                    elif isinstance(item, str):
+                        sub = _parse_subscription_entry(item)
+                        if sub:
+                            subscriptions.append(sub)
+                return subscriptions
+        except json.JSONDecodeError as e:
+            log(f"  ⚠ SUB_URLS 解析失败，回退到 SUB_URL_N 模式: {e}")
+
+    # 回退：动态发现 SUB_URL / SUB_URL_N
     sub_keys = sorted(
         [k for k in os.environ if re.match(r'^SUB_URL(_\d+)?$', k)],
         key=lambda k: (0, 0) if k == 'SUB_URL' else (1, int(k.split('_')[-1]))
@@ -208,15 +229,23 @@ def parse_subscriptions() -> list[dict[str, str]]:
         value = os.environ[env_name].strip()
         if not value:
             continue
-        if "|" in value:
-            name, url = value.split("|", 1)
-            name, url = name.strip(), url.strip()
-        else:
-            url = value
-            name = extract_name_from_url(url)
-        if name and url:
-            subscriptions.append({"name": name, "url": url, "filename": f"{name}.yaml"})
+        sub = _parse_subscription_entry(value)
+        if sub:
+            subscriptions.append(sub)
     return subscriptions
+
+
+def _parse_subscription_entry(value: str) -> dict[str, str] | None:
+    """解析单个订阅条目（名称|URL 或纯 URL）"""
+    if "|" in value:
+        name, url = value.split("|", 1)
+        name, url = name.strip(), url.strip()
+    else:
+        url = value
+        name = extract_name_from_url(url)
+    if name and url:
+        return {"name": name, "url": url, "filename": f"{name}.yaml"}
+    return None
 
 
 def extract_name_from_url(url: str) -> str:
@@ -564,7 +593,7 @@ def _download_all_subscriptions(
     skipped_subs: list[dict[str, str]] = []
 
     log(f"→ 并行下载 {len(subscriptions)} 个订阅...")
-    with ThreadPoolExecutor(max_workers=len(subscriptions)) as executor:
+    with ThreadPoolExecutor(max_workers=min(len(subscriptions), 8)) as executor:
         future_to_sub = {
             executor.submit(_process_subscription, sub, user_agent): sub
             for sub in subscriptions

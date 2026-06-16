@@ -82,14 +82,33 @@ function getLatestRelease(githubToken) {
  * 检查并更新依赖
  */
 async function checkAndUpdateDeps(githubToken) {
+    // 6 小时内已检查过且本地缓存存在，跳过 GitHub API 调用
+    const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
     try {
+        if (fs.existsSync(VERSION_FILE) && fs.existsSync(PROXY_UTILS_FILE)) {
+            const cached = fs.readFileSync(VERSION_FILE, 'utf8').trim();
+            const lines = cached.split('\n');
+            const cachedVersion = lines[0] || '';
+            const cachedTime = parseInt(lines[1] || '0', 10);
+            if (cachedTime && (Date.now() - cachedTime) < SIX_HOURS_MS) {
+                console.error(`[Convert] 使用缓存版本 (${cachedVersion}, ${Math.round((Date.now() - cachedTime) / 3600000)}h前检查)`);
+                return;
+            }
+        }
+
         console.error('[Convert] 检查 Sub-Store 依赖更新...');
         const release = await getLatestRelease(githubToken);
         const tagName = release.tag_name;
         
-        let currentVersion = fs.existsSync(VERSION_FILE) ? fs.readFileSync(VERSION_FILE, 'utf8').trim() : '';
+        let currentVersion = '';
+        if (fs.existsSync(VERSION_FILE)) {
+            const cached = fs.readFileSync(VERSION_FILE, 'utf8').trim();
+            currentVersion = cached.split('\n')[0] || '';
+        }
 
-        if (currentVersion === tagName && fs.existsSync(PROXY_UTILS_FILE)) {
+        if (currentVersion === tagName) {
+            // 版本未变，仅刷新时间戳
+            fs.writeFileSync(VERSION_FILE, `${tagName}\n${Date.now()}`);
             console.error(`[Convert] 已是最新版本: ${tagName}`);
             return;
         }
@@ -103,6 +122,7 @@ async function checkAndUpdateDeps(githubToken) {
 
         if (!asset) {
             if (!fs.existsSync(PROXY_UTILS_FILE)) throw new Error('未找到依赖文件');
+            fs.writeFileSync(VERSION_FILE, `${currentVersion}\n${Date.now()}`);
             console.error('[Convert] 使用本地缓存版本');
             return;
         }
@@ -111,7 +131,7 @@ async function checkAndUpdateDeps(githubToken) {
         await downloadFile(asset.browser_download_url, PROXY_UTILS_FILE + '.tmp');
         if (fs.existsSync(PROXY_UTILS_FILE)) fs.unlinkSync(PROXY_UTILS_FILE);
         fs.renameSync(PROXY_UTILS_FILE + '.tmp', PROXY_UTILS_FILE);
-        fs.writeFileSync(VERSION_FILE, tagName);
+        fs.writeFileSync(VERSION_FILE, `${tagName}\n${Date.now()}`);
         console.error('[Convert] 依赖更新成功');
 
     } catch (err) {
@@ -123,7 +143,13 @@ async function checkAndUpdateDeps(githubToken) {
 
 /**
  * 加载Sub-Store模块
- * 关键：在全局注入require，因为proxy-utils.esm.mjs内部有eval使用require
+ *
+ * 关键：在全局注入 require 和浏览器 API（window/document/navigator 等），
+ * 因为 proxy-utils.esm.mjs 内部有 eval 使用 require，也需要浏览器环境。
+ *
+ * 注意：此处通过修改 global 对象注入变量，但未使用 try-finally 包裹。
+ * 这是安全的，因为 convert.mjs 每次由 subprocess.run 启动为全新 Node 进程，
+ * 进程退出时所有全局状态自动清理，不存在跨调用污染的风险。
  */
 async function loadProxyUtils() {
     // 保存原始值，便于加载后清理
