@@ -12,6 +12,7 @@ Sing-box 配置合并脚本
 5. 处理空 outbound 的兼容性问题
 """
 
+import copy
 import json
 import re
 import sys
@@ -174,7 +175,7 @@ def merge_config(template_config, subscriptions_nodes, tls_insecure=False):
         合并后的配置字典
     """
     # 深拷贝配置模板
-    config = json.loads(json.dumps(template_config))
+    config = copy.deepcopy(template_config)
     
     # 确保 outbounds 是列表
     if 'outbounds' not in config:

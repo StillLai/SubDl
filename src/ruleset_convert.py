@@ -12,6 +12,10 @@ from io import StringIO
 HTTP_TIMEOUT = 30
 HTTP_RETRY = 3
 
+# 预编译正则，避免重复编译开销
+_PACKAGE_PART_RE = re.compile(r'^[a-zA-Z0-9_]+$')
+_IP_LIKE_RE = re.compile(r'^[\d./:a-fA-F]+$')
+
 def _http_get(url, **kwargs):
     """HTTP GET with timeout and retry"""
     kwargs.setdefault("timeout", HTTP_TIMEOUT)
@@ -61,6 +65,9 @@ def read_list_from_url(url):
     return rows
 
 def is_ipv4_or_ipv6(address):
+    # 快速初筛：明显不是 IP 格式的域名直接跳过
+    if not _IP_LIKE_RE.match(address):
+        return None
     try:
         ipaddress.IPv4Network(address, strict=False)
         return 'ipv4'
@@ -111,7 +118,7 @@ def is_android_package_name(text):
             return False
         if not part[0].isalpha():  # 每部分必须以字母开头
             return False
-        if not re.match(r'^[a-zA-Z0-9_]+$', part):  # 只包含字母、数字、下划线
+        if not _PACKAGE_PART_RE.match(part):  # 只包含字母、数字、下划线
             return False
     
     # 常见的包名前缀
@@ -179,16 +186,17 @@ def _compile_srs(file_name, srs_dir="./ruleset/srs/"):
         print(f"  ✗ SRS 错误: {srs_filename} - {e}")
 
 def sort_dict(obj):
+    """保持原有顺序，仅将 'version' 键置顶"""
     if isinstance(obj, dict):
-        sorted_keys = sorted(obj.keys())
-        if "version" in sorted_keys:
-            sorted_keys.remove("version")
-            sorted_keys.insert(0, "version")
-        return {k: sort_dict(obj[k]) for k in sorted_keys}
-    elif isinstance(obj, list) and all(isinstance(elem, dict) for elem in obj):
-        return sorted([sort_dict(x) for x in obj], key=lambda d: sorted(d.keys())[0])
+        result = {}
+        if "version" in obj:
+            result["version"] = sort_dict(obj["version"])
+        for k in obj:
+            if k != "version":
+                result[k] = sort_dict(obj[k])
+        return result
     elif isinstance(obj, list):
-        return sorted(sort_dict(x) for x in obj)
+        return [sort_dict(x) for x in obj]
     else:
         return obj
 
