@@ -128,13 +128,10 @@ async function checkAndUpdateDeps(githubToken) {
 async function loadProxyUtils() {
     // 保存原始值，便于加载后清理
     const GLOBAL_KEYS = ['require', 'window', 'document', 'self', 'navigator', 'location'];
+    const NOT_EXIST = Symbol('not-exist');
     const originals = {};
     for (const key of GLOBAL_KEYS) {
-        if (key in global) {
-            originals[key] = global[key];
-        } else {
-            originals[key] = undefined;  // 标记为原本不存在
-        }
+        originals[key] = (key in global) ? global[key] : NOT_EXIST;
     }
 
     // 在全局注入require（这是proxy-utils.esm.mjs需要的）
@@ -149,8 +146,8 @@ async function loadProxyUtils() {
     
     // 注入浏览器API
     const injectGlobal = (name, value) => {
-        if (originals[name] !== undefined || (name in global)) {
-            // 已有值，直接覆盖
+        if (originals[name] !== NOT_EXIST) {
+            // 原本已存在（即使是 undefined），直接覆盖
             global[name] = value;
         } else {
             // 原本不存在，用 defineProperty 创建
@@ -177,7 +174,7 @@ async function loadProxyUtils() {
 
     // 清理注入的全局变量，恢复原始状态
     for (const key of GLOBAL_KEYS) {
-        if (originals[key] === undefined) {
+        if (originals[key] === NOT_EXIST) {
             delete global[key];
         } else {
             global[key] = originals[key];

@@ -104,8 +104,12 @@ def download_subscription(url, user_agent, timeout=30000, max_retries=3):
             
             try:
                 cleaned = content.strip().replace(" ", "").replace("\n", "").replace("\r", "")
-                if re.match(r'^[A-Za-z0-9+/=]+$', cleaned):
-                    decoded = base64.b64decode(cleaned + "=" * (4 - len(cleaned) % 4))
+                if cleaned and re.match(r'^[A-Za-z0-9+/=]+$', cleaned):
+                    # 补全 base64 padding
+                    padding = 4 - len(cleaned) % 4
+                    if padding != 4:
+                        cleaned += "=" * padding
+                    decoded = base64.b64decode(cleaned)
                     content = decoded.decode("utf-8")
             except Exception:
                 pass
@@ -116,7 +120,7 @@ def download_subscription(url, user_agent, timeout=30000, max_retries=3):
             last_error = e
             if attempt < max_retries:
                 continue
-            raise
+            break
     
     raise last_error if last_error else Exception("下载失败")
 
