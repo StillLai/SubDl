@@ -206,8 +206,13 @@ async function main() {
     const command = args[0];
     const githubToken = process.env.GH_TOKEN || '';
 
-    // 用局部变量替代全局重写，避免并发竞态
-    const log = console.error;
+    // 将所有日志输出到stderr，stdout只输出JSON结果
+    // 注意：必须用全局重定向，不能替换为局部变量(如 const log = console.error)。
+    // 因为 checkAndUpdateDeps/loadProxyUtils 等子函数也在调用 console.log，
+    // 它们不在 main() 作用域内，无法访问局部变量。每次 subprocess.run 启动
+    // 全新 Node 进程，不存在并发竞态，全局重定向在此处是安全且必要的。
+    const originalLog = console.log;
+    console.log = (...args) => console.error(...args);
 
     try {
         if (!fs.existsSync(DEPS_DIR)) fs.mkdirSync(DEPS_DIR, { recursive: true });
@@ -216,22 +221,25 @@ async function main() {
         if (command === 'convert') {
             const inputFile = args[1];
             if (!inputFile) {
-                log('用法: node convert.mjs convert <input-file>');
+                console.error('用法: node convert.mjs convert <input-file>');
                 process.exit(1);
             }
 
             const clashContent = fs.readFileSync(inputFile, 'utf8');
             const singboxConfig = await convertClashToSingbox(clashContent);
-
+            
+            // 恢复console.log，只输出JSON到stdout
+            console.log = originalLog;
+            
             // produce 函数返回的 singbox 格式是 JSON 字符串
             console.log(singboxConfig);
         } else {
-            log('用法: node convert.mjs convert <input-file>');
+            console.error('用法: node convert.mjs convert <input-file>');
             process.exit(1);
         }
     } catch (err) {
-        log('[Convert] 错误:', err.message);
-        log(err.stack);
+        console.error('[Convert] 错误:', err.message);
+        console.error(err.stack);
         process.exit(1);
     }
 }
