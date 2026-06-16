@@ -341,9 +341,13 @@ def convert_to_singbox(clash_content: str) -> dict[str, Any] | None:
                 capture_output=True, text=True, encoding='utf-8'
             )
             if result.returncode != 0:
-                log(f"  ✗ 转换失败: {result.stderr}")
+                log(f"  ✗ 转换失败 (exit {result.returncode}): {result.stderr}")
                 return None
-            return json.loads(result.stdout)
+            stdout = result.stdout.strip()
+            if not stdout:
+                log(f"  ✗ 转换输出为空 (stderr: {result.stderr.strip() or '(无)'})")
+                return None
+            return json.loads(stdout)
         finally:
             os.unlink(temp_file)
     except Exception as e:
