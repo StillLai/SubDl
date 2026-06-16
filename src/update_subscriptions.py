@@ -120,8 +120,8 @@ def download_subscription(url, user_agent, timeout=30000, max_retries=3):
                         cleaned += "=" * padding
                     decoded = base64.b64decode(cleaned)
                     content = decoded.decode("utf-8")
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"    ⚠ Base64 解码失败，将作为明文处理: {e}")
             
             return content, parse_flow_info(response.headers)
             
@@ -233,8 +233,8 @@ def parse_cron_interval():
                     return "每分钟"
                 elif hour.startswith('*/'):
                     return f"每 {hour[2:]} 小时"
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"  ⚠ cron 解析失败: {e}，使用默认值")
     return "每小时"
 
 

@@ -164,7 +164,8 @@ def parse_and_convert_to_rows(link):
                     pattern, address = item.split(',', 1)  
                 rows.append({'pattern': pattern.strip(), 'address': address.strip(), 'other': None})
             return rows
-        except Exception:
+        except Exception as e:
+            print(f"  ⚠ YAML 解析失败 {link}: {e}，回退到 CSV 格式解析")
             return read_list_from_url(link)
     else:
         return read_list_from_url(link)
@@ -225,7 +226,7 @@ def parse_list_file(link, output_directory):
     os.makedirs(output_directory, exist_ok=True)
     file_name = os.path.join(output_directory, f"{os.path.basename(link).split('.')[0]}.json")
 
-    # 如果是 .json 链接，先检查是否为 sing-box 规则集格式
+    # 如果是 .json 链接，仅处理 sing-box 规则集格式，失败不继续
     if link.endswith('.json'):
         try:
             json_data = read_json_from_url(link)
@@ -234,8 +235,12 @@ def parse_list_file(link, output_directory):
                     json.dump(sort_dict(json_data), output_file, ensure_ascii=False, indent=2)
                 _compile_srs(file_name)
                 return file_name
+            else:
+                print(f"  ⚠ {link} 不是 sing-box 规则集格式，跳过")
+                return None
         except Exception as e:
-            print(f"处理 JSON 文件失败 {link}: {e}")
+            print(f"  ✗ 处理 JSON 文件失败 {link}: {e}")
+            return None
 
     rows = parse_and_convert_to_rows(link)
 

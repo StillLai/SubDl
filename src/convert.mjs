@@ -117,7 +117,7 @@ async function checkAndUpdateDeps(githubToken) {
     } catch (err) {
         console.error('[Convert] 检查更新失败:', err.message);
         if (!fs.existsSync(PROXY_UTILS_FILE)) throw new Error('依赖检查失败且本地无缓存');
-        console.log('[Convert] 使用本地缓存版本');
+        console.error('[Convert] 使用本地缓存版本');
     }
 }
 
