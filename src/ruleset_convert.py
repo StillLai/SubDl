@@ -1,15 +1,35 @@
-import pandas as pd
 import os
 import json
+import csv
+import subprocess
+import time
 import requests
 import yaml
 import ipaddress
 import re
+from io import StringIO
+
+HTTP_TIMEOUT = 30
+HTTP_RETRY = 3
+
+def _http_get(url, **kwargs):
+    """HTTP GET with timeout and retry"""
+    kwargs.setdefault("timeout", HTTP_TIMEOUT)
+    last_error = None
+    for attempt in range(1, HTTP_RETRY + 1):
+        try:
+            if attempt > 1:
+                time.sleep(2)
+            resp = requests.get(url, **kwargs)
+            resp.raise_for_status()
+            return resp
+        except requests.RequestException as e:
+            last_error = e
+    raise last_error if last_error else Exception(f"下载失败: {url}")
 
 def read_json_from_url(url):
     """下载并解析 sing-box JSON 格式的规则集"""
-    response = requests.get(url)
-    response.raise_for_status()
+    response = _http_get(url)
     json_data = json.loads(response.text)
     return json_data
 
@@ -20,14 +40,25 @@ def is_singbox_ruleset(json_data):
     return False
 
 def read_yaml_from_url(url):
-    response = requests.get(url)
-    response.raise_for_status()
+    """下载并解析 YAML 格式的规则集"""
+    response = _http_get(url)
     yaml_data = yaml.safe_load(response.text)
     return yaml_data
 
 def read_list_from_url(url):
-    df = pd.read_csv(url, header=None, names=['pattern', 'address', 'other'], on_bad_lines='warn')
-    return df
+    """使用标准库 csv 读取规则列表，返回 list[dict]"""
+    response = _http_get(url)
+    reader = csv.reader(StringIO(response.text))
+    rows = []
+    for row in reader:
+        if not row or not row[0].strip():
+            continue
+        pattern = row[0].strip() if len(row) >= 1 else ""
+        address = row[1].strip() if len(row) >= 2 else ""
+        other = row[2].strip() if len(row) >= 3 else None
+        if pattern and address:
+            rows.append({'pattern': pattern, 'address': address, 'other': other})
+    return rows
 
 def is_ipv4_or_ipv6(address):
     try:
@@ -91,7 +122,15 @@ def is_android_package_name(text):
     # 如果不符合常见前缀，但格式正确，也认为是包名
     return len(parts) >= 2  # 至少有两部分
 
-def parse_and_convert_to_dataframe(link):
+def _try_int(v):
+    """尝试将字符串转为 int，失败返回原值"""
+    try:
+        return int(v)
+    except ValueError:
+        return v
+
+def parse_and_convert_to_rows(link):
+    """下载并解析规则链接，返回 list[dict] (pattern, address, other)"""
     if link.endswith('.yaml') or link.endswith('.txt'):
         try:
             yaml_data = read_yaml_from_url(link)
@@ -110,7 +149,6 @@ def parse_and_convert_to_dataframe(link):
                     else:
                         if address.startswith('+') or address.startswith('.'):
                             pattern = 'DOMAIN-SUFFIX'
-                            # 只去掉+号，保留点号
                             if address.startswith('+'):
                                 address = address[1:]
                         else:
@@ -118,17 +156,31 @@ def parse_and_convert_to_dataframe(link):
                 else:
                     pattern, address = item.split(',', 1)  
                 rows.append({'pattern': pattern.strip(), 'address': address.strip(), 'other': None})
-            df = pd.DataFrame(rows, columns=['pattern', 'address', 'other'])
+            return rows
         except:
-            df = read_list_from_url(link)
+            return read_list_from_url(link)
     else:
-        df = read_list_from_url(link)
-    return df
+        return read_list_from_url(link)
+
+def _compile_srs(file_name, srs_dir="./ruleset/srs/"):
+    """使用 subprocess 安全调用 sing-box 编译 SRS"""
+    srs_filename = os.path.basename(file_name).replace(".json", ".srs")
+    srs_path = os.path.join(srs_dir, srs_filename)
+    os.makedirs(srs_dir, exist_ok=True)
+    try:
+        subprocess.run(
+            ["sing-box", "rule-set", "compile", "--output", srs_path, file_name],
+            check=True, capture_output=True, text=True
+        )
+        print(f"  ✓ SRS: {srs_filename}")
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(f"  ✗ SRS 编译失败: {srs_filename} - {e}")
+    except Exception as e:
+        print(f"  ✗ SRS 错误: {srs_filename} - {e}")
 
 def sort_dict(obj):
     if isinstance(obj, dict):
         sorted_keys = sorted(obj.keys())
-        # 将 "version" 键移到最前面
         if "version" in sorted_keys:
             sorted_keys.remove("version")
             sorted_keys.insert(0, "version")
@@ -140,108 +192,84 @@ def sort_dict(obj):
     else:
         return obj
 
+def _group_by_mapped(rows, map_dict):
+    """将行列表按 mapped_pattern 分组，返回 {mapped_pattern: [address, ...]}"""
+    groups = {}
+    seen = set()
+    for row in rows:
+        pattern = row['pattern']
+        if pattern not in map_dict:
+            continue
+        if '#' in pattern:
+            continue
+        address = row['address'].strip()
+        mapped = map_dict[pattern]
+        if pattern == 'PROCESS-NAME':
+            mapped = 'package_name' if is_android_package_name(address) else 'process_name'
+        key = (mapped, address)
+        if key in seen:
+            continue
+        seen.add(key)
+        groups.setdefault(mapped, []).append(address)
+    return groups
+
 def parse_list_file(link, output_directory):
     os.makedirs(output_directory, exist_ok=True)
     file_name = os.path.join(output_directory, f"{os.path.basename(link).split('.')[0]}.json")
-    
+
     # 如果是 .json 链接，先检查是否为 sing-box 规则集格式
     if link.endswith('.json'):
         try:
             json_data = read_json_from_url(link)
             if is_singbox_ruleset(json_data):
-                # 已经是 sing-box 规则集格式，直接下载并保存
                 with open(file_name, 'w', encoding='utf-8') as output_file:
                     json.dump(sort_dict(json_data), output_file, ensure_ascii=False, indent=2)
-                
-                # SRS 输出到 ruleset/srs 目录
-                srs_filename = os.path.basename(file_name).replace(".json", ".srs")
-                srs_path = os.path.join("./ruleset/srs/", srs_filename)
-                os.makedirs("./ruleset/srs/", exist_ok=True)
-                os.system(f"sing-box rule-set compile --output {srs_path} {file_name}")
+                _compile_srs(file_name)
                 return file_name
         except Exception as e:
             print(f"处理 JSON 文件失败 {link}: {e}")
-            # 如果不是 sing-box 格式或下载失败，继续使用原有逻辑处理
 
-    df = parse_and_convert_to_dataframe(link)
+    rows = parse_and_convert_to_rows(link)
 
-    df = df[~df['pattern'].str.contains('#')].reset_index(drop=True)
-
-    # 恢复原始映射字典，但处理重复键的情况
     map_dict = {
-        'DOMAIN-SUFFIX': 'domain_suffix', 
-        'HOST-SUFFIX': 'domain_suffix', 
-        'DOMAIN': 'domain', 
-        'HOST': 'domain', 
+        'DOMAIN-SUFFIX': 'domain_suffix',
+        'HOST-SUFFIX': 'domain_suffix',
+        'DOMAIN': 'domain',
+        'HOST': 'domain',
         'host': 'domain',
-        'DOMAIN-KEYWORD': 'domain_keyword', 
-        'HOST-KEYWORD': 'domain_keyword', 
-        'host-keyword': 'domain_keyword', 
+        'DOMAIN-KEYWORD': 'domain_keyword',
+        'HOST-KEYWORD': 'domain_keyword',
+        'host-keyword': 'domain_keyword',
         'IP-CIDR': 'ip_cidr',
-        'ip-cidr': 'ip_cidr', 
-        'IP-CIDR6': 'ip_cidr', 
+        'ip-cidr': 'ip_cidr',
+        'IP-CIDR6': 'ip_cidr',
         'IP6-CIDR': 'ip_cidr',
-        'SRC-IP-CIDR': 'source_ip_cidr', 
-        'GEOIP': 'geoip', 
+        'SRC-IP-CIDR': 'source_ip_cidr',
+        'GEOIP': 'geoip',
         'DST-PORT': 'port',
-        'SRC-PORT': 'source_port', 
-        'URL-REGEX': 'domain_regex', 
+        'SRC-PORT': 'source_port',
+        'URL-REGEX': 'domain_regex',
         'PROCESS-NAME': 'process_name'
     }
-    
-    # 筛选出支持的 pattern
-    df_filtered = df[df['pattern'].isin(map_dict.keys())].reset_index(drop=True)
-    
-    # 基础映射
-    df_with_mappings = df_filtered.copy()
-    df_with_mappings['mapped_pattern'] = df_with_mappings['pattern'].map(map_dict)
-    
-    # PROCESS-NAME 特殊处理：根据地址内容判断是安卓包名还是普通进程名
-    process_mask = df_with_mappings['pattern'] == 'PROCESS-NAME'
-    df_with_mappings.loc[process_mask, 'mapped_pattern'] = df_with_mappings.loc[process_mask, 'address'].apply(
-        lambda x: 'package_name' if is_android_package_name(x) else 'process_name'
-    )
-    
-    df_with_mappings = df_with_mappings.drop_duplicates().reset_index(drop=True)
+
+    groups = _group_by_mapped(rows, map_dict)
 
     result_rules = {"version": 4, "rules": []}
-    domain_suffix_set = set()
-
-    # 先收集所有 domain_suffix 的地址
-    for pattern, group in df_with_mappings.groupby('mapped_pattern'):
-        if pattern == 'domain_suffix':
-            addresses = group['address'].tolist()
-            domain_suffix_set.update([address.strip() for address in addresses])
+    domain_suffix_set = set(groups.get('domain_suffix', []))
 
     domain_entries = []
-
-    # 按映射后的模式分组处理
-    for pattern, group in df_with_mappings.groupby('mapped_pattern'):
-        addresses = group['address'].tolist()
-        
-        if pattern == 'domain_suffix':
-            rule_entry = {pattern: [address.strip() for address in addresses]}
-            result_rules["rules"].append(rule_entry)
-        elif pattern == 'domain':
-            # 过滤掉已存在于 domain_suffix 中的域名
-            filtered_addresses = [address.strip() for address in addresses if address.strip() not in domain_suffix_set]
-            domain_entries.extend(filtered_addresses)
-        elif pattern in ['port', 'source_port']:
-            # 特殊处理端口字段，将端口号转换为数字
-            port_numbers = []
-            for address in addresses:
-                address = address.strip()
-                try:
-                    port_numbers.append(int(address))
-                except ValueError:
-                    port_numbers.append(address)
-            rule_entry = {pattern: port_numbers}
-            result_rules["rules"].append(rule_entry)
+    for mapped, addresses in groups.items():
+        if mapped == 'domain_suffix':
+            result_rules["rules"].append({'domain_suffix': addresses})
+        elif mapped == 'domain':
+            filtered = [a for a in addresses if a not in domain_suffix_set]
+            domain_entries.extend(filtered)
+        elif mapped in ('port', 'source_port'):
+            port_numbers = [_try_int(a) for a in addresses]
+            result_rules["rules"].append({mapped: port_numbers})
         else:
-            rule_entry = {pattern: [address.strip() for address in addresses]}
-            result_rules["rules"].append(rule_entry)
-    
-    # 对 domain 字段去重并插入到 rules 最前面
+            result_rules["rules"].append({mapped: addresses})
+
     domain_entries = list(set(domain_entries))
     if domain_entries:
         result_rules["rules"].insert(0, {'domain': domain_entries})
@@ -249,11 +277,7 @@ def parse_list_file(link, output_directory):
     with open(file_name, 'w', encoding='utf-8') as output_file:
         json.dump(sort_dict(result_rules), output_file, ensure_ascii=False, indent=2)
 
-    # SRS 输出到 ruleset/srs 目录
-    srs_filename = os.path.basename(file_name).replace(".json", ".srs")
-    srs_path = os.path.join("./ruleset/srs/", srs_filename)
-    os.makedirs("./ruleset/srs/", exist_ok=True)
-    os.system(f"sing-box rule-set compile --output {srs_path} {file_name}")
+    _compile_srs(file_name)
     return file_name
 
 with open("ruleset/ruleset_source.txt", 'r') as links_file:

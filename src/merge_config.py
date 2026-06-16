@@ -14,7 +14,6 @@ Sing-box 配置合并脚本
 
 import json
 import re
-import os
 import sys
 
 
@@ -181,13 +180,14 @@ def remove_filter_fields(obj):
             remove_filter_fields(item)
 
 
-def merge_config(template_config, subscriptions_nodes):
+def merge_config(template_config, subscriptions_nodes, tls_insecure=False):
     """
     合并配置
     
     Args:
         template_config: 配置模板字典
         subscriptions_nodes: dict，键为订阅名，值为节点列表
+        tls_insecure: 是否设置所有节点的 tls.insecure = true
     
     Returns:
         合并后的配置字典
@@ -209,9 +209,10 @@ def merge_config(template_config, subscriptions_nodes):
     
     log(f"已收集 {len(all_nodes)} 个节点并添加订阅前缀")
     
-    # ========== 步骤 2: 修复 tls.insecure ==========
-    fixed = fix_tls_insecure(all_nodes)
-    log(f"已设置 {fixed} 个节点的 tls.insecure = true")
+    # ========== 步骤 2: 修复 tls.insecure (可选) ==========
+    if tls_insecure:
+        fixed = fix_tls_insecure(all_nodes)
+        log(f"已设置 {fixed} 个节点的 tls.insecure = true")
     
     # ========== 步骤 3: 处理 providers 配置 ==========
     if 'providers' in config:
@@ -259,11 +260,30 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(description='合并 sing-box 订阅到配置模板')
-    parser.add_argument('template', help='配置模板文件路径 (.json 或 .jsonc)')
-    parser.add_argument('subscription', help='sing-box 订阅文件路径')
+    parser.add_argument('template', nargs='?', help='配置模板文件路径 (.json 或 .jsonc)')
+    parser.add_argument('subscription', nargs='?', help='sing-box 订阅文件路径')
     parser.add_argument('-o', '--output', help='输出文件路径 (默认输出到 stdout)')
+    parser.add_argument('--tls-insecure', action='store_true', default=False,
+                        help='设置所有节点的 tls.insecure = true')
     
     args = parser.parse_args()
+    
+    # ---------- stdin 模式 ----------
+    if args.template is None and args.subscription is None:
+        log("stdin 模式：从标准输入读取 JSON")
+        input_data = json.loads(sys.stdin.read())
+        output = json.dumps(input_data, indent=2, ensure_ascii=False)
+        if args.output:
+            with open(args.output, 'w', encoding='utf-8') as f:
+                f.write(output)
+            log(f"已保存到: {args.output}")
+        else:
+            print(output)
+        return
+    
+    # ---------- 文件模式 ----------
+    if args.template is None or args.subscription is None:
+        parser.error("需要同时提供 template 和 subscription 位置参数，或不提供任何参数以使用 stdin 模式")
     
     # 加载配置模板
     template_path = args.template
@@ -300,7 +320,7 @@ def main():
         log(f"订阅 '{sub_name}': {len(nodes)} 个节点")
     
     # 合并配置
-    merged = merge_config(template, subscriptions_nodes)
+    merged = merge_config(template, subscriptions_nodes, tls_insecure=args.tls_insecure)
     
     # 输出结果
     output = json.dumps(merged, indent=2, ensure_ascii=False)
