@@ -1046,25 +1046,25 @@
       {
         "tag": "custom_whitelist",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/raw/refs/heads/main/ruleset/srs/custom_whitelist.srs",
+        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/custom_whitelist.srs",
         "update_interval": "3h"
       },
       {
         "tag": "custom_block",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/raw/refs/heads/main/ruleset/srs/custom_block.srs",
+        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/custom_block.srs",
         "update_interval": "3h"
       },
       {
         "tag": "custom_direct",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/raw/refs/heads/main/ruleset/srs/custom_direct.srs",
+        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/custom_direct.srs",
         "update_interval": "3h"
       },
       {
         "tag": "custom_proxy",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/raw/refs/heads/main/ruleset/srs/custom_proxy.srs",
+        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/custom_proxy.srs",
         "update_interval": "3h"
       },
       {
@@ -1082,13 +1082,13 @@
       {
         "tag": "ads",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/raw/refs/heads/main/ruleset/srs/AWAvenue-Ads-Rule-Singbox.srs",
+        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/AWAvenue-Ads-Rule-Singbox.srs",
         "update_interval": "6h"
       },
       {
         "tag": "WebRTC",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/raw/refs/heads/main/ruleset/srs/WebRTC.srs",
+        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/WebRTC.srs",
         "update_interval": "6h"
       },
       {
@@ -1118,7 +1118,7 @@
       {
         "tag": "BOCOM",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/raw/refs/heads/main/ruleset/srs/BOCOM.srs",
+        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/BOCOM.srs",
         "update_interval": "6h"
       },
       {
@@ -1130,19 +1130,19 @@
       {
         "tag": "WeChat",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/raw/refs/heads/main/ruleset/srs/WeChat.srs",
+        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/WeChat.srs",
         "update_interval": "6h"
       },
       {
         "tag": "AliPay",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/raw/refs/heads/main/ruleset/srs/AliPay.srs",
+        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/AliPay.srs",
         "update_interval": "6h"
       },
       {
         "tag": "BiliBili",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/raw/refs/heads/main/ruleset/srs/BiliBili.srs",
+        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/BiliBili.srs",
         "update_interval": "6h"
       },
       {
@@ -1154,7 +1154,7 @@
       {
         "tag": "Weibo",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/raw/refs/heads/main/ruleset/srs/Weibo.srs",
+        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/Weibo.srs",
         "update_interval": "6h"
       },
       {
@@ -1298,7 +1298,7 @@
       {
         "tag": "Apple",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/raw/refs/heads/main/ruleset/srs/Apple.srs",
+        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/Apple.srs",
         "update_interval": "6h"
       },
       {
@@ -1310,7 +1310,7 @@
       {
         "tag": "XiaoMi",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/raw/refs/heads/main/ruleset/srs/XiaoMi.srs",
+        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/XiaoMi.srs",
         "update_interval": "6h"
       },
       {
@@ -1348,7 +1348,7 @@
       {
         "tag": "GeositeCN",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/raw/refs/heads/main/ruleset/srs/GeositeCN.srs",
+        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/GeositeCN.srs",
         "update_interval": "6h"
       },
       {
