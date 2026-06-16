@@ -149,7 +149,7 @@ async function checkAndUpdateDeps(githubToken) {
 /**
  * 加载Sub-Store模块。在全局注入 require 和浏览器 API（window/document/navigator 等），
  * 因为 proxy-utils.esm.mjs 内部有 eval 使用 require，也需要浏览器环境。
- * 未用 try-finally 的理由见文件头部架构说明。
+ * 使用 try-finally 确保 import 抛出异常时也会清理注入的全局变量。
  */
 async function loadProxyUtils() {
     // 保存原始值，便于加载后清理
@@ -194,25 +194,26 @@ async function loadProxyUtils() {
     // 直接用file://协议导入
     const modulePath = 'file://' + PROXY_UTILS_FILE;
     
-    const mod = await import(modulePath);
-    console.error('[Convert] 模块加载成功');
-
-    // 清理注入的全局变量，恢复原始状态
-    for (const key of GLOBAL_KEYS) {
-        if (existed.has(key)) {
-            try {
-                global[key] = originals[key];
-            } catch {
-                Object.defineProperty(global, key, {
-                    value: originals[key], configurable: true, writable: true, enumerable: true
-                });
+    try {
+        const mod = await import(modulePath);
+        console.error('[Convert] 模块加载成功');
+        return mod;
+    } finally {
+        // 清理注入的全局变量，恢复原始状态
+        for (const key of GLOBAL_KEYS) {
+            if (existed.has(key)) {
+                try {
+                    global[key] = originals[key];
+                } catch {
+                    Object.defineProperty(global, key, {
+                        value: originals[key], configurable: true, writable: true, enumerable: true
+                    });
+                }
+            } else {
+                delete global[key];
             }
-        } else {
-            delete global[key];
         }
     }
-    
-    return mod;
 }
 
 /**
