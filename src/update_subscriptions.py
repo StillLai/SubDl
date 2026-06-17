@@ -415,10 +415,19 @@ def _generate_template_variant(suffix: str, label: str, transform_fn: Callable[[
 
 
 def _generate_all_template_variants() -> None:
-    """生成所有模板变体（noTun / tproxy / tun_for_win）"""
-    _generate_template_variant('noTun', 'noTun', lambda t: _remove_tun_inbounds(t))
-    _generate_template_variant('tproxy', 'tproxy', lambda t: _replace_tun_with_tproxy(t))
-    _generate_template_variant('tun_for_win', 'tun_for_win', lambda t: _remove_auto_redirect(t))
+    """生成所有模板变体（noTun / tproxy / tun_for_win），并行处理"""
+    variants = [
+        ('noTun', 'noTun', lambda t: _remove_tun_inbounds(t)),
+        ('tproxy', 'tproxy', lambda t: _replace_tun_with_tproxy(t)),
+        ('tun_for_win', 'tun_for_win', lambda t: _remove_auto_redirect(t)),
+    ]
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        futures = [
+            executor.submit(_generate_template_variant, suffix, label, transform)
+            for suffix, label, transform in variants
+        ]
+        for future in as_completed(futures):
+            future.result()  # 等待完成（异常会被 _generate_template_variant 内部捕获）
 
 
 def _remove_tun_inbounds(template: dict[str, Any]) -> None:
@@ -462,7 +471,7 @@ def _remove_auto_redirect(template: dict[str, Any]) -> None:
 def _process_templates(
     process_fn: Callable[[str, str], tuple[str, str] | None]
 ) -> dict[str, str]:
-    """遍历所有模板文件，对每个模板执行 process_fn(template_path, base_name)"""
+    """遍历所有模板文件，并行处理每个模板 process_fn(template_path, base_name)"""
     templates = discover_template_files(TEMPLATE_DIR)
     if not templates:
         log("  ✗ 模板目录中没有找到模板文件")
@@ -471,11 +480,16 @@ def _process_templates(
     log(f"  找到 {len(templates)} 个模板文件")
 
     results: dict[str, str] = {}
-    for template_path, base_name in templates:
-        entry = process_fn(template_path, base_name)
-        if entry:
-            filename, content = entry
-            results[filename] = content
+    with ThreadPoolExecutor(max_workers=min(len(templates), 4)) as executor:
+        future_to_template = {
+            executor.submit(process_fn, template_path, base_name): (template_path, base_name)
+            for template_path, base_name in templates
+        }
+        for future in as_completed(future_to_template):
+            entry = future.result()
+            if entry:
+                filename, content = entry
+                results[filename] = content
     return results
 
 
@@ -652,15 +666,19 @@ def _generate_and_upload(
 ) -> str:
     """生成合并配置、providers 配置，并上传到 Gist"""
 
-    merged_configs = merge_all_templates(subs_nodes_dict)
+    log("→ 并行生成合并配置和 providers 配置...")
+    sub_url_map = {sub['name']: sub['url'] for sub in subscriptions}
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        f_merged = executor.submit(merge_all_templates, subs_nodes_dict)
+        f_provider = executor.submit(generate_provider_configs, sub_url_map)
+        merged_configs = f_merged.result()
+        provider_configs = f_provider.result()
+
     for filename, content in merged_configs.items():
         files[filename] = content
     if merged_configs:
         log(f"  ✓ 共生成 {len(merged_configs)} 个配置文件")
 
-    log("→ 生成 providers 版本配置文件...")
-    sub_url_map = {sub['name']: sub['url'] for sub in subscriptions}
-    provider_configs = generate_provider_configs(sub_url_map)
     for filename, content in provider_configs.items():
         files[filename] = content
     if provider_configs:
