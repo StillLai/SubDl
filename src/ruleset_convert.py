@@ -6,43 +6,22 @@ import os
 import json
 import csv
 import subprocess
-import time
-import requests
 import yaml
 import ipaddress
 import re
 from io import StringIO
 from typing import Any
 
-from utils import log
-
-HTTP_TIMEOUT: int = 30
-HTTP_RETRY: int = 3
+from utils import log, http_get_with_retry
 
 # 预编译正则，避免重复编译开销
 _PACKAGE_PART_RE: re.Pattern[str] = re.compile(r'^[a-zA-Z0-9_]+$')
 _IP_LIKE_RE: re.Pattern[str] = re.compile(r'^[\d./:a-fA-F]+$')
 
 
-def _http_get(url: str, **kwargs: Any) -> requests.Response:
-    """HTTP GET with timeout and retry"""
-    kwargs.setdefault("timeout", HTTP_TIMEOUT)
-    last_error: Exception | None = None
-    for attempt in range(1, HTTP_RETRY + 1):
-        try:
-            if attempt > 1:
-                time.sleep(2 ** (attempt - 1))  # 指数退避：2s, 4s, 8s...
-            resp = requests.get(url, **kwargs)
-            resp.raise_for_status()
-            return resp
-        except requests.RequestException as e:
-            last_error = e
-    raise last_error if last_error else Exception(f"下载失败: {url}")
-
-
 def _fetch_parsed(url: str, parser: str) -> Any:
     """下载 URL 内容并按指定格式解析（'json' / 'yaml' / 'csv'）"""
-    response = _http_get(url)
+    response = http_get_with_retry(url)
     if parser == 'json':
         return json.loads(response.text)
     elif parser == 'yaml':
@@ -147,8 +126,9 @@ def parse_and_convert_to_rows(link: str) -> list[dict[str, str | None]]:
         return _fetch_parsed(link, 'csv')  # type: ignore[return-value]
 
 
-def _compile_srs(file_name: str, srs_dir: str = "./ruleset/srs/") -> None:
-    """使用 subprocess 安全调用 sing-box 编译 SRS"""
+def _compile_srs(file_name: str) -> None:
+    """使用 subprocess 安全调用 sing-box 编译 SRS，输出到 file_name 同级的 srs/ 目录"""
+    srs_dir = os.path.join(os.path.dirname(file_name), '..', 'srs')
     srs_filename = os.path.basename(file_name).replace(".json", ".srs")
     srs_path = os.path.join(srs_dir, srs_filename)
     os.makedirs(srs_dir, exist_ok=True)
@@ -192,7 +172,10 @@ def _group_by_mapped(
             continue
         if '#' in pattern:
             continue
-        address: str = row['address'].strip()  # type: ignore[union-attr]
+        address_raw = row.get('address')
+        if not address_raw or not address_raw.strip():
+            continue
+        address: str = address_raw.strip()
         mapped: str = map_dict[pattern]
         if pattern == 'PROCESS-NAME':
             mapped = 'package_name' if is_android_package_name(address) else 'process_name'

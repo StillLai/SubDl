@@ -15,7 +15,7 @@ import subprocess
 import tempfile
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any
+from typing import Any, IO
 from urllib.parse import urlparse
 from datetime import datetime, timezone, timedelta
 
@@ -323,7 +323,7 @@ def generate_readme(subscription_info: list[dict[str, Any]]) -> str:
 
 def _run_subprocess_with_tempfile(
     cmd: list[str],
-    write_fn: Callable[[str], None],
+    write_fn: Callable[[IO[str]], None],
     suffix: str,
     label: str,
 ) -> dict[str, Any] | None:
@@ -586,7 +586,7 @@ def _download_all_subscriptions(
             elif status == "convert_failed":
                 log(f"  ⚠️ {name}: {reason}")
                 skipped_subs.append({"name": name, "reason": reason})
-                subscription_info.append({"name": name, "flow": flow_info, "node_count": 0, "status": "ok"})
+                subscription_info.append({"name": name, "flow": flow_info, "node_count": 0, "status": "convert_failed"})
             else:
                 log(f"  ✗ {name}: {reason}")
                 subscription_info.append({"name": name, "flow": flow_info, "node_count": 0, "status": "error"})

@@ -158,9 +158,10 @@ async function loadProxyUtils() {
     }
 
     // 在全局注入require（这是proxy-utils.esm.mjs需要的）
+    // 注意: 不加入 existed，让 finally 块走 delete global.require 分支，
+    // 而非恢复为 undefined 的原始值
     const { createRequire } = await import('module');
     global.require = createRequire(PROXY_UTILS_FILE);
-    existed.add('require');
     
     // 创建jsdom环境，使用 pretendToBeVisual 避免 navigator 只读问题
     const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
