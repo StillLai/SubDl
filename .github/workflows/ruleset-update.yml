@@ -10,6 +10,11 @@ on:
   schedule:
     - cron: '0 */6 * * *'
 
+# 防止多次运行重叠
+concurrency:
+  group: ruleset-update
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
@@ -19,13 +24,35 @@ jobs:
 
     steps:
     - uses: actions/checkout@v6
+      with:
+        fetch-depth: 1
 
-    - name: "Setup sing-box"
+    - name: Get sing-box version
+      id: get_version
       run: |
-          set -Eeuo pipefail
-          ASSET_URL=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases/latest | grep -o 'https://github.com/SagerNet/sing-box/releases/download/[^"]*linux_amd64.deb')
-          wget -O sing-box.deb $ASSET_URL
-          sudo dpkg -i sing-box.deb
+        set -Eeuo pipefail
+        RELEASE_JSON=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases/latest)
+        VERSION=$(echo "$RELEASE_JSON" | grep -o '"tag_name":"[^"]*"' | head -1 | cut -d'"' -f4)
+        ASSET_URL=$(echo "$RELEASE_JSON" | grep -o 'https://github.com/SagerNet/sing-box/releases/download/[^"]*linux_amd64.deb')
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "asset_url=$ASSET_URL" >> $GITHUB_OUTPUT
+
+    - name: Restore sing-box deb cache
+      id: cache-deb
+      uses: actions/cache@v4
+      with:
+        path: sing-box.deb
+        key: sing-box-deb-${{ steps.get_version.outputs.version }}
+
+    - name: Setup sing-box
+      run: |
+        set -Eeuo pipefail
+        if [ ! -f sing-box.deb ]; then
+          wget -O sing-box.deb "${{ steps.get_version.outputs.asset_url }}"
+        else
+          echo "sing-box.deb restored from cache, skipping download"
+        fi
+        sudo dpkg -i sing-box.deb
 
     - name: Set up Python3
       uses: actions/setup-python@v6
