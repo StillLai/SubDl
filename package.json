@@ -1,0 +1,11 @@
+{
+  "name": "subdl",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SubDl - Subscription downloader. Node.js dependencies (jsdom, dotenv) are used by the GitHub Actions workflow for subscription conversion.",
+  "license": "GPL-3.0",
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "jsdom": "^29.1.1"
+  }
+}

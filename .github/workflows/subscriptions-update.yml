@@ -8,6 +8,11 @@ on:
     paths:
       - 'config_template/sing-box_template.jsonc'
 
+# 防止多次运行重叠（保证 Gist 状态一致）
+concurrency:
+  group: subscriptions-update
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
@@ -17,30 +22,24 @@ jobs:
     
     steps:
     - uses: actions/checkout@v6
-      
+      with:
+        fetch-depth: 1
+
     - uses: actions/setup-python@v6
       with:
         python-version: 3.x
         cache: 'pip'
         cache-dependency-path: requirements-sub.txt
 
-    # ════════════════════════════════════════════════════════════
-    # ⚠️ 此处故意不加 cache: 'npm'
-    # 原因：
-    #   1. 本项目没有 package-lock.json / yarn.lock，
-    #      setup-node 内置缓存需要 lock 文件来计算缓存 key
-    #   2. 仅依赖 jsdom + dotenv 两个包，下载只需 ~2s
-    #   3. 同一次 workflow run 内 npm 有内置缓存，不会重复下载
-    #   4. 不加缓存反而保证每次拉取最新版，零维护负担
-    # ════════════════════════════════════════════════════════════
     - uses: actions/setup-node@v6
       with:
         node-version: '22'
+        cache: 'npm'
 
     - run: pip install -r requirements-sub.txt
 
-    # 注意：dotenv 是 Sub-Store proxy-utils.esm.mjs 库的内部依赖，请勿移除
-    - run: npm install jsdom dotenv
+    # dotenv 是 Sub-Store proxy-utils.esm.mjs 库的内部依赖，请勿移除
+    - run: npm ci
         
     - name: Update subscriptions
       env:
