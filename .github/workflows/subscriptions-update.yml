@@ -25,10 +25,6 @@ jobs:
       with:
         fetch-depth: 1
 
-    - uses: actions/setup-node@v6
-      with:
-        node-version: '22'
-
     - name: Cache node_modules
       id: cache-npm
       uses: actions/cache@v5
@@ -50,12 +46,7 @@ jobs:
     # dotenv 是 Sub-Store proxy-utils.esm.mjs 库的内部依赖，请勿移除
     - name: Install Node dependencies
       working-directory: src
-      run: |
-        if [ "${{ steps.cache-npm.outputs.cache-hit }}" != "true" ]; then
-          npm ci
-        else
-          echo "node_modules restored from cache, skipping npm ci"
-        fi
+      run: npm ci
 
     - name: Update subscriptions
       env:
