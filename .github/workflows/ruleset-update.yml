@@ -32,10 +32,15 @@ jobs:
       run: |
         set -Eeuo pipefail
         RELEASE_JSON=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases/latest)
-        VERSION=$(echo "$RELEASE_JSON" | grep -o '"tag_name":"[^"]*"' | head -1 | cut -d'"' -f4)
-        ASSET_URL=$(echo "$RELEASE_JSON" | grep -o 'https://github.com/SagerNet/sing-box/releases/download/[^"]*linux_amd64.deb')
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
-        echo "asset_url=$ASSET_URL" >> $GITHUB_OUTPUT
+        VERSION=$(echo "$RELEASE_JSON" | grep -o '"tag_name":"[^"]*"' | head -1 | cut -d'"' -f4 || echo "")
+        ASSET_URL=$(echo "$RELEASE_JSON" | grep -o 'https://github.com/SagerNet/sing-box/releases/download/[^"]*linux_amd64.deb' || echo "")
+        if [ -z "$VERSION" ] || [ -z "$ASSET_URL" ]; then
+          echo "::error::Failed to extract version or asset URL from release JSON"
+          echo "Release JSON: $RELEASE_JSON"
+          exit 1
+        fi
+        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+        echo "asset_url=$ASSET_URL" >> "$GITHUB_OUTPUT"
 
     - name: Restore sing-box deb cache
       id: cache-deb
