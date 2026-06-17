@@ -28,8 +28,6 @@ jobs:
     - uses: actions/setup-python@v6
       with:
         python-version: 3.x
-        cache: 'pip'
-        cache-dependency-path: src/requirements.txt
 
     - uses: actions/setup-node@v6
       with:
@@ -42,9 +40,21 @@ jobs:
         path: src/node_modules
         key: node-modules-${{ runner.os }}-${{ hashFiles('src/package-lock.json') }}
 
+    - name: Cache pip
+      id: cache-pip
+      uses: actions/cache@v5
+      with:
+        path: ~/.cache/pip
+        key: pip-${{ runner.os }}-${{ hashFiles('src/requirements.txt') }}
+
     - name: Install Python dependencies
       working-directory: src
-      run: pip install -r requirements.txt
+      run: |
+        if [ "${{ steps.cache-pip.outputs.cache-hit }}" != "true" ]; then
+          pip install -r requirements.txt
+        else
+          echo "pip cache restored, skipping pip install"
+        fi
 
     # dotenv 是 Sub-Store proxy-utils.esm.mjs 库的内部依赖，请勿移除
     - name: Install Node dependencies
