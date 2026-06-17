@@ -1,6 +1,5 @@
-#!/usr/bin/env python3
 """
-Sing-box 配置合并脚本
+Sing-box 配置合并模块
 
 将 sing-box 订阅节点合并到 sing-box 配置模板中，生成最终可用的配置文件。
 
@@ -16,7 +15,6 @@ from __future__ import annotations
 import copy
 import json
 import re
-import sys
 from typing import Any
 
 from utils import load_jsonc, log
@@ -185,77 +183,3 @@ def merge_config(
         log("[Merge] 已添加 Compatible outbound 定义")
 
     return config
-
-
-def main() -> None:
-    import argparse
-
-    parser = argparse.ArgumentParser(description='合并 sing-box 订阅到配置模板')
-    parser.add_argument('template', nargs='?', help='配置模板文件路径 (.json 或 .jsonc)')
-    parser.add_argument('subscription', nargs='?', help='sing-box 订阅文件路径')
-    parser.add_argument('-o', '--output', help='输出文件路径 (默认输出到 stdout)')
-
-    args = parser.parse_args()
-
-    # ---------- stdin 模式 ----------
-    if args.template is None and args.subscription is None:
-        log("[Merge] stdin 模式：从标准输入读取 JSON")
-        input_data = json.loads(sys.stdin.read())
-        output = json.dumps(input_data, indent=2, ensure_ascii=False)
-        if args.output:
-            with open(args.output, 'w', encoding='utf-8') as f:
-                f.write(output)
-            log(f"[Merge] 已保存到: {args.output}")
-        else:
-            print(output)
-        return
-
-    # ---------- 文件模式 ----------
-    if args.template is None or args.subscription is None:
-        parser.error("需要同时提供 template 和 subscription 位置参数，或不提供任何参数以使用 stdin 模式")
-
-    # 加载配置模板
-    template_path: str = args.template
-    if template_path.endswith('.jsonc'):
-        template = load_jsonc(template_path)
-    else:
-        with open(template_path, 'r', encoding='utf-8') as f:
-            template = json.load(f)
-    log(f"[Merge] 已加载配置模板: {template_path}")
-
-    # 加载订阅
-    sub_path: str = args.subscription
-    with open(sub_path, 'r', encoding='utf-8') as f:
-        subscription = json.load(f)
-    log(f"[Merge] 已加载订阅: {sub_path}")
-
-    # 按订阅名分组节点
-    subscriptions_nodes: dict[str, list[dict[str, Any]]]
-    if isinstance(subscription, dict):
-        all_nodes = subscription.get('outbounds', []) + subscription.get('endpoints', [])
-        if all_nodes:
-            subscriptions_nodes = {"default": all_nodes}
-        else:
-            subscriptions_nodes = subscription
-    else:
-        raise ValueError(f"订阅文件格式错误：期望 dict，实际为 {type(subscription).__name__}")
-
-    for sub_name, nodes in subscriptions_nodes.items():
-        log(f"[Merge] 订阅 '{sub_name}': {len(nodes)} 个节点")
-
-    # 合并配置
-    merged = merge_config(template, subscriptions_nodes)
-
-    # 输出结果
-    output = json.dumps(merged, indent=2, ensure_ascii=False)
-
-    if args.output:
-        with open(args.output, 'w', encoding='utf-8') as f:
-            f.write(output)
-        log(f"[Merge] 已保存到: {args.output}")
-    else:
-        print(output)
-
-
-if __name__ == '__main__':
-    main()

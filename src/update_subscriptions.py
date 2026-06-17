@@ -22,6 +22,7 @@ from datetime import datetime, timezone, timedelta
 import requests
 
 from utils import load_jsonc, discover_template_files, log
+from merge_config import merge_config
 
 
 # ========== 路径常量 ==========
@@ -30,7 +31,6 @@ PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
 TEMPLATE_DIR = os.path.join(PROJECT_ROOT, 'config_template')
 WORKFLOW_PATH = os.path.join(PROJECT_ROOT, '.github', 'workflows', 'subscriptions-update.yml')
 CONVERT_SCRIPT = os.path.join(SCRIPT_DIR, 'convert.mjs')
-MERGE_SCRIPT = os.path.join(SCRIPT_DIR, 'merge_config.py')
 TEMPLATE_BASE = os.path.join(TEMPLATE_DIR, 'sing-box_template.jsonc')
 
 
@@ -365,19 +365,23 @@ def convert_to_singbox(clash_content: str) -> dict[str, Any] | None:
 def merge_singbox_config(
     subs_nodes_dict: dict[str, list[dict[str, Any]]], template_path: str | None = None
 ) -> dict[str, Any] | None:
-    """将多个sing-box订阅节点合并到配置模板"""
+    """将多个sing-box订阅节点合并到配置模板
+
+    NOTE: 直接 import 调用而非 subprocess，省去进程启动开销 (~1-2s)。
+    _run_subprocess_with_tempfile 仅用于 convert.mjs（跨语言调用）。
+    """
     if template_path is None:
         template_path = TEMPLATE_BASE
     if not os.path.exists(template_path):
         log(f"  ✗ 配置模板不存在: {template_path}")
         return None
 
-    return _run_subprocess_with_tempfile(
-        cmd=['python', MERGE_SCRIPT, template_path],
-        write_fn=lambda f: json.dump(subs_nodes_dict, f),
-        suffix='.json',
-        label='合并',
-    )
+    try:
+        template = load_jsonc(template_path)
+        return merge_config(template, subs_nodes_dict)
+    except Exception as e:
+        log(f"  ✗ 合并异常: {e}")
+        return None
 
 
 # ========== 模板生成 — 通用抽象 ==========
