@@ -36,7 +36,7 @@ jobs:
       with:
         node-version: '22'
 
-    - run: pip install -r requirements.txt
+    - run: pip install -r requirements-sub.txt
 
     # 注意：dotenv 是 Sub-Store proxy-utils.esm.mjs 库的内部依赖，请勿移除
     - run: npm install jsdom dotenv

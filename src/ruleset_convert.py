@@ -266,3 +266,26 @@ def parse_list_file(link: str, output_directory: str) -> str | None:
     return file_name
 
 
+def main() -> None:
+    with open("ruleset/ruleset_source.txt", 'r', encoding='utf-8') as links_file:
+        links = links_file.read().splitlines()
+
+    links = [l for l in links if l.strip() and not l.strip().startswith("#")]
+
+    output_dir = "./ruleset/json/"
+    result_file_names: list[str] = []
+
+    for link in links:
+        try:
+            result_file_name = parse_list_file(link, output_directory=output_dir)
+            if result_file_name:
+                result_file_names.append(result_file_name)
+        except Exception as e:
+            log(f"✗ 跳过 {link}: {e}")
+
+    for file_name in result_file_names:
+        log(file_name)
+
+
+if __name__ == "__main__":
+    main()
