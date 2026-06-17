@@ -88,11 +88,12 @@ function getLatestRelease(githubToken) {
 async function checkAndUpdateDeps(githubToken) {
     // 6 小时内已检查过且本地缓存存在，跳过 GitHub API 调用
     const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
+    let cachedVersion = '';
     try {
         if (fs.existsSync(VERSION_FILE) && fs.existsSync(PROXY_UTILS_FILE)) {
             const cached = fs.readFileSync(VERSION_FILE, 'utf8').trim();
             const lines = cached.split('\n');
-            const cachedVersion = lines[0] || '';
+            cachedVersion = lines[0] || '';
             const cachedTime = parseInt(lines[1] || '0', 10);
             if (cachedTime && (Date.now() - cachedTime) < SIX_HOURS_MS) {
                 console.error(`[Convert] 使用缓存版本 (${cachedVersion}, ${Math.round((Date.now() - cachedTime) / 3600000)}h前检查)`);
@@ -103,14 +104,8 @@ async function checkAndUpdateDeps(githubToken) {
         console.error('[Convert] 检查 Sub-Store 依赖更新...');
         const release = await getLatestRelease(githubToken);
         const tagName = release.tag_name;
-        
-        let currentVersion = '';
-        if (fs.existsSync(VERSION_FILE)) {
-            const cached = fs.readFileSync(VERSION_FILE, 'utf8').trim();
-            currentVersion = cached.split('\n')[0] || '';
-        }
 
-        if (currentVersion === tagName) {
+        if (cachedVersion === tagName) {
             // 版本未变，仅刷新时间戳
             fs.writeFileSync(VERSION_FILE, `${tagName}\n${Date.now()}`);
             console.error(`[Convert] 已是最新版本: ${tagName}`);
@@ -126,7 +121,7 @@ async function checkAndUpdateDeps(githubToken) {
 
         if (!asset) {
             if (!fs.existsSync(PROXY_UTILS_FILE)) throw new Error('未找到依赖文件');
-            fs.writeFileSync(VERSION_FILE, `${currentVersion}\n${Date.now()}`);
+            fs.writeFileSync(VERSION_FILE, `${cachedVersion}\n${Date.now()}`);
             console.error('[Convert] 使用本地缓存版本');
             return;
         }

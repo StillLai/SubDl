@@ -147,16 +147,10 @@ def validate_subscription_content(content: str, sub_name: str) -> tuple[bool, st
     if not content or len(content.strip()) < 10:
         return False, "内容为空或过短"
 
-    # 检查是否为HTML错误页面
+    # 检查是否为HTML页面
     content_lower = content.lower().strip()
     if content_lower.startswith('<!doctype') or content_lower.startswith('<html'):
-        # 检查是否是错误页面
-        error_indicators = ['404', 'not found', 'error', 'access denied', 'forbidden', 'captcha', '验证码']
-        if any(indicator in content_lower for indicator in error_indicators):
-            return False, "返回HTML错误页面"
-        # 可能只是重定向到网页，尝试解析
-        if '<!doctype html>' in content_lower or '<html' in content_lower:
-            return False, "返回的是网页而非订阅内容"
+        return False, "返回的是网页而非订阅内容"
 
     # 检查是否为有效配置（至少有一些关键字）
     valid_indicators = ['proxies', 'proxy-providers', 'proxy-groups', 'servers', 'outbounds', 'endpoints', 'vmess', 'trojan', 'ssid', 'wireguard']
@@ -388,7 +382,7 @@ def merge_singbox_config(
 
 # ========== 模板生成 — 通用抽象 ==========
 
-def _generate_template_variant(suffix: str, label: str, transform_fn: Callable[[dict[str, Any]], None]) -> str | None:
+def _generate_template_variant(suffix: str, label: str, transform_fn: Callable[[dict[str, Any]], None]) -> None:
     """通用模板变体生成器"""
     try:
         output_path = os.path.join(TEMPLATE_DIR, f'sing-box_template_{suffix}.jsonc')
@@ -398,21 +392,14 @@ def _generate_template_variant(suffix: str, label: str, transform_fn: Callable[[
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(output_content)
         log(f"  ✓ 已生成 {label} 模板: config_template/sing-box_template_{suffix}.jsonc")
-        return output_content
     except Exception as e:
         log(f"  ✗ 生成 {label} 模板异常: {e}")
-        return None
 
 
 def _generate_all_template_variants() -> None:
     """生成所有模板变体（noTun / tproxy / tun_for_win）"""
-    log("→ 生成不含 tun inbound 的模板...")
     _generate_template_variant('noTun', 'noTun', lambda t: _remove_tun_inbounds(t))
-
-    log("→ 生成 tproxy inbound 的模板...")
     _generate_template_variant('tproxy', 'tproxy', lambda t: _replace_tun_with_tproxy(t))
-
-    log("→ 生成适用于 Windows 的 tun 模板...")
     _generate_template_variant('tun_for_win', 'tun_for_win', lambda t: _remove_auto_redirect(t))
 
 

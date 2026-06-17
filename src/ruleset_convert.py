@@ -92,14 +92,6 @@ def is_android_package_name(text: str) -> bool:
     return len(parts) >= 2
 
 
-def _try_int(v: str) -> int | str:
-    """尝试将字符串转为 int，失败返回原值"""
-    try:
-        return int(v)
-    except ValueError:
-        return v
-
-
 def _parse_yaml_rows(yaml_data: Any) -> list[dict[str, str | None]]:
     """从 YAML 数据解析规则行"""
     rows: list[dict[str, str | None]] = []
@@ -270,7 +262,12 @@ def parse_list_file(link: str, output_directory: str) -> str | None:
             filtered = [a for a in addresses if a not in domain_suffix_set]
             domain_entries.extend(filtered)
         elif mapped in ('port', 'source_port'):
-            port_numbers = [_try_int(a) for a in addresses]
+            port_numbers = []
+            for a in addresses:
+                try:
+                    port_numbers.append(int(a))
+                except ValueError:
+                    port_numbers.append(a)
             result_rules["rules"].append({mapped: port_numbers})
         else:
             result_rules["rules"].append({mapped: addresses})
