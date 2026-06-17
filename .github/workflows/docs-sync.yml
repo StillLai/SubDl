@@ -25,19 +25,6 @@ jobs:
       with:
         fetch-depth: 1
 
-    - name: Get latest sing-box commit SHA
-      id: get_sha
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        SHA=$(gh api repos/reF1nd/sing-box/branches/reF1nd-stable --jq '.commit.sha')
-        if [ -z "$SHA" ] || [ "$SHA" = "null" ]; then
-          echo "::error::Failed to extract commit SHA from sing-box branch info"
-          exit 1
-        fi
-        echo "sha=$SHA" >> "$GITHUB_OUTPUT"
-        echo "Latest commit: $SHA"
-
     - name: Sync sing-box docs
       run: |
         set -Eeuo pipefail

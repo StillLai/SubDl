@@ -30,27 +30,19 @@ jobs:
       with:
         fetch-depth: 1
 
-    - name: Get sing-box version
-      id: get_version
+    - name: Setup sing-box
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         set -Eeuo pipefail
         JSON=$(gh api repos/SagerNet/sing-box/releases/latest)
-        VERSION=$(echo "$JSON" | jq -r '.tag_name')
         ASSET_URL=$(echo "$JSON" | jq -r '.assets[] | select(.name | endswith("linux_amd64.deb")) | .browser_download_url')
-        if [ -z "$VERSION" ] || [ "$VERSION" = "null" ] || [ -z "$ASSET_URL" ] || [ "$ASSET_URL" = "null" ]; then
-          echo "::error::Failed to extract version or asset URL from release JSON"
+        if [ -z "$ASSET_URL" ] || [ "$ASSET_URL" = "null" ]; then
+          echo "::error::Failed to get sing-box .deb asset URL from release JSON"
           echo "Release JSON: $JSON"
           exit 1
         fi
-        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-        echo "asset_url=$ASSET_URL" >> "$GITHUB_OUTPUT"
-
-    - name: Setup sing-box
-      run: |
-        set -Eeuo pipefail
-        wget -O sing-box.deb "${{ steps.get_version.outputs.asset_url }}"
+        wget -O sing-box.deb "$ASSET_URL"
         sudo dpkg -i sing-box.deb
 
     - name: Install Python dependencies
