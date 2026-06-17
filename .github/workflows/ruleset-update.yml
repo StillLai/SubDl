@@ -26,18 +26,19 @@ jobs:
     - uses: actions/checkout@v6
       with:
         fetch-depth: 1
-        persist-credentials: false
 
     - name: Get sing-box version
       id: get_version
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         set -Eeuo pipefail
-        RELEASE_JSON=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases/latest)
-        VERSION=$(echo "$RELEASE_JSON" | jq -r '.tag_name')
-        ASSET_URL=$(echo "$RELEASE_JSON" | jq -r '.assets[] | select(.name | endswith("linux_amd64.deb")) | .browser_download_url')
+        JSON=$(gh api repos/SagerNet/sing-box/releases/latest)
+        VERSION=$(echo "$JSON" | jq -r '.tag_name')
+        ASSET_URL=$(echo "$JSON" | jq -r '.assets[] | select(.name | endswith("linux_amd64.deb")) | .browser_download_url')
         if [ -z "$VERSION" ] || [ "$VERSION" = "null" ] || [ -z "$ASSET_URL" ] || [ "$ASSET_URL" = "null" ]; then
           echo "::error::Failed to extract version or asset URL from release JSON"
-          echo "Release JSON: $RELEASE_JSON"
+          echo "Release JSON: $JSON"
           exit 1
         fi
         echo "version=$VERSION" >> "$GITHUB_OUTPUT"

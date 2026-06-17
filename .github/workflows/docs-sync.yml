@@ -21,12 +21,13 @@ jobs:
     - uses: actions/checkout@v6
       with:
         fetch-depth: 1
-        persist-credentials: false
 
     - name: Get latest sing-box commit SHA
       id: get_sha
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        SHA=$(curl -s https://api.github.com/repos/reF1nd/sing-box/branches/reF1nd-stable | jq -r '.commit.sha')
+        SHA=$(gh api repos/reF1nd/sing-box/branches/reF1nd-stable --jq '.commit.sha')
         if [ -z "$SHA" ] || [ "$SHA" = "null" ]; then
           echo "::error::Failed to extract commit SHA from sing-box branch info"
           exit 1
