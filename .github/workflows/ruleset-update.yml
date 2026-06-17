@@ -61,10 +61,6 @@ jobs:
         fi
         sudo dpkg -i sing-box.deb
 
-    - uses: actions/setup-python@v6
-      with:
-        python-version: 3.x
-
     - name: Cache pip
       id: cache-pip
       uses: actions/cache@v5
@@ -74,12 +70,7 @@ jobs:
 
     - name: Install Python dependencies
       working-directory: src
-      run: |
-        if [ "${{ steps.cache-pip.outputs.cache-hit }}" != "true" ]; then
-          pip install -r requirements.txt
-        else
-          echo "pip cache restored, skipping pip install"
-        fi
+      run: pip install -r requirements.txt
 
     - name: Run script
       run: python src/ruleset_convert.py

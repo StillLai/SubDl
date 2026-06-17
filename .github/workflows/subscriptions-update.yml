@@ -25,10 +25,6 @@ jobs:
       with:
         fetch-depth: 1
 
-    - uses: actions/setup-python@v6
-      with:
-        python-version: 3.x
-
     - uses: actions/setup-node@v6
       with:
         node-version: '22'
@@ -49,12 +45,7 @@ jobs:
 
     - name: Install Python dependencies
       working-directory: src
-      run: |
-        if [ "${{ steps.cache-pip.outputs.cache-hit }}" != "true" ]; then
-          pip install -r requirements.txt
-        else
-          echo "pip cache restored, skipping pip install"
-        fi
+      run: pip install -r requirements.txt
 
     # dotenv 是 Sub-Store proxy-utils.esm.mjs 库的内部依赖，请勿移除
     - name: Install Node dependencies
