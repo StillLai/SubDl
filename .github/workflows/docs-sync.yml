@@ -10,6 +10,9 @@ concurrency:
   group: docs-sync
   cancel-in-progress: false
 
+# 缓存经验法则：仅当「直接下载/重新生成」比 8s cache restore 更慢时才用 actions/cache
+# 当前不 cache：git clone --sparse 跟 cache restore 差不多，没省
+
 permissions:
   contents: write
 
@@ -35,26 +38,14 @@ jobs:
         echo "sha=$SHA" >> "$GITHUB_OUTPUT"
         echo "Latest commit: $SHA"
 
-    - name: Restore docs cache
-      id: cache-docs
-      uses: actions/cache@v5
-      with:
-        path: sing-box-reF1nd-docs
-        key: "sing-box-reF1nd-docs-${{ steps.get_sha.outputs.sha }}"
-
     - name: Sync sing-box docs
       run: |
         set -Eeuo pipefail
-        if [ "${{ steps.cache-docs.outputs.cache-hit }}" != "true" ]; then
-          echo "Cache miss, cloning sing-box..."
-          git clone --depth 1 --filter=blob:none --sparse --branch reF1nd-stable https://github.com/reF1nd/sing-box.git /tmp/sing-box-reF1nd
-          cd /tmp/sing-box-reF1nd
-          git sparse-checkout set docs
-          rm -rf "$GITHUB_WORKSPACE/sing-box-reF1nd-docs"
-          cp -r docs "$GITHUB_WORKSPACE/sing-box-reF1nd-docs"
-        else
-          echo "Cache hit, skipping clone"
-        fi
+        git clone --depth 1 --filter=blob:none --sparse --branch reF1nd-stable https://github.com/reF1nd/sing-box.git /tmp/sing-box-reF1nd
+        cd /tmp/sing-box-reF1nd
+        git sparse-checkout set docs
+        rm -rf "$GITHUB_WORKSPACE/sing-box-reF1nd-docs"
+        cp -r docs "$GITHUB_WORKSPACE/sing-box-reF1nd-docs"
 
     - name: Commit changes
       run: |

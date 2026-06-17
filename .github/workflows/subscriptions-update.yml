@@ -13,6 +13,11 @@ concurrency:
   group: subscriptions-update
   cancel-in-progress: false
 
+# 缓存经验法则：仅当「直接下载/重新生成」比 8s cache restore 更慢时才用 actions/cache
+#   - 适合：克隆大仓库、重新生成很贵的场景
+#   - 不适合：源端本身快（PyPI / GitHub Releases / npm registry）
+#   - 当前仅保留 node_modules 缓存（npm ci 10s+ 真的能省）
+
 permissions:
   contents: write
 
@@ -31,13 +36,6 @@ jobs:
       with:
         path: src/node_modules
         key: node-modules-${{ runner.os }}-${{ hashFiles('src/package-lock.json') }}
-
-    - name: Cache pip
-      id: cache-pip
-      uses: actions/cache@v5
-      with:
-        path: ~/.cache/pip
-        key: pip-${{ runner.os }}-${{ hashFiles('src/requirements.txt') }}
 
     - name: Install Python dependencies
       working-directory: src

@@ -15,6 +15,9 @@ concurrency:
   group: ruleset-update
   cancel-in-progress: false
 
+# 缓存经验法则：仅当「直接下载/重新生成」比 8s cache restore 更慢时才用 actions/cache
+# 当前不 cache：GitHub Releases 直接 wget sing-box.deb 比 cache restore 快
+
 permissions:
   contents: write
 
@@ -49,13 +52,6 @@ jobs:
         set -Eeuo pipefail
         wget -O sing-box.deb "${{ steps.get_version.outputs.asset_url }}"
         sudo dpkg -i sing-box.deb
-
-    - name: Cache pip
-      id: cache-pip
-      uses: actions/cache@v5
-      with:
-        path: ~/.cache/pip
-        key: pip-${{ runner.os }}-${{ hashFiles('src/requirements.txt') }}
 
     - name: Install Python dependencies
       working-directory: src
