@@ -1,3 +1,4 @@
 requests
+brotli
 json5
 pyyaml

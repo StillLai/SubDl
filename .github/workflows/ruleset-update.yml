@@ -32,9 +32,9 @@ jobs:
       run: |
         set -Eeuo pipefail
         RELEASE_JSON=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases/latest)
-        VERSION=$(echo "$RELEASE_JSON" | grep -o '"tag_name":"[^"]*"' | head -1 | cut -d'"' -f4 || echo "")
-        ASSET_URL=$(echo "$RELEASE_JSON" | grep -o 'https://github.com/SagerNet/sing-box/releases/download/[^"]*linux_amd64.deb' || echo "")
-        if [ -z "$VERSION" ] || [ -z "$ASSET_URL" ]; then
+        VERSION=$(echo "$RELEASE_JSON" | jq -r '.tag_name')
+        ASSET_URL=$(echo "$RELEASE_JSON" | jq -r '.assets[] | select(.name | endswith("linux_amd64.deb")) | .browser_download_url')
+        if [ -z "$VERSION" ] || [ "$VERSION" = "null" ] || [ -z "$ASSET_URL" ] || [ "$ASSET_URL" = "null" ]; then
           echo "::error::Failed to extract version or asset URL from release JSON"
           echo "Release JSON: $RELEASE_JSON"
           exit 1
@@ -59,15 +59,15 @@ jobs:
         fi
         sudo dpkg -i sing-box.deb
 
-    - name: Set up Python3
-      uses: actions/setup-python@v6
+    - uses: actions/setup-python@v6
       with:
         python-version: 3.x
         cache: 'pip'
-        cache-dependency-path: requirements-ruleset.txt
+        cache-dependency-path: src/requirements.txt
 
-    - name: Install dependencies
-      run: pip install -r requirements-ruleset.txt
+    - name: Install Python dependencies
+      working-directory: src
+      run: pip install -r requirements.txt
 
     - name: Run script
       run: python src/ruleset_convert.py

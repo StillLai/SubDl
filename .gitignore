@@ -49,7 +49,7 @@ config.local.*
 src/deps/
 
 # Node.js
-node_modules/
+src/node_modules/
 
 # 自动生成的规则集文件（由 GitHub Action 生成，不需要本地跟踪）
 ruleset/json/

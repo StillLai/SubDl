@@ -19,7 +19,7 @@ permissions:
 jobs:
   update:
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: actions/checkout@v6
       with:
@@ -29,18 +29,23 @@ jobs:
       with:
         python-version: 3.x
         cache: 'pip'
-        cache-dependency-path: requirements-sub.txt
+        cache-dependency-path: src/requirements.txt
 
     - uses: actions/setup-node@v6
       with:
         node-version: '22'
         cache: 'npm'
+        cache-dependency-path: src/package-lock.json
 
-    - run: pip install -r requirements-sub.txt
+    - name: Install Python dependencies
+      working-directory: src
+      run: pip install -r requirements.txt
 
     # dotenv 是 Sub-Store proxy-utils.esm.mjs 库的内部依赖，请勿移除
-    - run: npm ci
-        
+    - name: Install Node dependencies
+      working-directory: src
+      run: npm ci
+
     - name: Update subscriptions
       env:
         GH_TOKEN: ${{ secrets.GH_TOKEN }}

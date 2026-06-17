@@ -25,8 +25,8 @@ jobs:
     - name: Get latest sing-box commit SHA
       id: get_sha
       run: |
-        SHA=$(curl -s https://api.github.com/repos/reF1nd/sing-box/branches/reF1nd-stable | grep -o '"sha":"[^"]*"' | head -1 | cut -d'"' -f4 || echo "")
-        if [ -z "$SHA" ]; then
+        SHA=$(curl -s https://api.github.com/repos/reF1nd/sing-box/branches/reF1nd-stable | jq -r '.commit.sha')
+        if [ -z "$SHA" ] || [ "$SHA" = "null" ]; then
           echo "::error::Failed to extract commit SHA from sing-box branch info"
           exit 1
         fi
