@@ -18,19 +18,17 @@ jobs:
     steps:
     - uses: actions/checkout@v6
       
-    # ⚠️ 请勿添加 actions/cache，本项目无 requirements.txt/pyproject.toml，
-    # setup-python 内置缓存会自动查找这些文件并报错：
-    #   Error: No file matched to [**/requirements.txt or **/pyproject.toml]
     - uses: actions/setup-python@v6
       with:
         python-version: 3.x
-        cache: ''
-        
+        cache: 'pip'
+
     - uses: actions/setup-node@v6
       with:
         node-version: '22'
-        
-    - run: pip install requests brotli json5
+        cache: 'npm'
+
+    - run: pip install -r requirements.txt
         
     # 注意：dotenv 是 Sub-Store proxy-utils.esm.mjs 库的内部依赖，请勿移除
     - run: npm install jsdom dotenv

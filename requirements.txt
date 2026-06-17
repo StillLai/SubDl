@@ -1,0 +1,3 @@
+requests
+brotli
+json5
