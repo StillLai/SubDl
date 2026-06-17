@@ -321,87 +321,8 @@ def generate_readme(subscription_info: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-def convert_to_singbox_daemon(contents_dict: dict[str, str]) -> dict[str, dict[str, Any] | None]:
-    """daemon 模式转换：启动一次 Node 进程，多个订阅通过 stdin/stdout 转换。
-    避免重复的 Node 启动 + JSDOM 初始化 + proxy-utils 加载开销。
-    
-    Args:
-        contents_dict: {订阅名称: clash内容, ...}
-    
-    Returns:
-        {订阅名称: singbox配置dict | None, ...}  — None 表示转换失败
-    """
-    if not contents_dict:
-        return {}
-
-    log(f"  → 批量转换 {len(contents_dict)} 个订阅（daemon 模式）...")
-
-    proc = None
-    try:
-        # 启动 daemon
-        proc = subprocess.Popen(
-            ['node', CONVERT_SCRIPT, 'daemon'],
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            text=True, bufsize=1
-        )
-
-        # 等待 daemon 就绪信号（输出 "READY\n"）
-        ready_line = proc.stdout.readline()
-        if ready_line.strip() != 'READY':
-            raise RuntimeError(f"daemon 未就绪: {ready_line!r}")
-
-        # 按顺序发送请求、读取响应
-        results: dict[str, dict[str, Any] | None] = {}
-        for name, content in contents_dict.items():
-            # 发送转换请求
-            proc.stdin.write(json.dumps({'name': name, 'content': content}, ensure_ascii=False) + '\n')
-            proc.stdin.flush()
-
-            # 读取响应（一行 JSON）
-            line = proc.stdout.readline()
-            if not line:
-                # daemon 异常退出
-                stderr_output = proc.stderr.read() if proc.stderr else ''
-                raise RuntimeError(f"daemon 异常关闭 (name={name})。stderr: {stderr_output[-500:]}")
-
-            try:
-                resp = json.loads(line)
-            except json.JSONDecodeError as e:
-                raise RuntimeError(f"daemon 返回非 JSON: {line!r} ({e})")
-
-            if 'error' in resp and 'result' not in resp:
-                log(f"    ✗ {name}: {resp['error']}")
-                results[name] = None
-            elif 'result' in resp:
-                results[name] = resp['result']
-                log(f"    ✓ {name}: 转换成功")
-            else:
-                log(f"    ✗ {name}: daemon 返回格式异常: {resp}")
-                results[name] = None
-
-        return results
-
-    except Exception as e:
-        log(f"  ✗ daemon 转换异常: {e}")
-        return {name: None for name in contents_dict}
-    finally:
-        # 关闭 daemon（写 EOF，Node 进程会自然退出）
-        if proc is not None:
-            try:
-                if proc.stdin and not proc.stdin.closed:
-                    proc.stdin.close()
-                # 给 daemon 1s 优雅退出，否则 kill
-                try:
-                    proc.wait(timeout=1)
-                except subprocess.TimeoutExpired:
-                    proc.kill()
-                    proc.wait()
-            except Exception:
-                pass
-
-
 def convert_to_singbox_batch(contents_dict: dict[str, str]) -> dict[str, dict[str, Any] | None]:
-    """批量转换：保留原 batch-convert 模式作为 fallback（daemon 出问题时用）。
+    """批量转换：将所有订阅内容一次性传给单个 Node.js 进程
     
     Args:
         contents_dict: {订阅名称: clash内容, ...}
@@ -411,31 +332,33 @@ def convert_to_singbox_batch(contents_dict: dict[str, str]) -> dict[str, dict[st
     """
     if not contents_dict:
         return {}
-
+    
     try:
         with tempfile.NamedTemporaryFile(
             mode='w', suffix='.json', delete=False, encoding='utf-8'
         ) as f:
             json.dump(contents_dict, f, ensure_ascii=False)
             batch_input_file = f.name
-
+        
         try:
-            log(f"  → 批量转换 {len(contents_dict)} 个订阅（fallback batch 模式）...")
+            log(f"  → 批量转换 {len(contents_dict)} 个订阅（单进程）...")
             result = subprocess.run(
                 ['node', CONVERT_SCRIPT, 'batch-convert', batch_input_file],
                 capture_output=True, text=True, encoding='utf-8'
             )
-
+            
             if result.returncode != 0:
                 log(f"  ✗ 批量转换失败 (exit {result.returncode}): {result.stderr}")
                 return {name: None for name in contents_dict}
-
+            
             stdout = result.stdout.strip()
             if not stdout:
                 log(f"  ✗ 批量转换输出为空 (stderr: {result.stderr.strip() or '(无)'})")
                 return {name: None for name in contents_dict}
-
+            
             raw_result: dict[str, Any] = json.loads(stdout)
+            
+            # 转为 {name: dict | None}
             final: dict[str, dict[str, Any] | None] = {}
             for name in contents_dict:
                 val = raw_result.get(name)
@@ -444,10 +367,10 @@ def convert_to_singbox_batch(contents_dict: dict[str, str]) -> dict[str, dict[st
                 else:
                     final[name] = None
             return final
-
+            
         finally:
             os.unlink(batch_input_file)
-
+            
     except Exception as e:
         log(f"  ✗ 批量转换异常: {e}")
         return {name: None for name in contents_dict}
@@ -652,18 +575,10 @@ def _batch_convert_and_collect(
         if result["status"] == "ok":
             contents_to_convert[name] = result["raw_content"]
     
-    # 一次性批量转换（daemon 模式，跳冷启动）
+    # 一次性批量转换
     converted: dict[str, dict[str, Any] | None] = {}
     if contents_to_convert:
-        try:
-            converted = convert_to_singbox_daemon(contents_to_convert)
-            # 失败则降级到 batch 模式
-            if all(v is None for v in converted.values()) and contents_to_convert:
-                log("  ⚠️ daemon 全部失败，降级到 batch 模式")
-                converted = convert_to_singbox_batch(contents_to_convert)
-        except Exception as e:
-            log(f"  ⚠️ daemon 异常 ({e})，降级到 batch 模式")
-            converted = convert_to_singbox_batch(contents_to_convert)
+        converted = convert_to_singbox_batch(contents_to_convert)
     
     files: dict[str, str] = {}
     subscription_info: list[dict[str, Any]] = []

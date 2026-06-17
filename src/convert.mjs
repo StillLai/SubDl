@@ -146,23 +146,77 @@ async function checkAndUpdateDeps(githubToken) {
  * @returns {Object<string, any>} - { "sub_name": <singbox_result>, ... }
  */
 async function batchConvertToSingbox(batchInput) {
-    // 使用抽取的 setupConvertEnvironment（初始化 + 转换）
-    const { parse, produce } = await setupConvertEnvironment();
-    console.error('[Convert] 模块加载成功，开始批量转换');
-
-    const results = {};
-    for (const [name, clashContent] of Object.entries(batchInput)) {
-        try {
-            const proxies = parse(clashContent);
-            const singboxConfig = produce(proxies, 'singbox');
-            results[name] = JSON.parse(singboxConfig);
-            console.error(`[Convert]   ✓ ${name} 转换成功`);
-        } catch (err) {
-            console.error(`[Convert]   ✗ ${name} 转换失败: ${err.message}`);
-            results[name] = null;
+    const GLOBAL_KEYS = ['require', 'window', 'document', 'self', 'navigator', 'location'];
+    const originals = {};
+    const existed = new Set();
+    for (const key of GLOBAL_KEYS) {
+        if (key in global) {
+            originals[key] = global[key];
+            existed.add(key);
         }
     }
-    return results;
+
+    // 注入require
+    const { createRequire } = await import('module');
+    global.require = createRequire(PROXY_UTILS_FILE);
+    
+    // 创建jsdom环境
+    const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
+        url: 'https://localhost',
+        pretendToBeVisual: true
+    });
+    
+    const injectGlobal = (name, value) => {
+        try {
+            global[name] = value;
+        } catch {
+            Object.defineProperty(global, name, {
+                value: value, configurable: true, writable: true, enumerable: true
+            });
+        }
+    };
+
+    injectGlobal('window', dom.window);
+    injectGlobal('document', dom.window.document);
+    injectGlobal('self', dom.window);
+    injectGlobal('navigator', dom.window.navigator);
+    injectGlobal('location', dom.window.location);
+    
+    const modulePath = 'file://' + PROXY_UTILS_FILE;
+    
+    try {
+        const { parse, produce } = await import(modulePath);
+        console.error('[Convert] 模块加载成功，开始批量转换');
+        
+        const results = {};
+        for (const [name, clashContent] of Object.entries(batchInput)) {
+            try {
+                const proxies = parse(clashContent);
+                const singboxConfig = produce(proxies, 'singbox');
+                results[name] = JSON.parse(singboxConfig);  // 解析为对象，方便 Python 侧处理
+                console.error(`[Convert]   ✓ ${name} 转换成功`);
+            } catch (err) {
+                console.error(`[Convert]   ✗ ${name} 转换失败: ${err.message}`);
+                results[name] = null;
+            }
+        }
+        return results;
+    } finally {
+        // 清理注入的全局变量
+        for (const key of GLOBAL_KEYS) {
+            if (existed.has(key)) {
+                try {
+                    global[key] = originals[key];
+                } catch {
+                    Object.defineProperty(global, key, {
+                        value: originals[key], configurable: true, writable: true, enumerable: true
+                    });
+                }
+            } else {
+                delete global[key];
+            }
+        }
+    }
 }
 
 /**
@@ -189,16 +243,13 @@ async function main() {
                 console.error(USAGE);
                 process.exit(1);
             }
-
+            
             const batchInput = JSON.parse(fs.readFileSync(inputFile, 'utf8'));
             const results = await batchConvertToSingbox(batchInput);
-
+            
             // 恢复console.log，只输出JSON到stdout
             console.log = originalLog;
             console.log(JSON.stringify(results));
-        } else if (command === 'daemon') {
-            // daemon 模式：stdin 接收转换请求，stdout 输出结果
-            await runDaemon(githubToken);
         } else {
             console.error(USAGE);
             process.exit(1);
@@ -208,103 +259,6 @@ async function main() {
         console.error(err.stack);
         process.exit(1);
     }
-}
-
-/**
- * daemon 模式：启动一次进程，多次转换（避冷启动 + JSDOM + proxy-utils 重复加载）
- * 协议：stdin 每行一个 JSON 请求，stdout 每行一个 JSON 响应
- * 请求：{"name": "sub_name", "content": "clash_yaml_content"}
- * 响应：{"name": "sub_name", "result": {...}} 或 {"name": "sub_name", "error": "..."}
- */
-async function runDaemon(githubToken) {
-    if (!fs.existsSync(DEPS_DIR)) fs.mkdirSync(DEPS_DIR, { recursive: true });
-    await checkAndUpdateDeps(githubToken);
-
-    // 初始化环境（只做一次）
-    const { parse, produce } = await setupConvertEnvironment();
-
-    console.error('[Daemon] Ready');
-    console.log('READY');  // 同步信号：告诉 Python 端 daemon 已就绪
-    console.log = () => {};  // 之后 console.log 不输出（避免污染 stdout 协议）
-
-    // 按行读 stdin
-    const rl = (await import('readline')).createInterface({
-        input: process.stdin,
-        crlfDelay: Infinity
-    });
-
-    for await (const line of rl) {
-        const trimmed = line.trim();
-        if (!trimmed) continue;
-
-        let req;
-        try {
-            req = JSON.parse(trimmed);
-        } catch (err) {
-            console.log(JSON.stringify({ error: 'Invalid JSON: ' + err.message }));
-            continue;
-        }
-
-        const { name, content } = req;
-        try {
-            const proxies = parse(content);
-            const singboxConfig = produce(proxies, 'singbox');
-            console.log(JSON.stringify({
-                name,
-                result: JSON.parse(singboxConfig)
-            }));
-        } catch (err) {
-            console.log(JSON.stringify({
-                name,
-                error: err.message
-            }));
-        }
-    }
-}
-
-/**
- * 初始化转换环境：注入 require、创建 JSDOM、加载 proxy-utils
- * @returns {{parse: Function, produce: Function}}
- */
-async function setupConvertEnvironment() {
-    const GLOBAL_KEYS = ['require', 'window', 'document', 'self', 'navigator', 'location'];
-    const originals = {};
-    const existed = new Set();
-    for (const key of GLOBAL_KEYS) {
-        if (key in global) {
-            originals[key] = global[key];
-            existed.add(key);
-        }
-    }
-
-    const { createRequire } = await import('module');
-    global.require = createRequire(PROXY_UTILS_FILE);
-
-    const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
-        url: 'https://localhost',
-        pretendToBeVisual: true
-    });
-
-    const injectGlobal = (name, value) => {
-        try {
-            global[name] = value;
-        } catch {
-            Object.defineProperty(global, name, {
-                value: value, configurable: true, writable: true, enumerable: true
-            });
-        }
-    };
-
-    injectGlobal('window', dom.window);
-    injectGlobal('document', dom.window.document);
-    injectGlobal('self', dom.window);
-    injectGlobal('navigator', dom.window.navigator);
-    injectGlobal('location', dom.window.location);
-
-    const modulePath = 'file://' + PROXY_UTILS_FILE;
-    const { parse, produce } = await import(modulePath);
-
-    return { parse, produce };
 }
 
 main();
