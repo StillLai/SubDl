@@ -45,7 +45,7 @@ jobs:
 
     - name: Restore sing-box deb cache
       id: cache-deb
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: sing-box.deb
         key: sing-box-deb-${{ steps.get_version.outputs.version }}
