@@ -1030,7 +1030,7 @@
     },
     {
       "type": "selector",
-      "tag": "GLOBAL",
+      "tag": "Global",
       "outbounds": [
         "🎈 自动选择",
         "🗂️ 备用自动",
@@ -1416,8 +1416,47 @@
         "action": "reject"
       },
       {
-        "inbound": "mixed-in-global",
-        "outbound": "GLOBAL"
+        "clash_mode": "Direct",
+        "outbound": "🎯 全球直连"
+      },
+      {
+        "type": "logical",
+        "mode": "or",
+        "rules": [
+          {
+            "clash_mode": "Global"
+          },
+          {
+            "inbound": "mixed-in-global"
+          }
+        ],
+        "outbound": "Global"
+      },
+      {
+        "type": "logical",
+        "mode": "and",
+        "rules": [
+          {
+            "clash_mode": "AlwAds",
+            "invert": true
+          },
+          {
+            "rule_set": [
+              "custom_whitelist",
+              "geosite-amazon",
+              "geosite-amazon@ads"
+            ],
+            "invert": true
+          },
+          {
+            "rule_set": [
+              "ads",
+              "custom_block",
+              "WebRTC"
+            ]
+          }
+        ],
+        "action": "reject"
       },
       {
         "type": "logical",
