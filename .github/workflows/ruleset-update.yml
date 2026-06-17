@@ -44,21 +44,10 @@ jobs:
         echo "version=$VERSION" >> "$GITHUB_OUTPUT"
         echo "asset_url=$ASSET_URL" >> "$GITHUB_OUTPUT"
 
-    - name: Restore sing-box deb cache
-      id: cache-deb
-      uses: actions/cache@v5
-      with:
-        path: sing-box.deb
-        key: sing-box-deb-${{ steps.get_version.outputs.version }}
-
     - name: Setup sing-box
       run: |
         set -Eeuo pipefail
-        if [ ! -f sing-box.deb ]; then
-          wget -O sing-box.deb "${{ steps.get_version.outputs.asset_url }}"
-        else
-          echo "sing-box.deb restored from cache, skipping download"
-        fi
+        wget -O sing-box.deb "${{ steps.get_version.outputs.asset_url }}"
         sudo dpkg -i sing-box.deb
 
     - name: Cache pip
