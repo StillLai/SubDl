@@ -13,7 +13,6 @@ Sing-box 配置合并模块
 from __future__ import annotations
 
 import copy
-import json
 import re
 from typing import Any
 
