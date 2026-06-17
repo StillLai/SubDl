@@ -15,7 +15,7 @@ import subprocess
 import tempfile
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, IO
+from typing import Any
 from urllib.parse import urlparse
 from datetime import datetime, timezone, timedelta
 
@@ -321,45 +321,59 @@ def generate_readme(subscription_info: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-def _run_subprocess_with_tempfile(
-    cmd: list[str],
-    write_fn: Callable[[IO[str]], None],
-    suffix: str,
-    label: str,
-) -> dict[str, Any] | None:
-    """通用函数：写入临时文件 → subprocess.run → 解析 JSON 输出 → 清理"""
+def convert_to_singbox_batch(contents_dict: dict[str, str]) -> dict[str, dict[str, Any] | None]:
+    """批量转换：将所有订阅内容一次性传给单个 Node.js 进程
+    
+    Args:
+        contents_dict: {订阅名称: clash内容, ...}
+    
+    Returns:
+        {订阅名称: singbox配置dict | None, ...}  — None 表示转换失败
+    """
+    if not contents_dict:
+        return {}
+    
     try:
-        with tempfile.NamedTemporaryFile(mode='w', suffix=suffix, delete=False, encoding='utf-8') as f:
-            write_fn(f)
-            temp_file = f.name
+        with tempfile.NamedTemporaryFile(
+            mode='w', suffix='.json', delete=False, encoding='utf-8'
+        ) as f:
+            json.dump(contents_dict, f, ensure_ascii=False)
+            batch_input_file = f.name
+        
         try:
+            log(f"  → 批量转换 {len(contents_dict)} 个订阅（单进程）...")
             result = subprocess.run(
-                cmd + [temp_file],
+                ['node', CONVERT_SCRIPT, 'batch-convert', batch_input_file],
                 capture_output=True, text=True, encoding='utf-8'
             )
+            
             if result.returncode != 0:
-                log(f"  ✗ {label}失败 (exit {result.returncode}): {result.stderr}")
-                return None
+                log(f"  ✗ 批量转换失败 (exit {result.returncode}): {result.stderr}")
+                return {name: None for name in contents_dict}
+            
             stdout = result.stdout.strip()
             if not stdout:
-                log(f"  ✗ {label}输出为空 (stderr: {result.stderr.strip() or '(无)'})")
-                return None
-            return json.loads(stdout)
+                log(f"  ✗ 批量转换输出为空 (stderr: {result.stderr.strip() or '(无)'})")
+                return {name: None for name in contents_dict}
+            
+            raw_result: dict[str, Any] = json.loads(stdout)
+            
+            # 转为 {name: dict | None}
+            final: dict[str, dict[str, Any] | None] = {}
+            for name in contents_dict:
+                val = raw_result.get(name)
+                if val is not None and isinstance(val, dict):
+                    final[name] = val
+                else:
+                    final[name] = None
+            return final
+            
         finally:
-            os.unlink(temp_file)
+            os.unlink(batch_input_file)
+            
     except Exception as e:
-        log(f"  ✗ {label}异常: {e}")
-        return None
-
-
-def convert_to_singbox(clash_content: str) -> dict[str, Any] | None:
-    """将Clash配置转换为Sing-box格式"""
-    return _run_subprocess_with_tempfile(
-        cmd=['node', CONVERT_SCRIPT, 'convert'],
-        write_fn=lambda f: f.write(clash_content),
-        suffix='.yaml',
-        label='转换',
-    )
+        log(f"  ✗ 批量转换异常: {e}")
+        return {name: None for name in contents_dict}
 
 
 def merge_singbox_config(
@@ -368,7 +382,7 @@ def merge_singbox_config(
     """将多个sing-box订阅节点合并到配置模板
 
     NOTE: 直接 import 调用而非 subprocess，省去进程启动开销 (~1-2s)。
-    _run_subprocess_with_tempfile 仅用于 convert.mjs（跨语言调用）。
+    convert.mjs 批量转换通过 convert_to_singbox_batch 完成（跨语言调用，单进程）。
     """
     if template_path is None:
         template_path = TEMPLATE_BASE
@@ -510,8 +524,8 @@ def generate_provider_configs(sub_url_map: dict[str, str]) -> dict[str, str]:
 
 # ========== 订阅下载 ==========
 
-def _process_subscription(sub: dict[str, str], user_agent: str) -> dict[str, Any]:
-    """处理单个订阅（下载 + 验证 + 转换），返回结果字典"""
+def _process_subscription_download_only(sub: dict[str, str], user_agent: str) -> dict[str, Any]:
+    """处理单个订阅（仅下载 + 验证，不做转换），返回结果字典"""
     result: dict[str, Any] = {"name": sub["name"], "status": "ok"}
     try:
         content, flow_info = download_subscription(sub["url"], user_agent)
@@ -521,85 +535,109 @@ def _process_subscription(sub: dict[str, str], user_agent: str) -> dict[str, Any
         if not is_valid:
             result["status"] = "invalid"
             result["reason"] = reason
-            result["filename"] = None
             return result
 
         result["raw_content"] = content
-
-        singbox_config = convert_to_singbox(content)
-        if singbox_config:
-            singbox_nodes = singbox_config.get('outbounds', []) + singbox_config.get('endpoints', [])
-            result["node_count"] = len(singbox_nodes)
-            result["singbox_nodes"] = singbox_nodes
-            result["singbox_content"] = json.dumps(singbox_config, indent=2, ensure_ascii=False)
-        else:
-            result["status"] = "convert_failed"
-            result["reason"] = "转换失败"
     except Exception as e:
         result["status"] = "error"
         result["reason"] = str(e)
     return result
 
 
-def _download_all_subscriptions(
-    subscriptions: list[dict[str, str]], user_agent: str
+def _batch_convert_and_collect(
+    download_results: dict[str, dict[str, Any]]
 ) -> tuple[dict[str, str], list[dict[str, Any]], dict[str, list[dict[str, Any]]]]:
-    """并行下载所有订阅，返回 (files, subscription_info, subs_nodes_dict)"""
+    """将下载结果批量转换，并收集最终的文件、订阅信息和节点字典
+    
+    Args:
+        download_results: {订阅名称: _process_subscription_download_only 的结果, ...}
+    
+    Returns:
+        (files, subscription_info, subs_nodes_dict)
+    """
+    # 收集所有需要转换的有效订阅内容
+    contents_to_convert: dict[str, str] = {}
+    for name, result in download_results.items():
+        if result["status"] == "ok":
+            contents_to_convert[name] = result["raw_content"]
+    
+    # 一次性批量转换
+    converted: dict[str, dict[str, Any] | None] = {}
+    if contents_to_convert:
+        converted = convert_to_singbox_batch(contents_to_convert)
+    
     files: dict[str, str] = {}
     subscription_info: list[dict[str, Any]] = []
     subs_nodes_dict: dict[str, list[dict[str, Any]]] = {}
     skipped_subs: list[dict[str, str]] = []
+    
+    for name, result in download_results.items():
+        status: str = result["status"]
+        flow_info: dict[str, int] | None = result.get("flow")
+        reason: str = result.get("reason", "未知")
+        
+        if status == "ok":
+            raw_content: str = result["raw_content"]
+            filename = result.get("filename", f"{name}.yaml")
+            files[filename] = raw_content
+            
+            singbox_config = converted.get(name)
+            if singbox_config is not None:
+                singbox_nodes = singbox_config.get('outbounds', []) + singbox_config.get('endpoints', [])
+                node_count = len(singbox_nodes)
+                singbox_content = json.dumps(singbox_config, indent=2, ensure_ascii=False)
+                
+                files[f"{name}-singbox.json"] = singbox_content
+                log(f"  ✓ {name}: 转换成功 ({len(singbox_content)} 字节, {node_count} 个节点)")
+                
+                if node_count > 0:
+                    subs_nodes_dict[name] = singbox_nodes
+                    log(f"    → '{name}': {node_count} 个节点")
+                else:
+                    skipped_subs.append({"name": name, "reason": "节点列表为空"})
+                subscription_info.append({"name": name, "flow": flow_info, "node_count": node_count, "status": "ok"})
+            else:
+                log(f"  ⚠️ {name}: 转换失败")
+                skipped_subs.append({"name": name, "reason": "转换失败"})
+                subscription_info.append({"name": name, "flow": flow_info, "node_count": 0, "status": "convert_failed"})
+        elif status == "invalid":
+            log(f"  ⚠️ {name}: 内容无效 - {reason}")
+            subscription_info.append({"name": name, "flow": flow_info, "node_count": 0, "status": "invalid"})
+            skipped_subs.append({"name": name, "reason": reason})
+        else:  # error
+            log(f"  ✗ {name}: {reason}")
+            subscription_info.append({"name": name, "flow": flow_info, "node_count": 0, "status": "error"})
+            skipped_subs.append({"name": name, "reason": reason})
+    
+    if skipped_subs:
+        log(f"⚠️ {len(skipped_subs)} 个订阅跳过: {', '.join([s['name'] for s in skipped_subs])}")
+    
+    return files, subscription_info, subs_nodes_dict
 
+
+def _download_all_subscriptions(
+    subscriptions: list[dict[str, str]], user_agent: str
+) -> tuple[dict[str, str], list[dict[str, Any]], dict[str, list[dict[str, Any]]]]:
+    """并行下载所有订阅 → 批量转换 → 返回 (files, subscription_info, subs_nodes_dict)"""
+    
+    # ========== 阶段1: 并行下载 + 验证（不做转换）==========
+    download_results: dict[str, dict[str, Any]] = {}
+    
     log(f"→ 并行下载 {len(subscriptions)} 个订阅...")
     with ThreadPoolExecutor(max_workers=min(len(subscriptions), 8)) as executor:
         future_to_sub = {
-            executor.submit(_process_subscription, sub, user_agent): sub
+            executor.submit(_process_subscription_download_only, sub, user_agent): sub
             for sub in subscriptions
         }
         for future in as_completed(future_to_sub):
             sub = future_to_sub[future]
             result = future.result()
             name: str = result["name"]
-            status: str = result["status"]
-            flow_info: dict[str, int] | None = result.get("flow")
-            reason: str = result.get("reason", "未知")
-            node_count: int = result.get("node_count", 0)
-
-            if status == "ok":
-                raw_content: str = result.get("raw_content", "")
-                files[sub["filename"]] = raw_content
-                singbox_content: str | None = result.get("singbox_content")
-                singbox_nodes: list[dict[str, Any]] | None = result.get("singbox_nodes")
-
-                if singbox_content and singbox_nodes is not None:
-                    files[f"{name}-singbox.json"] = singbox_content
-                    log(f"  ✓ {name}: 转换成功 ({len(singbox_content)} 字节, {node_count} 个节点)")
-                    if node_count > 0:
-                        subs_nodes_dict[name] = singbox_nodes
-                        log(f"    → '{name}': {node_count} 个节点")
-                    else:
-                        skipped_subs.append({"name": name, "reason": "节点列表为空"})
-                else:
-                    log(f"  ⚠️ {name}: 转换失败")
-                    skipped_subs.append({"name": name, "reason": "转换失败"})
-                subscription_info.append({"name": name, "flow": flow_info, "node_count": node_count, "status": "ok"})
-            elif status == "invalid":
-                log(f"  ⚠️ {name}: 内容无效 - {reason}")
-                subscription_info.append({"name": name, "flow": flow_info, "node_count": 0, "status": "invalid"})
-                skipped_subs.append({"name": name, "reason": reason})
-            elif status == "convert_failed":
-                log(f"  ⚠️ {name}: {reason}")
-                skipped_subs.append({"name": name, "reason": reason})
-                subscription_info.append({"name": name, "flow": flow_info, "node_count": 0, "status": "convert_failed"})
-            else:
-                log(f"  ✗ {name}: {reason}")
-                subscription_info.append({"name": name, "flow": flow_info, "node_count": 0, "status": "error"})
-                skipped_subs.append({"name": name, "reason": reason})
-
-    if skipped_subs:
-        log(f"⚠️ {len(skipped_subs)} 个订阅跳过: {', '.join([s['name'] for s in skipped_subs])}")
-
-    return files, subscription_info, subs_nodes_dict
+            result["filename"] = sub["filename"]
+            download_results[name] = result
+    
+    # ========== 阶段2: 批量转换（单次 Node.js 进程）==========
+    return _batch_convert_and_collect(download_results)
 
 
 # ========== 配置生成与上传 ==========

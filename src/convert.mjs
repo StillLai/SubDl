@@ -141,12 +141,11 @@ async function checkAndUpdateDeps(githubToken) {
 }
 
 /**
- * 加载Sub-Store模块。在全局注入 require 和浏览器 API（window/document/navigator 等），
- * 因为 proxy-utils.esm.mjs 内部有 eval 使用 require，也需要浏览器环境。
- * 使用 try-finally 确保 import 抛出异常时也会清理注入的全局变量。
+ * 批量转换：一次加载模块，转换多个订阅内容
+ * @param {Object<string, string>} batchInput - { "sub_name": "clash_content", ... }
+ * @returns {Object<string, any>} - { "sub_name": <singbox_result>, ... }
  */
-async function loadProxyUtils() {
-    // 保存原始值，便于加载后清理
+async function batchConvertToSingbox(batchInput) {
     const GLOBAL_KEYS = ['require', 'window', 'document', 'self', 'navigator', 'location'];
     const originals = {};
     const existed = new Set();
@@ -157,19 +156,16 @@ async function loadProxyUtils() {
         }
     }
 
-    // 在全局注入require（这是proxy-utils.esm.mjs需要的）
-    // 注意: 不加入 existed，让 finally 块走 delete global.require 分支，
-    // 而非恢复为 undefined 的原始值
+    // 注入require
     const { createRequire } = await import('module');
     global.require = createRequire(PROXY_UTILS_FILE);
     
-    // 创建jsdom环境，使用 pretendToBeVisual 避免 navigator 只读问题
+    // 创建jsdom环境
     const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
         url: 'https://localhost',
         pretendToBeVisual: true
     });
     
-    // 注入浏览器API — 用 try-catch 兼容 getter-only 属性
     const injectGlobal = (name, value) => {
         try {
             global[name] = value;
@@ -186,15 +182,27 @@ async function loadProxyUtils() {
     injectGlobal('navigator', dom.window.navigator);
     injectGlobal('location', dom.window.location);
     
-    // 直接用file://协议导入
     const modulePath = 'file://' + PROXY_UTILS_FILE;
     
     try {
-        const mod = await import(modulePath);
-        console.error('[Convert] 模块加载成功');
-        return mod;
+        const { parse, produce } = await import(modulePath);
+        console.error('[Convert] 模块加载成功，开始批量转换');
+        
+        const results = {};
+        for (const [name, clashContent] of Object.entries(batchInput)) {
+            try {
+                const proxies = parse(clashContent);
+                const singboxConfig = produce(proxies, 'singbox');
+                results[name] = JSON.parse(singboxConfig);  // 解析为对象，方便 Python 侧处理
+                console.error(`[Convert]   ✓ ${name} 转换成功`);
+            } catch (err) {
+                console.error(`[Convert]   ✗ ${name} 转换失败: ${err.message}`);
+                results[name] = null;
+            }
+        }
+        return results;
     } finally {
-        // 清理注入的全局变量，恢复原始状态
+        // 清理注入的全局变量
         for (const key of GLOBAL_KEYS) {
             if (existed.has(key)) {
                 try {
@@ -212,15 +220,6 @@ async function loadProxyUtils() {
 }
 
 /**
- * 转换Clash配置到Sing-box格式
- */
-async function convertClashToSingbox(clashContent) {
-    const { parse, produce } = await loadProxyUtils();
-    const proxies = parse(clashContent);
-    return produce(proxies, 'singbox');
-}
-
-/**
  * 主函数
  */
 async function main() {
@@ -228,7 +227,7 @@ async function main() {
     const command = args[0];
     const githubToken = process.env.GH_TOKEN || '';
 
-    const USAGE = '用法: node convert.mjs convert <input-file>';
+    const USAGE = '用法: node convert.mjs batch-convert <input-file>';
 
     // 将所有日志输出到stderr，stdout只输出JSON结果。
     const originalLog = console.log;
@@ -238,21 +237,19 @@ async function main() {
         if (!fs.existsSync(DEPS_DIR)) fs.mkdirSync(DEPS_DIR, { recursive: true });
         await checkAndUpdateDeps(githubToken);
 
-        if (command === 'convert') {
+        if (command === 'batch-convert') {
             const inputFile = args[1];
             if (!inputFile) {
                 console.error(USAGE);
                 process.exit(1);
             }
-
-            const clashContent = fs.readFileSync(inputFile, 'utf8');
-            const singboxConfig = await convertClashToSingbox(clashContent);
+            
+            const batchInput = JSON.parse(fs.readFileSync(inputFile, 'utf8'));
+            const results = await batchConvertToSingbox(batchInput);
             
             // 恢复console.log，只输出JSON到stdout
             console.log = originalLog;
-            
-            // produce 函数返回的 singbox 格式是 JSON 字符串
-            console.log(singboxConfig);
+            console.log(JSON.stringify(results));
         } else {
             console.error(USAGE);
             process.exit(1);
