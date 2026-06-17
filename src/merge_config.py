@@ -8,8 +8,7 @@ Sing-box 配置合并脚本
 1. 读取配置模板
 2. 处理 providers 配置（将 providers 数组展开为节点标签）
 3. 根据 include/exclude 正则筛选节点
-4. 设置 tls.insecure = true 以支持自签名证书
-5. 处理空 outbound 的兼容性问题
+4. 处理空 outbound 的兼容性问题
 """
 
 from __future__ import annotations
@@ -18,34 +17,9 @@ import copy
 import json
 import re
 import sys
-from typing import Any, TypedDict
+from typing import Any
 
 from utils import load_jsonc, log
-
-
-class SingBoxNode(TypedDict, total=False):
-    """sing-box 节点的最小公共字段"""
-    tag: str
-    type: str
-    server: str
-    server_port: int
-    tls: dict[str, Any]
-    outbounds: list[str] | list[dict[str, Any]]
-    providers: list[str]
-
-
-NodeList = list[SingBoxNode]
-SubsNodesDict = dict[str, NodeList]
-
-
-def fix_tls_insecure(proxies: NodeList) -> int:
-    """遍历所有节点，将 tls.insecure 设为 true"""
-    fixed_count = 0
-    for proxy in proxies:
-        if 'tls' in proxy and isinstance(proxy['tls'], dict):
-            proxy['tls']['insecure'] = True
-            fixed_count += 1
-    return fixed_count
 
 
 def filter_nodes_by_regex(
@@ -154,7 +128,6 @@ def remove_filter_fields(obj: Any) -> None:
 def merge_config(
     template_config: dict[str, Any],
     subscriptions_nodes: dict[str, list[dict[str, Any]]],
-    tls_insecure: bool = False,
 ) -> dict[str, Any]:
     """合并配置"""
     # 深拷贝配置模板
@@ -173,24 +146,19 @@ def merge_config(
 
     log(f"[Merge] 已收集 {len(all_nodes)} 个节点并添加订阅前缀")
 
-    # ========== 步骤 2: 修复 tls.insecure (可选) ==========
-    if tls_insecure:
-        fixed = fix_tls_insecure(all_nodes)
-        log(f"[Merge] 已设置 {fixed} 个节点的 tls.insecure = true")
-
-    # ========== 步骤 3: 处理 providers 配置 ==========
+    # ========== 步骤 2: 处理 providers 配置 ==========
     if 'providers' in config:
         process_providers(config, subscriptions_nodes)
         log("[Merge] 已处理 providers 配置")
 
-    # ========== 步骤 4: 移除所有 include 和 exclude 字段 ==========
+    # ========== 步骤 3: 移除所有 include 和 exclude 字段 ==========
     remove_filter_fields(config)
 
-    # ========== 步骤 5: 将代理节点添加到 outbounds 末尾 ==========
+    # ========== 步骤 4: 将代理节点添加到 outbounds 末尾 ==========
     config['outbounds'].extend(all_nodes)
     log(f"[Merge] 已添加 {len(all_nodes)} 个代理节点到配置")
 
-    # ========== 步骤 6: 处理空 outbound 的兼容性问题 ==========
+    # ========== 步骤 5: 处理空 outbound 的兼容性问题 ==========
     for outbound in config['outbounds']:
         if not isinstance(outbound, dict):
             continue
@@ -204,7 +172,7 @@ def merge_config(
             outbound['outbounds'] = ['Compatible']
             log(f"[Merge]   {outbound.get('tag')} -> 空 outbound，添加 Compatible")
 
-    # ========== 步骤 7: 添加 Compatible outbound 定义 ==========
+    # ========== 步骤 6: 添加 Compatible outbound 定义 ==========
     has_compatible = any(
         isinstance(o, dict) and o.get('tag') == 'Compatible'
         for o in config['outbounds']
@@ -226,8 +194,6 @@ def main() -> None:
     parser.add_argument('template', nargs='?', help='配置模板文件路径 (.json 或 .jsonc)')
     parser.add_argument('subscription', nargs='?', help='sing-box 订阅文件路径')
     parser.add_argument('-o', '--output', help='输出文件路径 (默认输出到 stdout)')
-    parser.add_argument('--tls-insecure', action='store_true', default=False,
-                        help='设置所有节点的 tls.insecure = true')
 
     args = parser.parse_args()
 
@@ -278,7 +244,7 @@ def main() -> None:
         log(f"[Merge] 订阅 '{sub_name}': {len(nodes)} 个节点")
 
     # 合并配置
-    merged = merge_config(template, subscriptions_nodes, tls_insecure=args.tls_insecure)
+    merged = merge_config(template, subscriptions_nodes)
 
     # 输出结果
     output = json.dumps(merged, indent=2, ensure_ascii=False)

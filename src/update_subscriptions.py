@@ -15,7 +15,7 @@ import subprocess
 import tempfile
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, TypedDict
+from typing import Any
 from urllib.parse import urlparse
 from datetime import datetime, timezone, timedelta
 
@@ -23,37 +23,6 @@ import requests
 
 from utils import load_jsonc, discover_template_files, log
 
-
-class Subscription(TypedDict):
-    name: str
-    url: str
-    filename: str
-
-
-class FlowInfo(TypedDict, total=False):
-    upload: int
-    download: int
-    total: int
-    expire: int | None
-
-
-class SubscriptionInfo(TypedDict, total=False):
-    name: str
-    flow: FlowInfo | None
-    node_count: int
-    status: str
-
-
-class SubscriptionResult(TypedDict, total=False):
-    name: str
-    status: str
-    flow: FlowInfo | None
-    reason: str
-    filename: str | None
-    raw_content: str
-    node_count: int
-    singbox_nodes: list[dict[str, Any]]
-    singbox_content: str
 
 # ========== 路径常量 ==========
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -150,7 +119,7 @@ def download_subscription(
             content = response.text
 
             try:
-                cleaned = content.strip().replace(" ", "").replace("\n", "").replace("\r", "")
+                cleaned = re.sub(r'\s+', '', content.strip())
                 if cleaned and re.match(r'^[A-Za-z0-9+/=]+$', cleaned):
                     # 补全 base64 padding
                     padding = 4 - len(cleaned) % 4
@@ -358,65 +327,63 @@ def generate_readme(subscription_info: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-def convert_to_singbox(clash_content: str) -> dict[str, Any] | None:
-    """将Clash配置转换为Sing-box格式"""
+def _run_subprocess_with_tempfile(
+    cmd: list[str],
+    write_fn: Callable[[str], None],
+    suffix: str,
+    label: str,
+) -> dict[str, Any] | None:
+    """通用函数：写入临时文件 → subprocess.run → 解析 JSON 输出 → 清理"""
     try:
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False, encoding='utf-8') as f:
-            f.write(clash_content)
+        with tempfile.NamedTemporaryFile(mode='w', suffix=suffix, delete=False, encoding='utf-8') as f:
+            write_fn(f)
             temp_file = f.name
         try:
             result = subprocess.run(
-                ['node', CONVERT_SCRIPT, 'convert', temp_file],
+                cmd + [temp_file],
                 capture_output=True, text=True, encoding='utf-8'
             )
             if result.returncode != 0:
-                log(f"  ✗ 转换失败 (exit {result.returncode}): {result.stderr}")
+                log(f"  ✗ {label}失败 (exit {result.returncode}): {result.stderr}")
                 return None
             stdout = result.stdout.strip()
             if not stdout:
-                log(f"  ✗ 转换输出为空 (stderr: {result.stderr.strip() or '(无)'})")
+                log(f"  ✗ {label}输出为空 (stderr: {result.stderr.strip() or '(无)'})")
                 return None
             return json.loads(stdout)
         finally:
             os.unlink(temp_file)
     except Exception as e:
-        log(f"  ✗ 转换异常: {e}")
+        log(f"  ✗ {label}异常: {e}")
         return None
+
+
+def convert_to_singbox(clash_content: str) -> dict[str, Any] | None:
+    """将Clash配置转换为Sing-box格式"""
+    return _run_subprocess_with_tempfile(
+        cmd=['node', CONVERT_SCRIPT, 'convert'],
+        write_fn=lambda f: f.write(clash_content),
+        suffix='.yaml',
+        label='转换',
+    )
 
 
 def merge_singbox_config(
     subs_nodes_dict: dict[str, list[dict[str, Any]]], template_path: str | None = None
 ) -> dict[str, Any] | None:
     """将多个sing-box订阅节点合并到配置模板"""
-    try:
-        if template_path is None:
-            template_path = TEMPLATE_BASE
-        if not os.path.exists(template_path):
-            log(f"  ✗ 配置模板不存在: {template_path}")
-            return None
-
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
-            json.dump(subs_nodes_dict, f)
-            sub_temp_file = f.name
-
-        try:
-            result = subprocess.run(
-                ['python', MERGE_SCRIPT, template_path, sub_temp_file],
-                capture_output=True, text=True, encoding='utf-8'
-            )
-            if result.returncode != 0:
-                log(f"  ✗ 合并失败: {result.stderr}")
-                return None
-            stdout = result.stdout.strip()
-            if not stdout:
-                log("  ✗ 合并脚本没有输出")
-                return None
-            return json.loads(stdout)
-        finally:
-            os.unlink(sub_temp_file)
-    except Exception as e:
-        log(f"  ✗ 合并异常: {e}")
+    if template_path is None:
+        template_path = TEMPLATE_BASE
+    if not os.path.exists(template_path):
+        log(f"  ✗ 配置模板不存在: {template_path}")
         return None
+
+    return _run_subprocess_with_tempfile(
+        cmd=['python', MERGE_SCRIPT, template_path],
+        write_fn=lambda f: json.dump(subs_nodes_dict, f),
+        suffix='.json',
+        label='合并',
+    )
 
 
 # ========== 模板生成 — 通用抽象 ==========
@@ -463,7 +430,7 @@ def _remove_tun_inbounds(template: dict[str, Any]) -> None:
 
 def _replace_tun_with_tproxy(template: dict[str, Any]) -> None:
     """将第一个 type=tun inbound 替换为 tproxy"""
-    tproxy_inbound: dict[str, object] = {
+    tproxy_inbound: dict[str, Any] = {
         "type": "tproxy", "tag": "tproxy-in", "listen": "::", "listen_port": 1536
     }
     if 'inbounds' in template and isinstance(template['inbounds'], list):
@@ -477,10 +444,10 @@ def _replace_tun_with_tproxy(template: dict[str, Any]) -> None:
 def _remove_auto_redirect(template: dict[str, Any]) -> None:
     """删除 tun inbound 中的 auto_redirect 字段"""
     if 'inbounds' in template and isinstance(template['inbounds'], list):
-        for i, inbound in enumerate(template['inbounds']):
+        for inbound in template['inbounds']:
             if isinstance(inbound, dict) and inbound.get('type') == 'tun':
-                if 'auto_redirect' in template['inbounds'][i]:
-                    del template['inbounds'][i]['auto_redirect']
+                if 'auto_redirect' in inbound:
+                    del inbound['auto_redirect']
                     log("  ✓ 已在 tun inbound 中删除 auto_redirect 字段")
                 break
 

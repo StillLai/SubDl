@@ -16,8 +16,7 @@ import https from 'https';
 import { fileURLToPath } from 'url';
 import { JSDOM } from 'jsdom';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const DEPS_DIR = path.join(__dirname, 'deps');
 const PROXY_UTILS_FILE = path.join(DEPS_DIR, 'proxy-utils.esm.mjs');
@@ -233,8 +232,9 @@ async function main() {
     const command = args[0];
     const githubToken = process.env.GH_TOKEN || '';
 
+    const USAGE = '用法: node convert.mjs convert <input-file>';
+
     // 将所有日志输出到stderr，stdout只输出JSON结果。
-    // 必须用全局重定向（不能替换为局部变量），理由见文件头部架构说明。
     const originalLog = console.log;
     console.log = (...args) => console.error(...args);
 
@@ -245,7 +245,7 @@ async function main() {
         if (command === 'convert') {
             const inputFile = args[1];
             if (!inputFile) {
-                console.error('用法: node convert.mjs convert <input-file>');
+                console.error(USAGE);
                 process.exit(1);
             }
 
@@ -258,7 +258,7 @@ async function main() {
             // produce 函数返回的 singbox 格式是 JSON 字符串
             console.log(singboxConfig);
         } else {
-            console.error('用法: node convert.mjs convert <input-file>');
+            console.error(USAGE);
             process.exit(1);
         }
     } catch (err) {

@@ -40,31 +40,15 @@ def _http_get(url: str, **kwargs: Any) -> requests.Response:
     raise last_error if last_error else Exception(f"下载失败: {url}")
 
 
-def read_json_from_url(url: str) -> dict[str, Any]:
-    """下载并解析 sing-box JSON 格式的规则集"""
+def _fetch_parsed(url: str, parser: str) -> Any:
+    """下载 URL 内容并按指定格式解析（'json' / 'yaml' / 'csv'）"""
     response = _http_get(url)
-    json_data: dict[str, Any] = json.loads(response.text)
-    return json_data
-
-
-def is_singbox_ruleset(json_data: Any) -> bool:
-    """判断 JSON 数据是否为 sing-box 规则集格式"""
-    if isinstance(json_data, dict):
-        return 'version' in json_data and 'rules' in json_data
-    return False
-
-
-def read_yaml_from_url(url: str) -> Any:
-    """下载并解析 YAML 格式的规则集"""
-    response = _http_get(url)
-    yaml_data = yaml.safe_load(response.text)
-    return yaml_data
-
-
-def read_list_from_url(url: str) -> list[dict[str, str | None]]:
-    """下载并解析 CSV 规则列表，复用 _parse_csv_rows()"""
-    response = _http_get(url)
-    return _parse_csv_rows(response.text)
+    if parser == 'json':
+        return json.loads(response.text)
+    elif parser == 'yaml':
+        return yaml.safe_load(response.text)
+    else:
+        return _parse_csv_rows(response.text)
 
 
 def is_ipv4_or_ipv6(address: str) -> str | None:
@@ -84,19 +68,12 @@ def is_ipv4_or_ipv6(address: str) -> str | None:
 
 def is_android_package_name(text: str) -> bool:
     """判断是否为安卓程序包名"""
-    if not text or not isinstance(text, str):
+    if not text or '.' not in text:
         return False
 
     # 排除明显是其他系统的程序
     other_system_extensions = ['.exe', '.dll', '.app', '.dmg', '.msi', '.deb', '.rpm', '.pkg']
     if any(text.lower().endswith(ext) for ext in other_system_extensions):
-        return False
-
-    if '/' in text or '\\' in text:
-        return False
-    if ' ' in text:
-        return False
-    if '.' not in text:
         return False
 
     parts = text.split('.')
@@ -169,15 +146,13 @@ def parse_and_convert_to_rows(link: str) -> list[dict[str, str | None]]:
     """下载并解析规则链接，返回 list[dict] (pattern, address, other)"""
     if link.endswith('.yaml') or link.endswith('.txt'):
         try:
-            yaml_data: Any = read_yaml_from_url(link)
+            yaml_data: Any = _fetch_parsed(link, 'yaml')
             return _parse_yaml_rows(yaml_data)
         except Exception as e:
             log(f"  ⚠ YAML 解析失败 {link}: {e}，回退到 CSV 格式解析")
-            response = _http_get(link)
-            return _parse_csv_rows(response.text)
+            return _fetch_parsed(link, 'csv')  # type: ignore[return-value]
     else:
-        response = _http_get(link)
-        return _parse_csv_rows(response.text)
+        return _fetch_parsed(link, 'csv')  # type: ignore[return-value]
 
 
 def _compile_srs(file_name: str, srs_dir: str = "./ruleset/srs/") -> None:
@@ -267,8 +242,8 @@ def parse_list_file(link: str, output_directory: str) -> str | None:
     # 如果是 .json 链接，仅处理 sing-box 规则集格式，失败不继续
     if link.endswith('.json'):
         try:
-            json_data = read_json_from_url(link)
-            if is_singbox_ruleset(json_data):
+            json_data = _fetch_parsed(link, 'json')
+            if isinstance(json_data, dict) and 'version' in json_data and 'rules' in json_data:
                 with open(file_name, 'w', encoding='utf-8') as output_file:
                     json.dump(sort_dict(json_data), output_file, ensure_ascii=False, indent=2)
                 _compile_srs(file_name)
