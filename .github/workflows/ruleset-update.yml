@@ -32,6 +32,7 @@ jobs:
       with:
         python-version: 3.x
         cache: 'pip'
+        cache-dependency-path: requirements-ruleset.txt
 
     - name: Install dependencies
       run: pip install -r requirements-ruleset.txt
