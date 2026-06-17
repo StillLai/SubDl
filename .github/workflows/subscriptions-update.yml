@@ -34,8 +34,13 @@ jobs:
     - uses: actions/setup-node@v6
       with:
         node-version: '22'
-        cache: 'npm'
-        cache-dependency-path: src/package-lock.json
+
+    - name: Cache node_modules
+      id: cache-npm
+      uses: actions/cache@v5
+      with:
+        path: src/node_modules
+        key: node-modules-${{ runner.os }}-${{ hashFiles('src/package-lock.json') }}
 
     - name: Install Python dependencies
       working-directory: src
@@ -44,7 +49,12 @@ jobs:
     # dotenv 是 Sub-Store proxy-utils.esm.mjs 库的内部依赖，请勿移除
     - name: Install Node dependencies
       working-directory: src
-      run: npm ci
+      run: |
+        if [ "${{ steps.cache-npm.outputs.cache-hit }}" != "true" ]; then
+          npm ci
+        else
+          echo "node_modules restored from cache, skipping npm ci"
+        fi
 
     - name: Update subscriptions
       env:
