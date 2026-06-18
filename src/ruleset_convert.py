@@ -138,7 +138,6 @@ def _compile_srs(file_name: str) -> None:
             ["sing-box", "rule-set", "compile", "--output", srs_path, file_name],
             check=True, capture_output=True, text=True
         )
-        pass  # 成功时不打日志，由 main() 统一输出
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         log(f"  ✗ SRS 编译失败: {srs_filename} - {e}")
     except Exception as e:

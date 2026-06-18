@@ -16,7 +16,7 @@ import copy
 import re
 from typing import Any
 
-from utils import load_jsonc, log
+from utils import log
 
 
 def filter_nodes_by_regex(

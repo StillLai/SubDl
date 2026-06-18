@@ -12,6 +12,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import http from 'http';
 import https from 'https';
 import { fileURLToPath } from 'url';
 import { JSDOM } from 'jsdom';
@@ -29,9 +30,10 @@ const PROXY_UTILS_NAME = 'proxy-utils.esm.mjs';
  * 下载文件
  */
 function downloadFile(url, dest, headers = {}) {
+    const client = url.startsWith('https') ? https : http;
     return new Promise((resolve, reject) => {
         const file = fs.createWriteStream(dest);
-        https.get(url, { headers, timeout: 30000 }, (response) => {
+        client.get(url, { headers, timeout: 30000 }, (response) => {
             if (response.statusCode === 302 || response.statusCode === 301) {
                 file.close();
                 if (fs.existsSync(dest)) fs.unlinkSync(dest);

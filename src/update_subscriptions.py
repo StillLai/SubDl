@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import os
 import sys
-import base64
 import re
 import time
 import json
@@ -22,7 +21,7 @@ from datetime import datetime, timezone, timedelta
 import copy
 import requests
 
-from utils import load_jsonc, discover_template_files, log
+from utils import load_jsonc, discover_template_files, log, http_get_with_retry, try_decode_base64
 from merge_config import merge_config
 
 
@@ -35,30 +34,27 @@ CONVERT_SCRIPT = os.path.join(SCRIPT_DIR, 'convert.mjs')
 TEMPLATE_BASE = os.path.join(TEMPLATE_DIR, 'sing-box_template.jsonc')
 
 
-def get_env_var(name: str, default: str | None = None, *, required: bool = False) -> str:
+def get_env_var(name: str, default: str | None = None, *, required: bool = False) -> str | None:
     value = os.environ.get(name, default)
     if required and not value:
         raise ValueError(f"环境变量 {name} 未设置")
     return value
 
 
-def parse_flow_info(headers: dict[str, str]) -> dict[str, int] | None:
+def parse_flow_info(headers: dict[str, str]) -> dict[str, int | None] | None:
     """从响应头解析流量信息"""
     flow_header = headers.get('subscription-userinfo', '')
     if not flow_header:
         return None
 
-    upload = re.search(r'upload=(\d+)', flow_header)
-    download = re.search(r'download=(\d+)', flow_header)
-    total = re.search(r'total=(\d+)', flow_header)
-    expire = re.search(r'expire=(\d+)', flow_header)
-
-    return {
-        'upload': int(upload.group(1)) if upload else 0,
-        'download': int(download.group(1)) if download else 0,
-        'total': int(total.group(1)) if total else 0,
-        'expire': int(expire.group(1)) if expire else None,
-    }
+    info: dict[str, int | None] = {}
+    for key in ('upload', 'download', 'total', 'expire'):
+        match = re.search(rf'{key}=(\d+)', flow_header)
+        if match:
+            info[key] = int(match.group(1))
+        else:
+            info[key] = 0 if key != 'expire' else None
+    return info
 
 
 def format_bytes(bytes_val: int) -> str:
@@ -104,42 +100,27 @@ def get_status(flow_info: dict[str, int] | None) -> str:
 
 def download_subscription(
     url: str, user_agent: str, timeout: int = 30, max_retries: int = 3
-) -> tuple[str, dict[str, int] | None]:
+) -> tuple[str, dict[str, int | None] | None]:
     """下载订阅内容，带重试机制"""
     headers = {"User-Agent": user_agent}
-    last_error: Exception | None = None
+    
+    try:
+        # 复用通用带重试的 GET 函数
+        response = http_get_with_retry(
+            url, headers=headers, timeout=timeout, allow_redirects=True
+        )
+        content = response.text
+        
+        # 尝试 Base64 解码
+        original_content = content
+        content = try_decode_base64(content)
+        if content != original_content:
+            log("    ℹ 内容已从 Base64 解码")
 
-    for attempt in range(1, max_retries + 1):
-        try:
-            if attempt > 1:
-                log(f"    重试 ({attempt}/{max_retries})...")
-                time.sleep(2 ** (attempt - 1))  # 指数退避：2s, 4s, 8s...
+        return content, parse_flow_info(response.headers)
 
-            response = requests.get(url, headers=headers, timeout=timeout, allow_redirects=True)
-            response.raise_for_status()
-            content = response.text
-
-            try:
-                cleaned = re.sub(r'\s+', '', content.strip())
-                if cleaned and re.match(r'^[A-Za-z0-9+/=]+$', cleaned):
-                    # 补全 base64 padding
-                    padding = 4 - len(cleaned) % 4
-                    if padding != 4:
-                        cleaned += "=" * padding
-                    decoded = base64.b64decode(cleaned)
-                    content = decoded.decode("utf-8")
-            except Exception as e:
-                log(f"    ⚠ Base64 解码失败，将作为明文处理: {e}")
-
-            return content, parse_flow_info(response.headers)
-
-        except requests.exceptions.RequestException as e:
-            last_error = e
-            if attempt < max_retries:
-                continue
-            break
-
-    raise last_error if last_error else Exception("下载失败")
+    except requests.exceptions.RequestException as e:
+        raise Exception(f"下载失败: {e}") from e
 
 
 def validate_subscription_content(content: str, sub_name: str) -> tuple[bool, str]:
@@ -564,14 +545,7 @@ def _process_subscription_download_only(sub: dict[str, str], user_agent: str) ->
 def _batch_convert_and_collect(
     download_results: dict[str, dict[str, Any]]
 ) -> tuple[dict[str, str], list[dict[str, Any]], dict[str, list[dict[str, Any]]]]:
-    """将下载结果批量转换，并收集最终的文件、订阅信息和节点字典
-    
-    Args:
-        download_results: {订阅名称: _process_subscription_download_only 的结果, ...}
-    
-    Returns:
-        (files, subscription_info, subs_nodes_dict)
-    """
+    """将下载结果批量转换，并收集最终的文件、订阅信息和节点字典"""
     # 收集所有需要转换的有效订阅内容
     contents_to_convert: dict[str, str] = {}
     for name, result in download_results.items():
@@ -586,16 +560,18 @@ def _batch_convert_and_collect(
     files: dict[str, str] = {}
     subscription_info: list[dict[str, Any]] = []
     subs_nodes_dict: dict[str, list[dict[str, Any]]] = {}
-    skipped_subs: list[dict[str, str]] = []
+    skipped_subs: list[str] = []
     
     for name, result in download_results.items():
         status: str = result["status"]
-        flow_info: dict[str, int] | None = result.get("flow")
+        flow_info: dict[str, int | None] | None = result.get("flow")
         reason: str = result.get("reason", "未知")
+        filename = result.get("filename", f"{name}.yaml")
+        
+        info_entry: dict[str, Any] = {"name": name, "flow": flow_info, "node_count": 0, "status": status}
         
         if status == "ok":
             raw_content: str = result["raw_content"]
-            filename = result.get("filename", f"{name}.yaml")
             files[filename] = raw_content
             
             singbox_config = converted.get(name)
@@ -611,23 +587,26 @@ def _batch_convert_and_collect(
                     subs_nodes_dict[name] = singbox_nodes
                     log(f"    → '{name}': {node_count} 个节点")
                 else:
-                    skipped_subs.append({"name": name, "reason": "节点列表为空"})
-                subscription_info.append({"name": name, "flow": flow_info, "node_count": node_count, "status": "ok"})
+                    skipped_subs.append(f"{name} (空节点)")
+                
+                info_entry.update({"node_count": node_count, "status": "ok"})
             else:
                 log(f"  ⚠️ {name}: 转换失败")
-                skipped_subs.append({"name": name, "reason": "转换失败"})
-                subscription_info.append({"name": name, "flow": flow_info, "node_count": 0, "status": "convert_failed"})
+                skipped_subs.append(f"{name} (转换失败)")
+                info_entry["status"] = "convert_failed"
+        
         elif status == "invalid":
             log(f"  ⚠️ {name}: 内容无效 - {reason}")
-            subscription_info.append({"name": name, "flow": flow_info, "node_count": 0, "status": "invalid"})
-            skipped_subs.append({"name": name, "reason": reason})
+            skipped_subs.append(f"{name} (无效)")
+        
         else:  # error
             log(f"  ✗ {name}: {reason}")
-            subscription_info.append({"name": name, "flow": flow_info, "node_count": 0, "status": "error"})
-            skipped_subs.append({"name": name, "reason": reason})
+            skipped_subs.append(f"{name} (错误)")
+            
+        subscription_info.append(info_entry)
     
     if skipped_subs:
-        log(f"⚠️ {len(skipped_subs)} 个订阅跳过: {', '.join([s['name'] for s in skipped_subs])}")
+        log(f"⚠️ {len(skipped_subs)} 个订阅跳过: {', '.join(skipped_subs)}")
     
     return files, subscription_info, subs_nodes_dict
 
@@ -687,8 +666,9 @@ def _generate_and_upload(
     if provider_configs:
         log(f"  ✓ 共生成 {len(provider_configs)} 个 providers配置文件")
 
+    readme_path = os.path.join(PROJECT_ROOT, "README.md")
     readme_content = generate_readme(subscription_info)
-    with open("README.md", "w", encoding="utf-8") as f:
+    with open(readme_path, "w", encoding="utf-8") as f:
         f.write(readme_content)
     log("✓ README 已更新")
 

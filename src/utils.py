@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-import json
+import base64
 import os
+import re
 import sys
 import time
 from typing import Any, IO
@@ -41,6 +42,20 @@ def discover_template_files(template_dir: str) -> list[tuple[str, str]]:
     files.sort(key=_sort_key)
 
     return files
+
+
+def try_decode_base64(content: str) -> str:
+    """尝试将内容作为 Base64 解码，失败则原样返回"""
+    try:
+        cleaned = re.sub(r'\s+', '', content.strip())
+        if cleaned and re.match(r'^[A-Za-z0-9+/=]+$', cleaned):
+            padding = 4 - len(cleaned) % 4
+            if padding != 4:
+                cleaned += "=" * padding
+            return base64.b64decode(cleaned).decode("utf-8")
+    except Exception:
+        pass
+    return content
 
 
 HTTP_RETRY: int = 3
