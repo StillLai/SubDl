@@ -730,7 +730,7 @@ def main() -> None:
         f_templates.result()  # 确保模板变体也已完成
     log("::endgroup::")
 
-    valid_count = len(files)
+    valid_count = sum(1 for info in subscription_info if info['status'] == 'ok')
     if valid_count == 0:
         log("错误: 所有订阅下载失败或内容无效")
         sys.exit(1)
