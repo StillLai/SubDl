@@ -52,9 +52,8 @@ def try_decode_base64(content: str) -> str:
     try:
         cleaned = re.sub(r'\s+', '', content.strip())
         if cleaned and _B64_PATTERN.match(cleaned):
-            padding = 4 - len(cleaned) % 4
-            if padding != 4:
-                cleaned += "=" * padding
+            # 利用负数取模特性自动补零：-len % 4 在整除时返回 0
+            cleaned += "=" * (-len(cleaned) % 4)
             return base64.b64decode(cleaned).decode("utf-8")
     except Exception:
         pass

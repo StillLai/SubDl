@@ -29,15 +29,21 @@ const PROXY_UTILS_NAME = 'proxy-utils.esm.mjs';
 /**
  * 下载文件
  */
-function downloadFile(url, dest, headers = {}) {
+function downloadFile(url, dest, headers = {}, maxRedirects = 5) {
     const client = url.startsWith('https') ? https : http;
     return new Promise((resolve, reject) => {
         const file = fs.createWriteStream(dest);
         client.get(url, { headers, timeout: 30000 }, (response) => {
             if (response.statusCode === 302 || response.statusCode === 301) {
+                if (maxRedirects <= 0) {
+                    file.close();
+                    if (fs.existsSync(dest)) fs.unlinkSync(dest);
+                    reject(new Error('重定向次数过多'));
+                    return;
+                }
                 file.close();
                 if (fs.existsSync(dest)) fs.unlinkSync(dest);
-                downloadFile(response.headers.location, dest, headers).then(resolve).catch(reject);
+                downloadFile(response.headers.location, dest, headers, maxRedirects - 1).then(resolve).catch(reject);
                 return;
             }
             if (response.statusCode !== 200) {

@@ -129,7 +129,7 @@ def parse_and_convert_to_rows(link: str) -> list[dict[str, str | None]]:
 
 def _compile_srs(file_name: str) -> None:
     """使用 subprocess 安全调用 sing-box 编译 SRS，输出到 file_name 同级的 srs/ 目录"""
-    srs_dir = os.path.join(os.path.dirname(file_name), '..', 'srs')
+    srs_dir = os.path.normpath(os.path.join(os.path.dirname(file_name), '..', 'srs'))
     srs_filename = os.path.basename(file_name).replace(".json", ".srs")
     srs_path = os.path.join(srs_dir, srs_filename)
     os.makedirs(srs_dir, exist_ok=True)
@@ -168,16 +168,17 @@ def _group_by_mapped(
     seen: set[tuple[str, str]] = set()
     for row in rows:
         pattern: str = row['pattern']  # type: ignore[assignment]
-        if pattern not in map_dict:
-            continue
         if '#' in pattern:
+            continue
+        # 统一转大写后查表，兼容大小写混杂的规则源
+        mapped = map_dict.get(pattern.upper())
+        if mapped is None:
             continue
         address_raw = row.get('address')
         if not address_raw or not address_raw.strip():
             continue
         address: str = address_raw.strip()
-        mapped: str = map_dict[pattern]
-        if pattern == 'PROCESS-NAME':
+        if pattern.upper() == 'PROCESS-NAME':
             mapped = 'package_name' if is_android_package_name(address) else 'process_name'
         key = (mapped, address)
         if key in seen:
@@ -192,12 +193,9 @@ _MAP_DICT: dict[str, str] = {
     'HOST-SUFFIX': 'domain_suffix',
     'DOMAIN': 'domain',
     'HOST': 'domain',
-    'host': 'domain',
     'DOMAIN-KEYWORD': 'domain_keyword',
     'HOST-KEYWORD': 'domain_keyword',
-    'host-keyword': 'domain_keyword',
     'IP-CIDR': 'ip_cidr',
-    'ip-cidr': 'ip_cidr',
     'IP-CIDR6': 'ip_cidr',
     'IP6-CIDR': 'ip_cidr',
     'SRC-IP-CIDR': 'source_ip_cidr',
@@ -245,12 +243,7 @@ def parse_list_file(link: str, output_directory: str) -> str | None:
             filtered = [a for a in addresses if a not in domain_suffix_set]
             domain_entries.extend(filtered)
         elif mapped in ('port', 'source_port'):
-            port_numbers = []
-            for a in addresses:
-                try:
-                    port_numbers.append(int(a))
-                except ValueError:
-                    port_numbers.append(a)
+            port_numbers = [int(a) for a in addresses]
             result_rules["rules"].append({mapped: port_numbers})
         else:
             result_rules["rules"].append({mapped: addresses})

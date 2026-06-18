@@ -19,6 +19,7 @@ from urllib.parse import urlparse
 from datetime import datetime, timezone, timedelta
 
 import copy
+import threading
 import requests
 
 from utils import load_jsonc, discover_template_files, log, http_get_with_retry, try_decode_base64
@@ -50,7 +51,8 @@ def parse_flow_info(headers: dict[str, str]) -> dict[str, int | None] | None:
     if not flow_header:
         return None
 
-    info: dict[str, int | None] = {k: (0 if k != 'expire' else None) for k in ('upload', 'download', 'total', 'expire')}
+    info: dict[str, int | None] = dict.fromkeys(('upload', 'download', 'total', 'expire'), 0)
+    info['expire'] = None
     for match in _FLOW_KEY_PATTERN.finditer(flow_header):
         key, value = match.group(1), int(match.group(2))
         if key in info:
@@ -185,12 +187,13 @@ def _parse_subscription_entry(value: str) -> dict[str, str] | None:
 
 
 def extract_name_from_url(url: str) -> str:
+    """从 URL 提取域名作为订阅名称"""
     try:
         domain = urlparse(url).netloc.replace("www.", "").split(":")[0]
         name = re.sub(r'[^a-zA-Z0-9_-]', '_', domain)
-        return name[:50]
+        return name[:50] if name else f"unknown_{int(time.time())}"
     except Exception:
-        return f"sub_{int(time.time())}"
+        return f"unknown_{int(time.time())}"
 
 
 def upload_to_gist(github_token: str, gist_id: str, files: dict[str, str]) -> str:
@@ -305,42 +308,42 @@ def convert_to_singbox_batch(contents_dict: dict[str, str]) -> dict[str, dict[st
     """
     if not contents_dict:
         return {}
-    
+
+    batch_input_file: str | None = None
     try:
         with tempfile.NamedTemporaryFile(
             mode='w', suffix='.json', delete=False, encoding='utf-8'
         ) as f:
             json.dump(contents_dict, f, ensure_ascii=False)
             batch_input_file = f.name
-        
-        try:
-            log(f"  → 批量转换 {len(contents_dict)} 个订阅（单进程）...")
-            result = subprocess.run(
-                ['node', CONVERT_SCRIPT, 'batch-convert', batch_input_file],
-                capture_output=True, text=True, encoding='utf-8'
-            )
-            
-            if result.returncode != 0:
-                log(f"  ✗ 批量转换失败 (exit {result.returncode}): {result.stderr}")
-                return {name: None for name in contents_dict}
-            
-            stdout = result.stdout.strip()
-            if not stdout:
-                log(f"  ✗ 批量转换输出为空 (stderr: {result.stderr.strip() or '(无)'})")
-                return {name: None for name in contents_dict}
-            
-            raw_result: dict[str, Any] = json.loads(stdout)
-            return {
-                name: val if isinstance(val, dict) else None
-                for name, val in ((n, raw_result.get(n)) for n in contents_dict)
-            }
-            
-        finally:
-            os.unlink(batch_input_file)
-            
+
+        log(f"  → 批量转换 {len(contents_dict)} 个订阅（单进程）...")
+        result = subprocess.run(
+            ['node', CONVERT_SCRIPT, 'batch-convert', batch_input_file],
+            capture_output=True, text=True, encoding='utf-8'
+        )
+
+        if result.returncode != 0:
+            log(f"  ✗ 批量转换失败 (exit {result.returncode}): {result.stderr}")
+            return {name: None for name in contents_dict}
+
+        stdout = result.stdout.strip()
+        if not stdout:
+            log(f"  ✗ 批量转换输出为空 (stderr: {result.stderr.strip() or '(无)'})")
+            return {name: None for name in contents_dict}
+
+        raw_result: dict[str, Any] = json.loads(stdout)
+        return {
+            name: val if isinstance(val, dict) else None
+            for name, val in ((n, raw_result.get(n)) for n in contents_dict)
+        }
+
     except Exception as e:
         log(f"  ✗ 批量转换异常: {e}")
         return {name: None for name in contents_dict}
+    finally:
+        if batch_input_file:
+            os.unlink(batch_input_file)
 
 
 def merge_singbox_config(
@@ -678,10 +681,10 @@ def main() -> None:
     log(f"找到 {len(subscriptions)} 个订阅")
 
     log("::group::Download & Convert subscriptions")
-    with ThreadPoolExecutor(max_workers=1) as executor:
-        f_templates = executor.submit(_generate_all_template_variants)
-        files, subscription_info, subs_nodes_dict = _download_all_subscriptions(subscriptions, user_agent)
-        f_templates.result()  # 确保模板变体也已完成
+    templates_thread = threading.Thread(target=_generate_all_template_variants)
+    templates_thread.start()
+    files, subscription_info, subs_nodes_dict = _download_all_subscriptions(subscriptions, user_agent)
+    templates_thread.join()
     log("::endgroup::")
 
     valid_count = sum(1 for info in subscription_info if info['status'] == 'ok')
