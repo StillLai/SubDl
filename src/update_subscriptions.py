@@ -41,19 +41,20 @@ def get_env_var(name: str, default: str | None = None, *, required: bool = False
     return value
 
 
+_FLOW_KEY_PATTERN: re.Pattern[str] = re.compile(r'(\w+)=(\d+)')
+
+
 def parse_flow_info(headers: dict[str, str]) -> dict[str, int | None] | None:
     """从响应头解析流量信息"""
     flow_header = headers.get('subscription-userinfo', '')
     if not flow_header:
         return None
 
-    info: dict[str, int | None] = {}
-    for key in ('upload', 'download', 'total', 'expire'):
-        match = re.search(rf'{key}=(\d+)', flow_header)
-        if match:
-            info[key] = int(match.group(1))
-        else:
-            info[key] = 0 if key != 'expire' else None
+    info: dict[str, int | None] = {k: (0 if k != 'expire' else None) for k in ('upload', 'download', 'total', 'expire')}
+    for match in _FLOW_KEY_PATTERN.finditer(flow_header):
+        key, value = match.group(1), int(match.group(2))
+        if key in info:
+            info[key] = value
     return info
 
 
@@ -62,12 +63,8 @@ def format_bytes(n: int) -> str:
     if n == 0:
         return "0 B"
     units = ('B', 'KB', 'MB', 'GB', 'TB')
-    i = 0
-    val = float(n)
-    while val >= 1024 and i < len(units) - 1:
-        val /= 1024
-        i += 1
-    return f"{val:.2f} {units[i]}"
+    i = min(int(n.bit_length() - 1) // 10, len(units) - 1)
+    return f"{n / (1024 ** i):.2f} {units[i]}"
 
 
 def format_expire(timestamp: int | None) -> str:
@@ -75,8 +72,7 @@ def format_expire(timestamp: int | None) -> str:
     if not timestamp:
         return "无"
     try:
-        dt = datetime.fromtimestamp(timestamp)
-        return dt.strftime("%Y-%m-%d")
+        return datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d")
     except Exception:
         return "无"
 
@@ -100,28 +96,22 @@ def get_status(flow_info: dict[str, int] | None) -> str:
 
 
 def download_subscription(
-    url: str, user_agent: str, timeout: int = 30, max_retries: int = 3
+    url: str, user_agent: str, timeout: int = 30
 ) -> tuple[str, dict[str, int | None] | None]:
     """下载订阅内容，带重试机制"""
     headers = {"User-Agent": user_agent}
-    
-    try:
-        # 复用通用带重试的 GET 函数
-        response = http_get_with_retry(
-            url, headers=headers, timeout=timeout, allow_redirects=True
-        )
-        content = response.text
-        
-        # 尝试 Base64 解码
-        original_content = content
-        content = try_decode_base64(content)
-        if content != original_content:
-            log("    ℹ 内容已从 Base64 解码")
+    response = http_get_with_retry(
+        url, headers=headers, timeout=timeout, allow_redirects=True
+    )
+    content = response.text
 
-        return content, parse_flow_info(response.headers)
+    # 尝试 Base64 解码
+    decoded = try_decode_base64(content)
+    if decoded is not content:
+        log("    ℹ 内容已从 Base64 解码")
+        content = decoded
 
-    except requests.exceptions.RequestException as e:
-        raise Exception(f"下载失败: {e}") from e
+    return content, parse_flow_info(response.headers)
 
 
 def validate_subscription_content(content: str, sub_name: str) -> tuple[bool, str]:
@@ -136,7 +126,7 @@ def validate_subscription_content(content: str, sub_name: str) -> tuple[bool, st
         return False, "返回的是网页而非订阅内容"
 
     # 检查是否为有效配置（至少有一些关键字）
-    valid_indicators = ['proxies', 'proxy-providers', 'proxy-groups', 'servers', 'outbounds', 'endpoints', 'vmess', 'trojan', 'ssid', 'wireguard']
+    valid_indicators = ('proxies', 'proxy-providers', 'proxy-groups', 'servers', 'outbounds', 'endpoints', 'vmess', 'trojan', 'ssid', 'wireguard')
     if not any(indicator in content_lower for indicator in valid_indicators):
         return False, "内容不包含有效的订阅配置"
 
@@ -340,16 +330,10 @@ def convert_to_singbox_batch(contents_dict: dict[str, str]) -> dict[str, dict[st
                 return {name: None for name in contents_dict}
             
             raw_result: dict[str, Any] = json.loads(stdout)
-            
-            # 转为 {name: dict | None}
-            final: dict[str, dict[str, Any] | None] = {}
-            for name in contents_dict:
-                val = raw_result.get(name)
-                if val is not None and isinstance(val, dict):
-                    final[name] = val
-                else:
-                    final[name] = None
-            return final
+            return {
+                name: val if isinstance(val, dict) else None
+                for name, val in ((n, raw_result.get(n)) for n in contents_dict)
+            }
             
         finally:
             os.unlink(batch_input_file)
@@ -398,21 +382,14 @@ def _generate_template_variant(suffix: str, label: str, transform_fn: Callable[[
 
 
 def _generate_all_template_variants() -> None:
-    """生成所有模板变体（noTun / tproxy / tun_for_win），并行处理"""
-    # 预加载基础模板一次，避免 3 个线程各自重复解析 json5
+    """生成所有模板变体（noTun / tproxy / tun_for_win），串行处理"""
     base_template = load_jsonc(TEMPLATE_BASE)
-    variants = [
-        ('noTun', 'noTun', lambda t: _remove_tun_inbounds(t)),
-        ('tproxy', 'tproxy', lambda t: _replace_tun_with_tproxy(t)),
-        ('tun_for_win', 'tun_for_win', lambda t: _remove_auto_redirect(t)),
-    ]
-    with ThreadPoolExecutor(max_workers=3) as executor:
-        futures = [
-            executor.submit(_generate_template_variant, suffix, label, transform, base_template)
-            for suffix, label, transform in variants
-        ]
-        for future in as_completed(futures):
-            future.result()  # 等待完成（异常会被 _generate_template_variant 内部捕获）
+    for suffix, label, transform in [
+        ('noTun', 'noTun', _remove_tun_inbounds),
+        ('tproxy', 'tproxy', _replace_tun_with_tproxy),
+        ('tun_for_win', 'tun_for_win', _remove_auto_redirect),
+    ]:
+        _generate_template_variant(suffix, label, transform, base_template)
 
 
 def _remove_tun_inbounds(template: dict[str, Any]) -> None:
@@ -499,11 +476,7 @@ def generate_provider_configs(sub_url_map: dict[str, str]) -> dict[str, str]:
     """生成 providers 版本的配置文件（直接填充 url，不做其他处理）"""
     def _fill_one(template_path: str, base_name: str) -> tuple[str, str] | None:
         template_file = os.path.basename(template_path)
-        if template_file.endswith('.jsonc'):
-            template = load_jsonc(template_path)
-        else:
-            with open(template_path, 'r', encoding='utf-8') as f:
-                template = json.load(f)
+        template = load_jsonc(template_path)
 
         filled_count = 0
         for provider in template.get('providers', []):
@@ -686,10 +659,10 @@ def _generate_and_upload(
 # ========== 主入口 ==========
 
 def main() -> None:
-    log("=" * 60, file=sys.stdout)
-    log("SubDl - Subscription Downloader", file=sys.stdout)
-    log(f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", file=sys.stdout)
-    log("=" * 60, file=sys.stdout)
+    print("=" * 60)
+    print("SubDl - Subscription Downloader")
+    print(f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("=" * 60)
 
     github_token = get_env_var("GH_TOKEN", required=True)
     gist_id = get_env_var("GIST_ID", default="")

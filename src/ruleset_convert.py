@@ -144,18 +144,18 @@ def _compile_srs(file_name: str) -> None:
         log(f"  ✗ SRS 错误: {srs_filename} - {e}")
 
 
-def sort_dict(obj: Any) -> Any:
+def prioritize_version_key(obj: Any) -> Any:
     """保持原有顺序，仅将 'version' 键置顶"""
     if isinstance(obj, dict):
         result: dict[str, Any] = {}
         if "version" in obj:
-            result["version"] = sort_dict(obj["version"])
+            result["version"] = prioritize_version_key(obj["version"])
         for k in obj:
             if k != "version":
-                result[k] = sort_dict(obj[k])
+                result[k] = prioritize_version_key(obj[k])
         return result
     elif isinstance(obj, list):
-        return [sort_dict(x) for x in obj]
+        return [prioritize_version_key(x) for x in obj]
     else:
         return obj
 
@@ -220,7 +220,7 @@ def parse_list_file(link: str, output_directory: str) -> str | None:
             json_data = _fetch_parsed(link, 'json')
             if isinstance(json_data, dict) and 'version' in json_data and 'rules' in json_data:
                 with open(file_name, 'w', encoding='utf-8') as output_file:
-                    json.dump(sort_dict(json_data), output_file, ensure_ascii=False, indent=2)
+                    json.dump(prioritize_version_key(json_data), output_file, ensure_ascii=False, indent=2)
                 _compile_srs(file_name)
                 return file_name
             else:
@@ -260,19 +260,23 @@ def parse_list_file(link: str, output_directory: str) -> str | None:
         result_rules["rules"].insert(0, {'domain': domain_entries})
 
     with open(file_name, 'w', encoding='utf-8') as output_file:
-        json.dump(sort_dict(result_rules), output_file, ensure_ascii=False, indent=2)
+        json.dump(prioritize_version_key(result_rules), output_file, ensure_ascii=False, indent=2)
 
     _compile_srs(file_name)
     return file_name
 
 
 def main() -> None:
-    with open("ruleset/ruleset_source.txt", 'r', encoding='utf-8') as links_file:
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(script_dir)
+    ruleset_source = os.path.join(project_root, 'ruleset', 'ruleset_source.txt')
+    output_dir = os.path.join(project_root, 'ruleset', 'json')
+
+    with open(ruleset_source, 'r', encoding='utf-8') as links_file:
         links = [l.strip() for l in links_file if l.strip() and not l.strip().startswith("#")]
 
-    output_dir = "./ruleset/json/"
     os.makedirs(output_dir, exist_ok=True)
-    os.makedirs("./ruleset/srs/", exist_ok=True)
+    os.makedirs(os.path.join(project_root, 'ruleset', 'srs'), exist_ok=True)
     result_file_names: list[str] = []
 
     log(f"→ 并行处理 {len(links)} 个规则源...")

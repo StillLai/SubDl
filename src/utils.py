@@ -44,11 +44,14 @@ def discover_template_files(template_dir: str) -> list[tuple[str, str]]:
     return files
 
 
+_B64_PATTERN: re.Pattern[str] = re.compile(r'^[A-Za-z0-9+/=]+$')
+
+
 def try_decode_base64(content: str) -> str:
     """尝试将内容作为 Base64 解码，失败则原样返回"""
     try:
         cleaned = re.sub(r'\s+', '', content.strip())
-        if cleaned and re.match(r'^[A-Za-z0-9+/=]+$', cleaned):
+        if cleaned and _B64_PATTERN.match(cleaned):
             padding = 4 - len(cleaned) % 4
             if padding != 4:
                 cleaned += "=" * padding

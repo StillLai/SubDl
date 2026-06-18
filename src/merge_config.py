@@ -84,25 +84,16 @@ def process_providers(
         if isinstance(existing_outbounds, list):
             fixed_outbounds = [o for o in existing_outbounds if isinstance(o, str)]
 
-        if use_all:
-            for provider_tag in provider_nodes.keys():
-                filtered = filter_nodes_by_regex(
-                    provider_nodes[provider_tag], include_regex, exclude_regex
-                )
-                expanded.extend(filtered)
-            del outbound['use_all_providers']
-            if 'providers' in outbound:
-                del outbound['providers']
-        elif 'providers' in outbound:
-            for provider_tag in outbound['providers']:
-                if provider_tag in provider_nodes:
-                    filtered = filter_nodes_by_regex(
-                        provider_nodes[provider_tag], include_regex, exclude_regex
-                    )
-                    expanded.extend(filtered)
-            del outbound['providers']
-        else:
+        provider_tags = list(provider_nodes) if use_all else outbound.pop('providers', [])
+        if not provider_tags and not use_all:
             continue
+        if use_all:
+            del outbound['use_all_providers']
+        for provider_tag in provider_tags:
+            if provider_tag in provider_nodes:
+                expanded.extend(filter_nodes_by_regex(
+                    provider_nodes[provider_tag], include_regex, exclude_regex
+                ))
 
         outbound['outbounds'] = fixed_outbounds + expanded
 
