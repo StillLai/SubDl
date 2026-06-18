@@ -629,20 +629,16 @@ def _generate_and_upload(
 ) -> str:
     """生成合并配置、providers 配置，并上传到 Gist"""
 
+    def _merge_and_log(src: dict[str, str], label: str) -> None:
+        """合并配置字典到 files 并记录日志"""
+        files.update(src)
+        if src:
+            log(f"  ✓ 共生成 {len(src)} 个{label}")
+
     log("→ 生成合并配置和 providers 配置...")
     sub_url_map = {sub['name']: sub['url'] for sub in subscriptions}
-    merged_configs = merge_all_templates(subs_nodes_dict)
-    provider_configs = generate_provider_configs(sub_url_map)
-
-    for filename, content in merged_configs.items():
-        files[filename] = content
-    if merged_configs:
-        log(f"  ✓ 共生成 {len(merged_configs)} 个配置文件")
-
-    for filename, content in provider_configs.items():
-        files[filename] = content
-    if provider_configs:
-        log(f"  ✓ 共生成 {len(provider_configs)} 个 providers配置文件")
+    _merge_and_log(merge_all_templates(subs_nodes_dict), "配置文件")
+    _merge_and_log(generate_provider_configs(sub_url_map), "providers配置文件")
 
     readme_path = os.path.join(PROJECT_ROOT, "README.md")
     readme_content = generate_readme(subscription_info)
@@ -663,10 +659,10 @@ def _generate_and_upload(
 # ========== 主入口 ==========
 
 def main() -> None:
-    print("=" * 60)
-    print("SubDl - Subscription Downloader")
-    print(f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print("=" * 60)
+    log("=" * 60)
+    log("SubDl - Subscription Downloader")
+    log(f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    log("=" * 60)
 
     github_token = get_env_var("GH_TOKEN", required=True)
     gist_id = get_env_var("GIST_ID", default="")

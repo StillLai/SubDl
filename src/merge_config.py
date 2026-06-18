@@ -119,16 +119,17 @@ def merge_config(
         config['outbounds'] = []
 
     # ========== 步骤 1: 收集所有节点并添加订阅前缀 ==========
-    # NOTE: 深拷贝节点以避免修改 subscriptions_nodes 中的原始数据
+    # NOTE: 浅拷贝节点以避免修改 subscriptions_nodes 中的原始数据
+    #       （节点 dict 为单层结构，仅需修改 tag，无需深拷贝）
     all_nodes: list[dict[str, Any]] = []
     for sub_name, nodes in subscriptions_nodes.items():
         for node in nodes:
             if isinstance(node, dict) and 'tag' in node:
-                node_copy = copy.deepcopy(node)
+                node_copy = node.copy()
                 node_copy['tag'] = f"{sub_name}/{node_copy['tag']}"
                 all_nodes.append(node_copy)
             else:
-                all_nodes.append(copy.deepcopy(node))
+                all_nodes.append(node)
 
     log(f"[Merge] 已收集 {len(all_nodes)} 个节点并添加订阅前缀")
 

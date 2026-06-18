@@ -153,55 +153,43 @@ async function checkAndUpdateDeps(githubToken) {
  */
 async function batchConvertToSingbox(batchInput) {
     const GLOBAL_KEYS = ['require', 'window', 'document', 'self', 'navigator', 'location'];
-    const originals = {};
-    const existed = new Set();
+
+    // 保存原始全局变量状态
+    const originals = new Map();
     for (const key of GLOBAL_KEYS) {
-        if (key in global) {
-            originals[key] = global[key];
-            existed.add(key);
-        }
+        if (key in global) originals.set(key, global[key]);
     }
 
-    // 注入require
+    const setGlobal = (key, value) => {
+        try { global[key] = value; }
+        catch { Object.defineProperty(global, key, { value, configurable: true, writable: true, enumerable: true }); }
+    };
+
+    // 注入 require
     // NOTE: dotenv 是 proxy-utils.esm.mjs (Sub-Store 模块) 内部 require('dotenv') 的隐式依赖，
     //       不是本项目自身使用的。如需移除，请先确认 Sub-Store 模块不再需要。
     const { createRequire } = await import('module');
-    global.require = createRequire(PROXY_UTILS_FILE);
-    
-    // 创建jsdom环境
+    setGlobal('require', createRequire(PROXY_UTILS_FILE));
+
+    // 创建 jsdom 环境
     const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
         url: 'https://localhost',
         pretendToBeVisual: true
     });
-    
-    const injectGlobal = (name, value) => {
-        try {
-            global[name] = value;
-        } catch {
-            Object.defineProperty(global, name, {
-                value: value, configurable: true, writable: true, enumerable: true
-            });
-        }
-    };
+    for (const key of ['window', 'document', 'self', 'navigator', 'location']) {
+        setGlobal(key, key === 'document' ? dom.window.document : key === 'location' ? dom.window.location : dom.window);
+    }
 
-    injectGlobal('window', dom.window);
-    injectGlobal('document', dom.window.document);
-    injectGlobal('self', dom.window);
-    injectGlobal('navigator', dom.window.navigator);
-    injectGlobal('location', dom.window.location);
-    
     const modulePath = 'file://' + PROXY_UTILS_FILE;
-    
+
     try {
         const { parse, produce } = await import(modulePath);
         console.error('[Convert] 模块加载成功，开始批量转换');
-        
+
         const results = {};
         for (const [name, clashContent] of Object.entries(batchInput)) {
             try {
-                const proxies = parse(clashContent);
-                const singboxConfig = produce(proxies, 'singbox');
-                results[name] = JSON.parse(singboxConfig);  // 解析为对象，方便 Python 侧处理
+                results[name] = JSON.parse(produce(parse(clashContent), 'singbox'));
                 console.error(`[Convert]   ✓ ${name} 转换成功`);
             } catch (err) {
                 console.error(`[Convert]   ✗ ${name} 转换失败: ${err.message}`);
@@ -210,16 +198,10 @@ async function batchConvertToSingbox(batchInput) {
         }
         return results;
     } finally {
-        // 清理注入的全局变量
+        // 恢复原始全局变量状态
         for (const key of GLOBAL_KEYS) {
-            if (existed.has(key)) {
-                try {
-                    global[key] = originals[key];
-                } catch {
-                    Object.defineProperty(global, key, {
-                        value: originals[key], configurable: true, writable: true, enumerable: true
-                    });
-                }
+            if (originals.has(key)) {
+                setGlobal(key, originals.get(key));
             } else {
                 delete global[key];
             }

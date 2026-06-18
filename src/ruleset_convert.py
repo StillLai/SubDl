@@ -32,14 +32,14 @@ def is_ipv4_or_ipv6(address: str) -> str | None:
     if not _IP_LIKE_RE.match(address):
         return None
     try:
+        # 通过 ':' 快速区分 v4/v6，省去一次无意义的 try/except
+        if ':' in address:
+            ipaddress.IPv6Network(address, strict=False)
+            return 'ipv6'
         ipaddress.IPv4Network(address, strict=False)
         return 'ipv4'
     except ValueError:
-        try:
-            ipaddress.IPv6Network(address, strict=False)
-            return 'ipv6'
-        except ValueError:
-            return None
+        return None
 
 
 _OTHER_SYSTEM_EXTENSIONS: frozenset[str] = frozenset(
@@ -81,9 +81,8 @@ def _parse_yaml_rows(yaml_data: Any) -> list[dict[str, str | None]]:
     if not isinstance(yaml_data, str):
         items = yaml_data.get('payload', [])
     else:
-        lines = yaml_data.splitlines()
-        line_content = lines[0]
-        items = line_content.split()
+        # 按任意空白分割所有行，兼容多行纯文本格式
+        items = yaml_data.split()
     for item in items:
         address_addr = item.strip("'")
         if ',' not in item:
