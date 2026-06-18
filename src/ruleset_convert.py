@@ -276,7 +276,6 @@ def main() -> None:
     os.makedirs("./ruleset/srs/", exist_ok=True)
     result_file_names: list[str] = []
 
-    log("::group::Build rulesets")
     log(f"→ 并行处理 {len(links)} 个规则源...")
     with ThreadPoolExecutor(max_workers=min(len(links), 8)) as executor:
         futures = {
@@ -291,10 +290,10 @@ def main() -> None:
                     result_file_names.append(result)
             except Exception as e:
                 log(f"✗ 跳过 {link}: {e}")
-    log("::endgroup::")
 
+    log(f"✓ 共生成 {len(result_file_names)}/{len(links)} 个规则集")
     for file_name in result_file_names:
-        log(file_name)
+        log(f"  - {os.path.basename(file_name)}")
 
 
 if __name__ == "__main__":
