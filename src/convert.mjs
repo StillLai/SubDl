@@ -159,6 +159,8 @@ async function batchConvertToSingbox(batchInput) {
     }
 
     // 注入require
+    // NOTE: dotenv 是 proxy-utils.esm.mjs (Sub-Store 模块) 内部 require('dotenv') 的隐式依赖，
+    //       不是本项目自身使用的。如需移除，请先确认 Sub-Store 模块不再需要。
     const { createRequire } = await import('module');
     global.require = createRequire(PROXY_UTILS_FILE);
     
