@@ -10,6 +10,7 @@ import yaml
 import ipaddress
 import re
 from io import StringIO
+from collections.abc import Callable
 from typing import Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -23,12 +24,7 @@ _IP_LIKE_RE: re.Pattern[str] = re.compile(r'^[\d./:a-fA-F]+$')
 def _fetch_parsed(url: str, parser: str) -> Any:
     """下载 URL 内容并按指定格式解析（'json' / 'yaml' / 'csv'）"""
     response = http_get_with_retry(url)
-    if parser == 'json':
-        return json.loads(response.text)
-    elif parser == 'yaml':
-        return yaml.safe_load(response.text)
-    else:
-        return _parse_csv_rows(response.text)
+    return _PARSERS[parser](response.text)
 
 
 def is_ipv4_or_ipv6(address: str) -> str | None:
@@ -46,14 +42,22 @@ def is_ipv4_or_ipv6(address: str) -> str | None:
             return None
 
 
+_OTHER_SYSTEM_EXTENSIONS: frozenset[str] = frozenset(
+    ('.exe', '.dll', '.app', '.dmg', '.msi', '.deb', '.rpm', '.pkg')
+)
+_ANDROID_COMMON_PREFIXES: frozenset[str] = frozenset(
+    ('com', 'org', 'net', 'edu', 'gov', 'mil', 'android', 'google')
+)
+
+
 def is_android_package_name(text: str) -> bool:
     """判断是否为安卓程序包名"""
     if not text or '.' not in text:
         return False
 
     # 排除明显是其他系统的程序
-    other_system_extensions = ['.exe', '.dll', '.app', '.dmg', '.msi', '.deb', '.rpm', '.pkg']
-    if any(text.lower().endswith(ext) for ext in other_system_extensions):
+    text_lower = text.lower()
+    if any(text_lower.endswith(ext) for ext in _OTHER_SYSTEM_EXTENSIONS):
         return False
 
     parts = text.split('.')
@@ -65,8 +69,7 @@ def is_android_package_name(text: str) -> bool:
         if not _PACKAGE_PART_RE.match(part):
             return False
 
-    common_prefixes = ['com', 'org', 'net', 'edu', 'gov', 'mil', 'android', 'google']
-    if parts[0] in common_prefixes:
+    if parts[0] in _ANDROID_COMMON_PREFIXES:
         return True
 
     return len(parts) >= 2
@@ -112,6 +115,13 @@ def _parse_csv_rows(data: str) -> list[dict[str, str | None]]:
         if pattern and address:
             rows.append({'pattern': pattern, 'address': address, 'other': other})
     return rows
+
+
+_PARSERS: dict[str, Callable[[str], Any]] = {
+    'json': json.loads,
+    'yaml': yaml.safe_load,
+    'csv': _parse_csv_rows,
+}
 
 
 def parse_and_convert_to_rows(link: str) -> list[dict[str, str | None]]:
@@ -171,14 +181,15 @@ def _group_by_mapped(
         if '#' in pattern:
             continue
         # 统一转大写后查表，兼容大小写混杂的规则源
-        mapped = map_dict.get(pattern.upper())
+        pattern_upper = pattern.upper()
+        mapped = map_dict.get(pattern_upper)
         if mapped is None:
             continue
         address_raw = row.get('address')
         if not address_raw or not address_raw.strip():
             continue
         address: str = address_raw.strip()
-        if pattern.upper() == 'PROCESS-NAME':
+        if pattern_upper == 'PROCESS-NAME':
             mapped = 'package_name' if is_android_package_name(address) else 'process_name'
         key = (mapped, address)
         if key in seen:
@@ -210,7 +221,7 @@ _MAP_DICT: dict[str, str] = {
 def parse_list_file(link: str, output_directory: str) -> str | None:
     """解析规则链接并生成 JSON/SRS 文件"""
     os.makedirs(output_directory, exist_ok=True)
-    file_name = os.path.join(output_directory, f"{os.path.basename(link).split('.')[0]}.json")
+    file_name = os.path.join(output_directory, f"{os.path.splitext(os.path.basename(link))[0]}.json")
 
     # 如果是 .json 链接，仅处理 sing-box 规则集格式，失败不继续
     if link.endswith('.json'):

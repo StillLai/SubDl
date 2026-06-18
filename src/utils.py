@@ -37,9 +37,7 @@ def discover_template_files(template_dir: str) -> list[tuple[str, str]]:
         files.append((os.path.join(template_dir, name), base))
 
     # 基础模板恒在首位，其余按字母序排列
-    def _sort_key(entry: tuple[str, str]) -> tuple[int, str]:
-        return (0, "") if entry[1] == "sing-box_template" else (1, entry[1])
-    files.sort(key=_sort_key)
+    files.sort(key=lambda e: (e[1] != "sing-box_template", e[1]))
 
     return files
 
@@ -50,7 +48,7 @@ _B64_PATTERN: re.Pattern[str] = re.compile(r'^[A-Za-z0-9+/=]+$')
 def try_decode_base64(content: str) -> str:
     """尝试将内容作为 Base64 解码，失败则原样返回"""
     try:
-        cleaned = re.sub(r'\s+', '', content.strip())
+        cleaned = ''.join(content.split())
         if cleaned and _B64_PATTERN.match(cleaned):
             # 利用负数取模特性自动补零：-len % 4 在整除时返回 0
             cleaned += "=" * (-len(cleaned) % 4)
@@ -77,4 +75,4 @@ def http_get_with_retry(url: str, **kwargs: Any) -> requests.Response:
             return resp
         except requests.RequestException as e:
             last_error = e
-    raise last_error if last_error else Exception(f"下载失败: {url}")
+    raise last_error  # type: ignore[misc]

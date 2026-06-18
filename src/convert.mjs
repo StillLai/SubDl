@@ -33,31 +33,29 @@ function downloadFile(url, dest, headers = {}, maxRedirects = 5) {
     const client = url.startsWith('https') ? https : http;
     return new Promise((resolve, reject) => {
         const file = fs.createWriteStream(dest);
+        const cleanup = () => {
+            file.close(() => { if (fs.existsSync(dest)) fs.unlinkSync(dest); });
+        };
+
         client.get(url, { headers, timeout: 30000 }, (response) => {
             if (response.statusCode === 302 || response.statusCode === 301) {
                 if (maxRedirects <= 0) {
-                    file.close();
-                    if (fs.existsSync(dest)) fs.unlinkSync(dest);
+                    cleanup();
                     reject(new Error('重定向次数过多'));
                     return;
                 }
-                file.close();
-                if (fs.existsSync(dest)) fs.unlinkSync(dest);
+                cleanup();
                 downloadFile(response.headers.location, dest, headers, maxRedirects - 1).then(resolve).catch(reject);
                 return;
             }
             if (response.statusCode !== 200) {
-                file.close();
-                if (fs.existsSync(dest)) fs.unlinkSync(dest);
+                cleanup();
                 reject(new Error(`下载失败: ${response.statusCode}`));
                 return;
             }
             response.pipe(file);
             file.on('finish', () => file.close(resolve));
-        }).on('error', (err) => {
-            if (fs.existsSync(dest)) fs.unlinkSync(dest);
-            reject(err);
-        });
+        }).on('error', (err) => { cleanup(); reject(err); });
     });
 }
 

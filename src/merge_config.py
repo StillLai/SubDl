@@ -75,7 +75,7 @@ def process_providers(
 
         include_regex: str | None = outbound.get('include')
         exclude_regex: str | None = outbound.get('exclude')
-        use_all: bool = outbound.get('use_all_providers', False)
+        use_all: bool = outbound.pop('use_all_providers', False)
 
         existing_outbounds: list[Any] = outbound.get('outbounds', [])
         fixed_outbounds = [o for o in existing_outbounds if isinstance(o, str)]
@@ -83,8 +83,6 @@ def process_providers(
         provider_tags = list(provider_nodes) if use_all else outbound.pop('providers', [])
         if not provider_tags and not use_all:
             continue
-        if use_all:
-            del outbound['use_all_providers']
 
         expanded: list[str] = []
         for provider_tag in provider_tags:

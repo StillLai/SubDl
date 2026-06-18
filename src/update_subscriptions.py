@@ -51,8 +51,7 @@ def parse_flow_info(headers: dict[str, str]) -> dict[str, int | None] | None:
     if not flow_header:
         return None
 
-    info: dict[str, int | None] = dict.fromkeys(('upload', 'download', 'total', 'expire'), 0)
-    info['expire'] = None
+    info: dict[str, int | None] = {'upload': 0, 'download': 0, 'total': 0, 'expire': None}
     for match in _FLOW_KEY_PATTERN.finditer(flow_header):
         key, value = match.group(1), int(match.group(2))
         if key in info:
@@ -116,6 +115,12 @@ def download_subscription(
     return content, parse_flow_info(response.headers)
 
 
+_VALID_INDICATORS: tuple[str, ...] = (
+    'proxies', 'proxy-providers', 'proxy-groups', 'servers',
+    'outbounds', 'endpoints', 'vmess', 'trojan', 'ssid', 'wireguard',
+)
+
+
 def validate_subscription_content(content: str, sub_name: str) -> tuple[bool, str]:
     """验证订阅内容是否有效"""
     # 检查是否为空
@@ -128,8 +133,7 @@ def validate_subscription_content(content: str, sub_name: str) -> tuple[bool, st
         return False, "返回的是网页而非订阅内容"
 
     # 检查是否为有效配置（至少有一些关键字）
-    valid_indicators = ('proxies', 'proxy-providers', 'proxy-groups', 'servers', 'outbounds', 'endpoints', 'vmess', 'trojan', 'ssid', 'wireguard')
-    if not any(indicator in content_lower for indicator in valid_indicators):
+    if not any(indicator in content_lower for indicator in _VALID_INDICATORS):
         return False, "内容不包含有效的订阅配置"
 
     return True, "有效"
@@ -625,13 +629,10 @@ def _generate_and_upload(
 ) -> str:
     """生成合并配置、providers 配置，并上传到 Gist"""
 
-    log("→ 并行生成合并配置和 providers 配置...")
+    log("→ 生成合并配置和 providers 配置...")
     sub_url_map = {sub['name']: sub['url'] for sub in subscriptions}
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        f_merged = executor.submit(merge_all_templates, subs_nodes_dict)
-        f_provider = executor.submit(generate_provider_configs, sub_url_map)
-        merged_configs = f_merged.result()
-        provider_configs = f_provider.result()
+    merged_configs = merge_all_templates(subs_nodes_dict)
+    provider_configs = generate_provider_configs(sub_url_map)
 
     for filename, content in merged_configs.items():
         files[filename] = content
