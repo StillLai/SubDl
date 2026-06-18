@@ -745,7 +745,7 @@ def main() -> None:
     _generate_and_upload(files, subs_nodes_dict, subscriptions, subscription_info, github_token, gist_id)
     log("::endgroup::")
 
-    log(f"完成! 成功处理 {len(files)} 个订阅")
+    log(f"完成! 成功处理 {valid_count} 个订阅，共 {len(files)} 个文件")
 
 
 if __name__ == "__main__":
