@@ -57,16 +57,17 @@ def parse_flow_info(headers: dict[str, str]) -> dict[str, int | None] | None:
     return info
 
 
-def format_bytes(bytes_val: int) -> str:
-    """格式化字节数"""
-    if bytes_val == 0:
+def format_bytes(n: int) -> str:
+    """将字节数格式化为人类可读字符串（B / KB / MB / GB / TB）"""
+    if n == 0:
         return "0 B"
-    units = ['B', 'KB', 'MB', 'GB', 'TB']
-    unit_idx = 0
-    while bytes_val >= 1024 and unit_idx < len(units) - 1:
-        bytes_val /= 1024
-        unit_idx += 1
-    return f"{bytes_val:.2f} {units[unit_idx]}"
+    units = ('B', 'KB', 'MB', 'GB', 'TB')
+    i = 0
+    val = float(n)
+    while val >= 1024 and i < len(units) - 1:
+        val /= 1024
+        i += 1
+    return f"{val:.2f} {units[i]}"
 
 
 def format_expire(timestamp: int | None) -> str:
