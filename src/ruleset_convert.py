@@ -11,6 +11,7 @@ import ipaddress
 import re
 from io import StringIO
 from typing import Any
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from utils import log, http_get_with_retry
 
@@ -268,20 +269,27 @@ def parse_list_file(link: str, output_directory: str) -> str | None:
 
 def main() -> None:
     with open("ruleset/ruleset_source.txt", 'r', encoding='utf-8') as links_file:
-        links = links_file.read().splitlines()
-
-    links = [l for l in links if l.strip() and not l.strip().startswith("#")]
+        links = [l.strip() for l in links_file if l.strip() and not l.strip().startswith("#")]
 
     output_dir = "./ruleset/json/"
+    os.makedirs(output_dir, exist_ok=True)
+    os.makedirs("./ruleset/srs/", exist_ok=True)
     result_file_names: list[str] = []
 
-    for link in links:
-        try:
-            result_file_name = parse_list_file(link, output_directory=output_dir)
-            if result_file_name:
-                result_file_names.append(result_file_name)
-        except Exception as e:
-            log(f"✗ 跳过 {link}: {e}")
+    log(f"→ 并行处理 {len(links)} 个规则源...")
+    with ThreadPoolExecutor(max_workers=min(len(links), 8)) as executor:
+        futures = {
+            executor.submit(parse_list_file, link, output_dir): link
+            for link in links
+        }
+        for future in as_completed(futures):
+            link = futures[future]
+            try:
+                result = future.result()
+                if result:
+                    result_file_names.append(result)
+            except Exception as e:
+                log(f"✗ 跳过 {link}: {e}")
 
     for file_name in result_file_names:
         log(file_name)
