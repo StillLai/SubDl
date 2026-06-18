@@ -13,6 +13,11 @@ concurrency:
   group: subscriptions-update
   cancel-in-progress: false
 
+# 缓存经验法则：仅当「直接下载/重新生成」比 8s cache restore 更慢时才用 actions/cache
+#   - 适合：克隆大仓库、重新生成很贵的场景
+#   - 不适合：源端本身快（PyPI / GitHub Releases / npm registry）
+#   - 当前不 cache：actions/cache post-job cleanup 8s 抵消了大部分收益
+
 permissions:
   contents: write
 
@@ -24,36 +29,18 @@ jobs:
     - uses: actions/checkout@v6
       with:
         fetch-depth: 1
-        persist-credentials: false
 
     - name: Install Python dependencies
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.x'
-        cache: 'pip'
-        cache-dependency-path: src/requirements.txt
-    - run: pip install -r src/requirements.txt
+      working-directory: src
+      run: pip install -r requirements.txt
 
     # dotenv 是 Sub-Store proxy-utils.esm.mjs 库的内部依赖，请勿移除
     - name: Install Node dependencies
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: src/package-lock.json
-    - working-directory: src
+      working-directory: src
       run: npm ci
 
-    # 缓存 Sub-Store proxy-utils，避免每次都调用 GitHub API 下载
-    - name: Cache Sub-Store dependency
-      id: cache-deps
-      uses: actions/cache@v4
-      with:
-        path: src/deps
-        key: sub-store-deps
-
+    # 预下载 Sub-Store proxy-utils，使 convert.mjs 的 checkAndUpdateDeps() 命中缓存直接跳过
     - name: Pre-download Sub-Store dependency
-      if: steps.cache-deps.outputs.cache-hit != 'true'
       env:
         GH_TOKEN: ${{ secrets.GH_TOKEN }}
       run: |
@@ -93,4 +80,4 @@ jobs:
         git config user.email "github-actions[bot]@users.noreply.github.com"
         git add README.md config_template/sing-box_template_noTun.jsonc config_template/sing-box_template_tproxy.jsonc config_template/sing-box_template_tun_for_win.jsonc
         git diff --quiet && git diff --staged --quiet || git commit -m "Update subscription info [skip ci]"
-        git push https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git HEAD:main
+        git push
