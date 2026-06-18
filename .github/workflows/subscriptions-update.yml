@@ -56,7 +56,7 @@ jobs:
           echo "::warning::Sub-Store dependency not found, convert.mjs will download it"
         fi
 
-    - name: Update subscriptions
+    - name: Build subscriptions
       env:
         GH_TOKEN: ${{ secrets.GH_TOKEN }}
         GIST_ID: ${{ secrets.GIST_ID }}

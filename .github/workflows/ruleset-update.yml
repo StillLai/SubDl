@@ -30,11 +30,12 @@ jobs:
       with:
         fetch-depth: 1
 
-    - name: Setup sing-box
+    - name: Setup environment
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         set -Eeuo pipefail
+        pip install -r src/requirements.txt &
         JSON=$(gh api repos/SagerNet/sing-box/releases/latest)
         ASSET_URL=$(echo "$JSON" | jq -r '.assets[] | select(.name | endswith("linux_amd64.deb")) | .browser_download_url')
         if [ -z "$ASSET_URL" ] || [ "$ASSET_URL" = "null" ]; then
@@ -44,12 +45,9 @@ jobs:
         fi
         wget -O sing-box.deb "$ASSET_URL"
         sudo dpkg -i sing-box.deb
+        wait
 
-    - name: Install Python dependencies
-      working-directory: src
-      run: pip install -r requirements.txt
-
-    - name: Run script
+    - name: Build rulesets
       run: python src/ruleset_convert.py
 
     - name: Upload JSON to Release

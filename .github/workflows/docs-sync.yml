@@ -25,7 +25,7 @@ jobs:
       with:
         fetch-depth: 1
 
-    - name: Sync sing-box docs
+    - name: Sync documentation
       run: |
         set -Eeuo pipefail
         git clone --depth 1 --filter=blob:none --sparse --branch reF1nd-stable https://github.com/reF1nd/sing-box.git /tmp/sing-box-reF1nd
