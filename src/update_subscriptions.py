@@ -723,10 +723,12 @@ def main() -> None:
 
     log(f"找到 {len(subscriptions)} 个订阅")
 
+    log("::group::Download & Convert subscriptions")
     with ThreadPoolExecutor(max_workers=1) as executor:
         f_templates = executor.submit(_generate_all_template_variants)
         files, subscription_info, subs_nodes_dict = _download_all_subscriptions(subscriptions, user_agent)
         f_templates.result()  # 确保模板变体也已完成
+    log("::endgroup::")
 
     valid_count = len(files)
     if valid_count == 0:
@@ -739,7 +741,9 @@ def main() -> None:
         sys.exit(1)
     log(f"✓ 合并节点: {len(subs_nodes_dict)}/{len(subscriptions)}")
 
+    log("::group::Generate configs & Upload to Gist")
     _generate_and_upload(files, subs_nodes_dict, subscriptions, subscription_info, github_token, gist_id)
+    log("::endgroup::")
 
     log(f"完成! 成功处理 {len(files)} 个订阅")
 
