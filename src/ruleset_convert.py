@@ -138,7 +138,7 @@ def _compile_srs(file_name: str) -> None:
             ["sing-box", "rule-set", "compile", "--output", srs_path, file_name],
             check=True, capture_output=True, text=True
         )
-        log(f"  ✓ SRS: {srs_filename}")
+        pass  # 成功时不打日志，由 main() 统一输出
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         log(f"  ✗ SRS 编译失败: {srs_filename} - {e}")
     except Exception as e:
@@ -291,9 +291,10 @@ def main() -> None:
             except Exception as e:
                 log(f"✗ 跳过 {link}: {e}")
 
-    log(f"✓ 共生成 {len(result_file_names)}/{len(links)} 个规则集")
+    log(f"✓ 共生成 {len(result_file_names)}/{len(links)} 个规则集（JSON + SRS）")
     for file_name in result_file_names:
-        log(f"  - {os.path.basename(file_name)}")
+        name = os.path.basename(file_name).replace('.json', '')
+        log(f"  ✓ {name}")
 
 
 if __name__ == "__main__":
