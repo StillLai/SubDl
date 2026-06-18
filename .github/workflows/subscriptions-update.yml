@@ -39,6 +39,23 @@ jobs:
       working-directory: src
       run: npm ci
 
+    # 预下载 Sub-Store proxy-utils，使 convert.mjs 的 checkAndUpdateDeps() 命中缓存直接跳过
+    - name: Pre-download Sub-Store dependency
+      env:
+        GH_TOKEN: ${{ secrets.GH_TOKEN }}
+      run: |
+        mkdir -p src/deps
+        RELEASE_JSON=$(gh api repos/sub-store-org/Sub-Store/releases/latest)
+        TAG_NAME=$(echo "$RELEASE_JSON" | jq -r '.tag_name')
+        DOWNLOAD_URL=$(echo "$RELEASE_JSON" | jq -r '.assets[] | select(.uploader.login == "github-actions[bot]" and .name == "proxy-utils.esm.mjs") | .browser_download_url')
+        if [ -n "$DOWNLOAD_URL" ] && [ "$DOWNLOAD_URL" != "null" ]; then
+          curl -sL -o src/deps/proxy-utils.esm.mjs "$DOWNLOAD_URL"
+          printf '%s\n%s' "$TAG_NAME" "$(date +%s%3N)" > src/deps/.version
+          echo "✓ Pre-downloaded proxy-utils.esm.mjs ($TAG_NAME)"
+        else
+          echo "::warning::Sub-Store dependency not found, convert.mjs will download it"
+        fi
+
     - name: Update subscriptions
       env:
         GH_TOKEN: ${{ secrets.GH_TOKEN }}

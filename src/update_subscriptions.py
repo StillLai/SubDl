@@ -19,6 +19,7 @@ from typing import Any
 from urllib.parse import urlparse
 from datetime import datetime, timezone, timedelta
 
+import copy
 import requests
 
 from utils import load_jsonc, discover_template_files, log
@@ -400,11 +401,11 @@ def merge_singbox_config(
 
 # ========== 模板生成 — 通用抽象 ==========
 
-def _generate_template_variant(suffix: str, label: str, transform_fn: Callable[[dict[str, Any]], None]) -> None:
-    """通用模板变体生成器"""
+def _generate_template_variant(suffix: str, label: str, transform_fn: Callable[[dict[str, Any]], None], base_template: dict[str, Any] | None = None) -> None:
+    """通用模板变体生成器（可复用预加载的基础模板）"""
     try:
         output_path = os.path.join(TEMPLATE_DIR, f'sing-box_template_{suffix}.jsonc')
-        template = load_jsonc(TEMPLATE_BASE)
+        template = copy.deepcopy(base_template) if base_template is not None else load_jsonc(TEMPLATE_BASE)
         transform_fn(template)
         output_content = json.dumps(template, indent=2, ensure_ascii=False)
         with open(output_path, 'w', encoding='utf-8') as f:
@@ -416,6 +417,8 @@ def _generate_template_variant(suffix: str, label: str, transform_fn: Callable[[
 
 def _generate_all_template_variants() -> None:
     """生成所有模板变体（noTun / tproxy / tun_for_win），并行处理"""
+    # 预加载基础模板一次，避免 3 个线程各自重复解析 json5
+    base_template = load_jsonc(TEMPLATE_BASE)
     variants = [
         ('noTun', 'noTun', lambda t: _remove_tun_inbounds(t)),
         ('tproxy', 'tproxy', lambda t: _replace_tun_with_tproxy(t)),
@@ -423,7 +426,7 @@ def _generate_all_template_variants() -> None:
     ]
     with ThreadPoolExecutor(max_workers=3) as executor:
         futures = [
-            executor.submit(_generate_template_variant, suffix, label, transform)
+            executor.submit(_generate_template_variant, suffix, label, transform, base_template)
             for suffix, label, transform in variants
         ]
         for future in as_completed(futures):
@@ -711,8 +714,8 @@ def main() -> None:
     gist_id = get_env_var("GIST_ID", default="")
     user_agent = get_env_var("USER_AGENT", default="clash-verge/v2.4.4")
 
-    _generate_all_template_variants()
-
+    # 并行执行：模板生成（后台线程）+ 订阅下载（主线程）
+    # 两者完全互不依赖，可同时进行
     subscriptions = parse_subscriptions()
     if not subscriptions:
         log("错误: 未找到订阅配置")
@@ -720,7 +723,10 @@ def main() -> None:
 
     log(f"找到 {len(subscriptions)} 个订阅")
 
-    files, subscription_info, subs_nodes_dict = _download_all_subscriptions(subscriptions, user_agent)
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        f_templates = executor.submit(_generate_all_template_variants)
+        files, subscription_info, subs_nodes_dict = _download_all_subscriptions(subscriptions, user_agent)
+        f_templates.result()  # 确保模板变体也已完成
 
     valid_count = len(files)
     if valid_count == 0:
