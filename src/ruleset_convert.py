@@ -97,7 +97,12 @@ def is_android_package_name(text: str) -> bool:
 def _parse_yaml_rows(yaml_data: Any) -> list[dict[str, str | None]]:
     """从 YAML 数据解析规则行"""
     rows: list[dict[str, str | None]] = []
-    items = yaml_data.get('payload', []) if isinstance(yaml_data, dict) else yaml_data.split()
+    if isinstance(yaml_data, dict):
+        items = yaml_data.get('payload', [])
+    elif isinstance(yaml_data, str):
+        items = yaml_data.split()
+    else:
+        items = yaml_data
 
     for item in items:
         address_addr = item.strip("'")
@@ -215,28 +220,23 @@ def _group_by_mapped(
     return groups
 
 
-def parse_list_file(link: str, output_directory: str) -> str | None:
-    """解析规则链接并生成 JSON/SRS 文件"""
-    out_dir = Path(output_directory)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    file_name = str(out_dir / f"{Path(link).stem}.json")
+def _handle_json_ruleset(link: str, file_name: str) -> str | None:
+    """处理已是 sing-box 格式的 JSON 规则集"""
+    try:
+        json_data = _fetch_parsed(link, 'json')
+        if isinstance(json_data, dict) and 'version' in json_data and 'rules' in json_data:
+            with open(file_name, 'w', encoding='utf-8') as output_file:
+                json.dump(prioritize_version_key(json_data), output_file, ensure_ascii=False, indent=2)
+            _compile_srs(file_name)
+            return file_name
+        logger.warn(f"  {link} 不是 sing-box 规则集格式，跳过")
+    except Exception as e:
+        logger.error(f"  处理 JSON 文件失败 {link}: {e}")
+    return None
 
-    # 如果是 .json 链接，仅处理 sing-box 规则集格式
-    if link.endswith('.json'):
-        try:
-            json_data = _fetch_parsed(link, 'json')
-            if isinstance(json_data, dict) and 'version' in json_data and 'rules' in json_data:
-                with open(file_name, 'w', encoding='utf-8') as output_file:
-                    json.dump(prioritize_version_key(json_data), output_file, ensure_ascii=False, indent=2)
-                _compile_srs(file_name)
-                return file_name
-            else:
-                logger.warn(f"  {link} 不是 sing-box 规则集格式，跳过")
-                return None
-        except Exception as e:
-            logger.error(f"  处理 JSON 文件失败 {link}: {e}")
-            return None
 
+def _convert_rules_to_json(link: str, file_name: str) -> str | None:
+    """将 Clash/Surge 等规则源转换为 sing-box JSON 并编译 SRS"""
     rows = parse_and_convert_to_rows(link)
     groups = _group_by_mapped(rows, _MAP_DICT)
 
@@ -248,22 +248,31 @@ def parse_list_file(link: str, output_directory: str) -> str | None:
         if mapped == 'domain_suffix':
             result_rules["rules"].append({'domain_suffix': addresses})
         elif mapped == 'domain':
-            filtered = [a for a in addresses if a not in domain_suffix_set]
-            domain_entries.extend(filtered)
+            domain_entries.extend(a for a in addresses if a not in domain_suffix_set)
         elif mapped in ('port', 'source_port'):
             result_rules["rules"].append({mapped: [int(a) for a in addresses]})
         else:
             result_rules["rules"].append({mapped: addresses})
 
-    domain_entries = list(set(domain_entries))
     if domain_entries:
-        result_rules["rules"].insert(0, {'domain': domain_entries})
+        result_rules["rules"].insert(0, {'domain': list(set(domain_entries))})
 
     with open(file_name, 'w', encoding='utf-8') as output_file:
         json.dump(prioritize_version_key(result_rules), output_file, ensure_ascii=False, indent=2)
 
     _compile_srs(file_name)
     return file_name
+
+
+def parse_list_file(link: str, output_directory: str) -> str | None:
+    """解析规则链接并生成 JSON/SRS 文件"""
+    out_dir = Path(output_directory)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    file_name = str(out_dir / f"{Path(link).stem}.json")
+
+    if link.endswith('.json'):
+        return _handle_json_ruleset(link, file_name)
+    return _convert_rules_to_json(link, file_name)
 
 
 def main() -> None:

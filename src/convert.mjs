@@ -10,7 +10,8 @@
  * 因此全局修改不需要 try-finally / 互斥锁等保护，不存在跨调用污染。
  */
 
-import fs from 'fs';
+import fs from 'fs/promises';
+import { existsSync, mkdirSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { JSDOM } from 'jsdom';
@@ -32,8 +33,7 @@ async function downloadFile(url, dest, headers = {}) {
     if (!resp.ok) {
         throw new Error(`下载失败: ${resp.status}`);
     }
-    const buffer = Buffer.from(await resp.arrayBuffer());
-    fs.writeFileSync(dest, buffer);
+    await fs.writeFile(dest, Buffer.from(await resp.arrayBuffer()));
 }
 
 /**
@@ -55,20 +55,36 @@ async function getLatestRelease(githubToken) {
 /**
  * 检查并更新依赖
  */
+async function fileExists(p) {
+    try { await fs.access(p); return true; }
+    catch { return false; }
+}
+
+async function getCachedVersion() {
+    if (!(await fileExists(VERSION_FILE)) || !(await fileExists(PROXY_UTILS_FILE))) {
+        return { version: '', time: 0 };
+    }
+    const cached = (await fs.readFile(VERSION_FILE, 'utf8')).trim();
+    const lines = cached.split('\n');
+    return { version: lines[0] || '', time: parseInt(lines[1] || '0', 10) };
+}
+
+async function downloadAndInstall(asset, tagName) {
+    console.error('[Convert] 下载依赖...');
+    await downloadFile(asset.browser_download_url, PROXY_UTILS_FILE + '.tmp');
+    if (await fileExists(PROXY_UTILS_FILE)) await fs.unlink(PROXY_UTILS_FILE);
+    await fs.rename(PROXY_UTILS_FILE + '.tmp', PROXY_UTILS_FILE);
+    await fs.writeFile(VERSION_FILE, `${tagName}\n${Date.now()}`);
+    console.error('[Convert] 依赖更新成功');
+}
+
 async function checkAndUpdateDeps(githubToken) {
-    // 6 小时内已检查过且本地缓存存在，跳过 GitHub API 调用
     const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
-    let cachedVersion = '';
     try {
-        if (fs.existsSync(VERSION_FILE) && fs.existsSync(PROXY_UTILS_FILE)) {
-            const cached = fs.readFileSync(VERSION_FILE, 'utf8').trim();
-            const lines = cached.split('\n');
-            cachedVersion = lines[0] || '';
-            const cachedTime = parseInt(lines[1] || '0', 10);
-            if (cachedTime && (Date.now() - cachedTime) < SIX_HOURS_MS) {
-                console.error(`[Convert] 使用缓存版本 (${cachedVersion}, ${Math.round((Date.now() - cachedTime) / 3600000)}h前检查)`);
-                return;
-            }
+        const { version: cachedVersion, time: cachedTime } = await getCachedVersion();
+        if (cachedVersion && cachedTime && (Date.now() - cachedTime) < SIX_HOURS_MS) {
+            console.error(`[Convert] 使用缓存版本 (${cachedVersion}, ${Math.round((Date.now() - cachedTime) / 3600000)}h前检查)`);
+            return;
         }
 
         console.error('[Convert] 检查 Sub-Store 依赖更新...');
@@ -76,36 +92,30 @@ async function checkAndUpdateDeps(githubToken) {
         const tagName = release.tag_name;
 
         if (cachedVersion === tagName) {
-            // 版本未变，仅刷新时间戳
-            fs.writeFileSync(VERSION_FILE, `${tagName}\n${Date.now()}`);
+            await fs.writeFile(VERSION_FILE, `${tagName}\n${Date.now()}`);
             console.error(`[Convert] 已是最新版本: ${tagName}`);
             return;
         }
 
         console.error(`[Convert] 发现新版本: ${tagName}`);
 
-        const asset = release.assets.find(a => 
-            a.uploader?.login === 'github-actions[bot]' && 
+        const asset = release.assets.find(a =>
+            a.uploader?.login === 'github-actions[bot]' &&
             a.name === PROXY_UTILS_NAME
         );
 
         if (!asset) {
-            if (!fs.existsSync(PROXY_UTILS_FILE)) throw new Error('未找到依赖文件');
-            fs.writeFileSync(VERSION_FILE, `${cachedVersion}\n${Date.now()}`);
+            if (!(await fileExists(PROXY_UTILS_FILE))) throw new Error('未找到依赖文件');
+            await fs.writeFile(VERSION_FILE, `${cachedVersion}\n${Date.now()}`);
             console.error('[Convert] 使用本地缓存版本');
             return;
         }
 
-        console.error('[Convert] 下载依赖...');
-        await downloadFile(asset.browser_download_url, PROXY_UTILS_FILE + '.tmp');
-        if (fs.existsSync(PROXY_UTILS_FILE)) fs.unlinkSync(PROXY_UTILS_FILE);
-        fs.renameSync(PROXY_UTILS_FILE + '.tmp', PROXY_UTILS_FILE);
-        fs.writeFileSync(VERSION_FILE, `${tagName}\n${Date.now()}`);
-        console.error('[Convert] 依赖更新成功');
+        await downloadAndInstall(asset, tagName);
 
     } catch (err) {
         console.error('[Convert] 检查更新失败:', err.message);
-        if (!fs.existsSync(PROXY_UTILS_FILE)) throw new Error('依赖检查失败且本地无缓存');
+        if (!(await fileExists(PROXY_UTILS_FILE))) throw new Error('依赖检查失败且本地无缓存');
         console.error('[Convert] 使用本地缓存版本');
     }
 }
@@ -188,7 +198,7 @@ async function main() {
     console.log = (...args) => console.error(...args);
 
     try {
-        if (!fs.existsSync(DEPS_DIR)) fs.mkdirSync(DEPS_DIR, { recursive: true });
+        if (!existsSync(DEPS_DIR)) mkdirSync(DEPS_DIR, { recursive: true });
         await checkAndUpdateDeps(githubToken);
 
         if (command === 'batch-convert') {
@@ -198,7 +208,7 @@ async function main() {
                 process.exit(1);
             }
             
-            const batchInput = JSON.parse(fs.readFileSync(inputFile, 'utf8'));
+            const batchInput = JSON.parse(await fs.readFile(inputFile, 'utf8'));
             const results = await batchConvertToSingbox(batchInput);
             
             // 恢复console.log，只输出JSON到stdout

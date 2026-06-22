@@ -87,7 +87,8 @@ class Logger:
 
 
 # 全局日志实例（可通过环境变量 SUBDL_LOG_LEVEL 配置）
-_log_level = {l.name: l for l in LogLevel}.get(os.environ.get('SUBDL_LOG_LEVEL', 'INFO').upper(), LogLevel.INFO)
+_level_name = os.environ.get('SUBDL_LOG_LEVEL', 'INFO').upper()
+_log_level = LogLevel[_level_name] if _level_name in LogLevel.__members__ else LogLevel.INFO
 logger = Logger(min_level=_log_level)
 
 # 兼容旧的 log() 函数
@@ -184,7 +185,7 @@ class SubscriptionInfo:
 
 # ========== 基础工具函数 ==========
 
-def load_jsonc(filepath: str | Path) -> dict[str, Any]:
+def load_jsonc(filepath: str | Path) -> Any:
     """加载 JSONC/JSON5 文件（支持 // 和 /* */ 注释）"""
     with open(filepath, 'r', encoding='utf-8') as f:
         return json5.load(f)
@@ -196,13 +197,7 @@ def discover_template_files(template_dir: str | Path) -> list[tuple[str, str]]:
     if not template_path.exists():
         return []
     
-    files: list[tuple[str, str]] = []
-    for entry in template_path.iterdir():
-        if entry.suffix not in ('.json', '.jsonc'):
-            continue
-        files.append((str(entry), entry.stem))
-
-    # 基础模板恒在首位，其余按字母序排列
+    files = [(str(e), e.stem) for e in template_path.iterdir() if e.suffix in ('.json', '.jsonc')]
     files.sort(key=lambda e: (e[1] != "sing-box_template", e[1]))
 
     return files

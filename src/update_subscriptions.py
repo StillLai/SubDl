@@ -49,18 +49,16 @@ def parse_flow_info(headers: dict[str, str]) -> FlowInfo | None:
     if not flow_header:
         return None
 
-    info: dict[str, int | None] = {'upload': 0, 'download': 0, 'total': 0, 'expire': None}
+    upload = download = total = 0
+    expire: int | None = None
     for match in _FLOW_KEY_PATTERN.finditer(flow_header):
         key, value = match.group(1), int(match.group(2))
-        if key in info:
-            info[key] = value
+        if key == 'upload': upload = value
+        elif key == 'download': download = value
+        elif key == 'total': total = value
+        elif key == 'expire': expire = value
 
-    return FlowInfo(
-        upload=info['upload'] or 0,  # type: ignore[arg-type]
-        download=info['download'] or 0,  # type: ignore[arg-type]
-        total=info['total'] or 0,  # type: ignore[arg-type]
-        expire=info['expire'],  # type: ignore[arg-type]
-    )
+    return FlowInfo(upload=upload, download=download, total=total, expire=expire)
 
 
 # ========== 订阅验证 ==========
@@ -117,7 +115,8 @@ def parse_subscriptions() -> list[Subscription]:
                         sub = _parse_single_entry(item)
                         if sub:
                             subscriptions.append(sub)
-                return subscriptions
+                if subscriptions:
+                    return subscriptions
         except json.JSONDecodeError as e:
             logger.warn(f"  SUB_URLS 解析失败，回退到 SUB_URL_N 模式: {e}")
 
@@ -263,7 +262,8 @@ def _aggregate_results(
             continue
 
         # 保存原始内容
-        files[result.filename] = result.raw_content  # type: ignore[assignment]
+        assert result.raw_content is not None
+        files[result.filename] = result.raw_content
 
         # 处理转换结果
         singbox_config = converted.get(result.name)
