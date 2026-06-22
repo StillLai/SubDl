@@ -52,6 +52,13 @@ def process_providers(
     4. 应用 include/exclude 筛选
     5. 将 providers 字段替换为展开的节点标签列表
     6. 从最终配置中移除 providers 字段
+
+    ⚠️ 前缀一致性约束：
+       subscriptions_nodes 的 key 是 sub_name（即 provider 的 tag），
+       merge_config 步骤 1 中会给所有节点 tag 加上 "{sub_name}/" 前缀
+       再追加到 outbounds。因此本函数展开 provider 引用时，也必须使用
+       相同的 "{provider_tag}/{node_tag}" 格式，否则 selector 中的引用
+       会指向不存在的节点 tag，导致路由失效。
     """
     if 'providers' not in config or not isinstance(config['providers'], list):
         return
@@ -59,7 +66,10 @@ def process_providers(
     providers: list[dict[str, Any]] = config['providers']
     provider_nodes: dict[str, list[str]] = {}  # provider_tag -> [节点标签列表]
 
-    # 展开每个 provider 的节点（tag 需带 sub_name 前缀，与 merge_config 步骤 1 一致）
+    # 展开每个 provider 的节点，tag 必须带 "{sub_name}/" 前缀：
+    #   - subscriptions_nodes 的 key 就是 sub_name（等于 provider tag）
+    #   - merge_config 步骤 1 中所有节点 tag 都会加上 "{sub_name}/" 前缀
+    #   - 这里必须用相同的前缀格式，否则 selector 引用会断裂
     for provider in providers:
         tag: str = provider.get('tag', '')
         if tag in subscriptions_nodes:
@@ -92,6 +102,8 @@ def process_providers(
                 ))
         outbound['outbounds'] = fixed_outbounds + expanded
 
+    # 移除 providers 字段：本函数走"节点全部展开"路径，不再需要 providers 引用。
+    # 带 providers 的配置版本由 generate_provider_configs() 单独生成。
     del config['providers']
 
 
