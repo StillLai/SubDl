@@ -25,11 +25,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone, timedelta
 from typing import Any
 
-import requests
-
 from utils import (
     logger, load_jsonc, discover_template_files,
-    http_get_with_retry, try_decode_base64,
+    http_get_with_retry, http_request, try_decode_base64,
     FlowInfo, Subscription, DownloadResult, SubscriptionInfo,
     format_bytes, format_expire, get_env_var,
     PROJECT_ROOT, TEMPLATE_DIR, WORKFLOW_PATH,
@@ -126,7 +124,7 @@ def _download_subscription(sub: Subscription, user_agent: str) -> DownloadResult
     """下载单个订阅，返回结果"""
     try:
         headers = {"User-Agent": user_agent}
-        response = http_get_with_retry(sub.url, headers=headers, allow_redirects=True)
+        response = http_get_with_retry(sub.url, headers=headers)
         content = response.text
 
         # 尝试 Base64 解码
@@ -525,32 +523,31 @@ def generate_readme(subscription_info: list[SubscriptionInfo]) -> str:
 
 def upload_to_gist(github_token: str, gist_id: str, files: dict[str, str]) -> str:
     """上传文件到 GitHub Gist"""
+    from urllib.error import HTTPError as UrllibHTTPError
+
     headers = {"Authorization": f"token {github_token}", "Accept": "application/vnd.github.v3+json"}
     gist_files = {name: {"content": content} for name, content in files.items()}
 
     try:
         if not gist_id:
             logger.info("    创建新的 Gist...")
-            resp = requests.post("https://api.github.com/gists", headers=headers, json={
+            resp = http_request("POST", "https://api.github.com/gists", headers=headers, json_body={
                 "description": "SubDl Subscriptions", "public": False, "files": gist_files
-            }, timeout=30)
+            })
             resp.raise_for_status()
-            new_id: str = resp.json()["id"]
+            new_id: str = json.loads(resp.text)["id"]
             logger.info(f"    ✓ 创建成功，Gist ID: {new_id}")
             return new_id
 
         logger.info(f"    更新 Gist: {gist_id}")
-        resp = requests.patch(
-            f"https://api.github.com/gists/{gist_id}",
-            headers=headers, json={"files": gist_files}, timeout=30
-        )
+        resp = http_request("PATCH", f"https://api.github.com/gists/{gist_id}", headers=headers, json_body={"files": gist_files})
         resp.raise_for_status()
         logger.info("    ✓ 更新成功")
         return gist_id
 
-    except requests.exceptions.HTTPError as e:
+    except UrllibHTTPError as e:
         logger.error(f"    Gist API 错误: {e}")
-        logger.error(f"      响应: {e.response.text if hasattr(e, 'response') and e.response is not None else 'N/A'}")
+        logger.error(f"      响应: {e.read().decode('utf-8', errors='replace')}")
         raise
     except Exception as e:
         logger.error(f"    Gist 上传异常: {e}")

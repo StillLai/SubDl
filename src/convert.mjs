@@ -6,8 +6,7 @@
  *
  * ═══ 架构前提 ═══
  * 本脚本每次由 Python 侧 subprocess.run 启动为全新的 Node 进程，
- * 进程退出时所有全局状态（global 变量、console.log 重定向等）自动清理。
- * 因此全局修改不需要 try-finally / 互斥锁等保护，不存在跨调用污染。
+ * 进程退出时所有全局状态自动清理，不存在跨调用污染。
  */
 
 import fs from 'fs/promises';
@@ -25,65 +24,66 @@ const VERSION_FILE = path.join(DEPS_DIR, '.version');
 const RELEASES_API = 'https://api.github.com/repos/sub-store-org/Sub-Store/releases/latest';
 const PROXY_UTILS_NAME = 'proxy-utils.esm.mjs';
 
-/**
- * 下载文件
- */
-async function downloadFile(url, dest, headers = {}) {
-    const resp = await fetch(url, { headers });
-    if (!resp.ok) {
-        throw new Error(`下载失败: ${resp.status}`);
-    }
-    await fs.writeFile(dest, Buffer.from(await resp.arrayBuffer()));
-}
+// 可通过环境变量配置缓存 TTL（毫秒），默认 6 小时
+const CACHE_TTL_MS = parseInt(process.env.SUB_STORE_CACHE_TTL || '21600000', 10);
 
 /**
- * 获取GitHub Releases信息
+ * 获取 GitHub Releases 最新信息
  */
 async function getLatestRelease(githubToken) {
     const headers = {
         'User-Agent': 'SubDl-Converter',
-        'Accept': 'application/vnd.github.v3+json'
+        'Accept': 'application/vnd.github.v3+json',
     };
     if (githubToken) headers['Authorization'] = `token ${githubToken}`;
 
     const resp = await fetch(RELEASES_API, { headers });
-    if (resp.status === 403) throw new Error('API限流');
-    if (!resp.ok) throw new Error(`API请求失败: ${resp.status}`);
+    if (resp.status === 403) throw new Error('GitHub API 限流 (403)');
+    if (!resp.ok) throw new Error(`GitHub API 请求失败: ${resp.status}`);
     return resp.json();
 }
 
 /**
- * 检查并更新依赖
+ * 缓存版本读写
  */
-async function fileExists(p) {
-    try { await fs.access(p); return true; }
-    catch { return false; }
-}
-
 async function getCachedVersion() {
-    if (!(await fileExists(VERSION_FILE)) || !(await fileExists(PROXY_UTILS_FILE))) {
+    try {
+        const cached = (await fs.readFile(VERSION_FILE, 'utf8')).trim();
+        const [version, timeStr] = cached.split('\n');
+        return { version: version || '', time: parseInt(timeStr || '0', 10) };
+    } catch {
         return { version: '', time: 0 };
     }
-    const cached = (await fs.readFile(VERSION_FILE, 'utf8')).trim();
-    const lines = cached.split('\n');
-    return { version: lines[0] || '', time: parseInt(lines[1] || '0', 10) };
 }
 
+/**
+ * 下载并安装 Sub-Store 依赖
+ */
 async function downloadAndInstall(asset, tagName) {
-    console.error('[Convert] 下载依赖...');
-    await downloadFile(asset.browser_download_url, PROXY_UTILS_FILE + '.tmp');
-    if (await fileExists(PROXY_UTILS_FILE)) await fs.unlink(PROXY_UTILS_FILE);
-    await fs.rename(PROXY_UTILS_FILE + '.tmp', PROXY_UTILS_FILE);
+    console.error(`[Convert] 下载依赖 ${tagName}...`);
+    const tmpFile = PROXY_UTILS_FILE + '.tmp';
+    const resp = await fetch(asset.browser_download_url);
+    if (!resp.ok) throw new Error(`下载失败: ${resp.status}`);
+    await fs.writeFile(tmpFile, Buffer.from(await resp.arrayBuffer()));
+    await fs.rename(tmpFile, PROXY_UTILS_FILE);
     await fs.writeFile(VERSION_FILE, `${tagName}\n${Date.now()}`);
     console.error('[Convert] 依赖更新成功');
 }
 
+/**
+ * 检查并更新 Sub-Store 依赖（带本地缓存）
+ */
 async function checkAndUpdateDeps(githubToken) {
-    const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
+    const hasLocal = existsSync(PROXY_UTILS_FILE);
+
     try {
         const { version: cachedVersion, time: cachedTime } = await getCachedVersion();
-        if (cachedVersion && cachedTime && (Date.now() - cachedTime) < SIX_HOURS_MS) {
-            console.error(`[Convert] 使用缓存版本 (${cachedVersion}, ${Math.round((Date.now() - cachedTime) / 3600000)}h前检查)`);
+        const age = Date.now() - cachedTime;
+
+        // 缓存未过期，直接使用
+        if (cachedVersion && cachedTime && age < CACHE_TTL_MS) {
+            const hours = Math.round(age / 3600000);
+            console.error(`[Convert] 使用缓存版本 (${cachedVersion}, ${hours}h 前检查)`);
             return;
         }
 
@@ -91,6 +91,7 @@ async function checkAndUpdateDeps(githubToken) {
         const release = await getLatestRelease(githubToken);
         const tagName = release.tag_name;
 
+        // 版本未变，仅刷新时间戳
         if (cachedVersion === tagName) {
             await fs.writeFile(VERSION_FILE, `${tagName}\n${Date.now()}`);
             console.error(`[Convert] 已是最新版本: ${tagName}`);
@@ -105,17 +106,18 @@ async function checkAndUpdateDeps(githubToken) {
         );
 
         if (!asset) {
-            if (!(await fileExists(PROXY_UTILS_FILE))) throw new Error('未找到依赖文件');
+            if (!hasLocal) throw new Error('未找到依赖文件且本地无缓存');
+            // 有本地缓存时刷新时间戳避免下次再请求
             await fs.writeFile(VERSION_FILE, `${cachedVersion}\n${Date.now()}`);
-            console.error('[Convert] 使用本地缓存版本');
+            console.error('[Convert] 未找到新版本资产，使用本地缓存');
             return;
         }
 
         await downloadAndInstall(asset, tagName);
 
     } catch (err) {
-        console.error('[Convert] 检查更新失败:', err.message);
-        if (!(await fileExists(PROXY_UTILS_FILE))) throw new Error('依赖检查失败且本地无缓存');
+        console.error(`[Convert] 更新检查失败: ${err.message}`);
+        if (!hasLocal) throw new Error('依赖检查失败且本地无缓存');
         console.error('[Convert] 使用本地缓存版本');
     }
 }
@@ -140,47 +142,41 @@ async function batchConvertToSingbox(batchInput) {
         catch { Object.defineProperty(global, key, { value, configurable: true, writable: true, enumerable: true }); }
     };
 
-    // 注入 require
-    // NOTE: dotenv 是 proxy-utils.esm.mjs (Sub-Store 模块) 内部 require('dotenv') 的隐式依赖，
-    //       不是本项目自身使用的。如需移除，请先确认 Sub-Store 模块不再需要。
+    // 注入 require（Sub-Store 内部隐式依赖 dotenv）
     const { createRequire } = await import('module');
     setGlobal('require', createRequire(PROXY_UTILS_FILE));
 
     // 创建 jsdom 环境
     const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
         url: 'https://localhost',
-        pretendToBeVisual: true
+        pretendToBeVisual: true,
     });
     for (const key of DOM_KEYS) {
         setGlobal(key, key === 'document' ? dom.window.document : key === 'location' ? dom.window.location : dom.window);
     }
 
-    const modulePath = 'file://' + PROXY_UTILS_FILE;
-
     try {
-        const { parse, produce } = await import(modulePath);
-        console.error('[Convert] 模块加载成功，开始批量转换');
+        const { parse, produce } = await import('file://' + PROXY_UTILS_FILE);
+        console.error(`[Convert] 模块加载成功，开始转换 ${Object.keys(batchInput).length} 个订阅`);
 
         const results = {};
         for (const [name, clashContent] of Object.entries(batchInput)) {
             try {
                 results[name] = JSON.parse(produce(parse(clashContent), 'singbox'));
-                console.error(`[Convert]   ✓ ${name} 转换成功`);
+                console.error(`[Convert]   ✓ ${name}`);
             } catch (err) {
-                console.error(`[Convert]   ✗ ${name} 转换失败: ${err.message}`);
+                console.error(`[Convert]   ✗ ${name}: ${err.message}`);
                 results[name] = null;
             }
         }
         return results;
     } finally {
-        // 恢复原始全局变量状态
+        // 恢复原始全局变量
         for (const key of GLOBAL_KEYS) {
-            if (originals.has(key)) {
-                setGlobal(key, originals.get(key));
-            } else {
-                delete global[key];
-            }
+            if (originals.has(key)) setGlobal(key, originals.get(key));
+            else delete global[key];
         }
+        dom.window.close();
     }
 }
 
@@ -192,35 +188,33 @@ async function main() {
     const command = args[0];
     const githubToken = process.env.GH_TOKEN || '';
 
-    const USAGE = '用法: node convert.mjs batch-convert <input-file>';
-
-    // 将所有日志输出到stderr，stdout只输出JSON结果。
+    // 所有日志输出到 stderr，stdout 只输出 JSON 结果
     const originalLog = console.log;
-    console.log = (...args) => console.error(...args);
+    console.log = (...a) => console.error(...a);
 
     try {
         if (!existsSync(DEPS_DIR)) mkdirSync(DEPS_DIR, { recursive: true });
         await checkAndUpdateDeps(githubToken);
 
-        if (command === 'batch-convert') {
-            const inputFile = args[1];
-            if (!inputFile) {
-                console.error(USAGE);
-                process.exit(1);
-            }
-            
-            const batchInput = JSON.parse(await fs.readFile(inputFile, 'utf8'));
-            const results = await batchConvertToSingbox(batchInput);
-            
-            // 恢复console.log，只输出JSON到stdout
-            console.log = originalLog;
-            console.log(JSON.stringify(results));
-        } else {
-            console.error(USAGE);
+        if (command !== 'batch-convert') {
+            console.error('用法: node convert.mjs batch-convert <input-file>');
             process.exit(1);
         }
+
+        const inputFile = args[1];
+        if (!inputFile) {
+            console.error('用法: node convert.mjs batch-convert <input-file>');
+            process.exit(1);
+        }
+
+        const batchInput = JSON.parse(await fs.readFile(inputFile, 'utf8'));
+        const results = await batchConvertToSingbox(batchInput);
+
+        // 恢复 console.log，只输出 JSON 到 stdout
+        console.log = originalLog;
+        console.log(JSON.stringify(results));
     } catch (err) {
-        console.error('[Convert] 错误:', err.message);
+        console.error(`[Convert] 错误: ${err.message}`);
         console.error(err.stack);
         process.exit(1);
     }

@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import base64
+import json
 import os
 import re
 import sys
@@ -13,12 +14,14 @@ import time
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
+from http.client import HTTPResponse
 from pathlib import Path
 from typing import Any, IO
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 
 import json5  # type: ignore[import-untyped]
-import requests
 
 
 # ========== 路径常量 ==========
@@ -64,25 +67,20 @@ class Logger:
         self.file = file
     
     def _log(self, level: LogLevel, msg: str) -> None:
-        """内部日志输出"""
         if level.value >= self.min_level.value:
             prefix = f"[{level.name}]" if level != LogLevel.INFO else ""
             print(f"{prefix} {msg}" if prefix else msg, file=self.file)
     
     def debug(self, msg: str) -> None:
-        """调试信息"""
         self._log(LogLevel.DEBUG, msg)
     
     def info(self, msg: str) -> None:
-        """普通信息"""
         self._log(LogLevel.INFO, msg)
     
     def warn(self, msg: str) -> None:
-        """警告信息"""
         self._log(LogLevel.WARN, msg)
     
     def error(self, msg: str) -> None:
-        """错误信息"""
         self._log(LogLevel.ERROR, msg)
 
 
@@ -102,34 +100,28 @@ class FlowInfo:
     
     @property
     def used(self) -> int:
-        """已用流量"""
         return self.upload + self.download
     
     @property
     def remaining(self) -> int:
-        """剩余流量"""
         return max(0, self.total - self.used)
     
     @property
     def is_expired(self) -> bool:
-        """是否已过期"""
         return bool(self.expire and self.expire < time.time())
     
     @property
     def is_expiring_soon(self) -> bool:
-        """是否即将过期（7天内）"""
         if not self.expire:
             return False
         return self.expire - time.time() < 7 * 24 * 3600
     
     @property
     def is_traffic_exhausted(self) -> bool:
-        """流量是否用完"""
         return self.total > 0 and self.used >= self.total
     
     @property
     def status(self) -> str:
-        """获取状态描述"""
         if self.is_expired:
             return "❌ 已过期"
         if self.is_traffic_exhausted:
@@ -148,7 +140,6 @@ class Subscription:
     
     @classmethod
     def from_url(cls, url: str, name: str | None = None) -> Subscription:
-        """从 URL 创建订阅"""
         if name is None:
             name = _extract_name_from_url(url)
         return cls(name=name, url=url, filename=f"{name}.yaml")
@@ -206,7 +197,6 @@ def try_decode_base64(content: str) -> str:
     try:
         cleaned = ''.join(content.split())
         if cleaned and _B64_PATTERN.match(cleaned):
-            # 利用负数取模特性自动补零：-len % 4 在整除时返回 0
             cleaned += "=" * (-len(cleaned) % 4)
             return base64.b64decode(cleaned).decode("utf-8")
     except Exception:
@@ -214,64 +204,103 @@ def try_decode_base64(content: str) -> str:
     return content
 
 
-# ========== 网络请求 ==========
+# ========== 网络请求（基于 urllib，无第三方依赖） ==========
 
 @dataclass
-class RetryConfig:
-    """重试配置"""
-    max_retries: int = HTTP_RETRY
-    backoff_factor: int = 2
-    retryable_status_codes: frozenset[int] = frozenset({429, 500, 502, 503, 504})
-    timeout: int = HTTP_TIMEOUT
+class HttpResponse:
+    """轻量 HTTP 响应封装，兼容 requests.Response 的常用接口"""
+    status_code: int
+    text: str
+    headers: dict[str, str]
+    
+    def raise_for_status(self) -> None:
+        if 400 <= self.status_code < 600:
+            raise HTTPError(url='', code=self.status_code, msg=f"HTTP {self.status_code}", hdrs=None, fp=None)
+
+
+_RETRYABLE_CODES: frozenset[int] = frozenset({429, 500, 502, 503, 504})
+
+
+def http_get(
+    url: str,
+    *,
+    headers: dict[str, str] | None = None,
+    timeout: int = HTTP_TIMEOUT,
+    allow_redirects: bool = True,
+) -> HttpResponse:
+    """使用 urllib 发送 GET 请求"""
+    req = Request(url, headers=headers or {}, method='GET')
+    if not allow_redirects:
+        # urllib 默认跟随重定向，通过自定义 opener 禁用
+        import urllib.request
+        opener = urllib.request.OpenerDirector()
+        opener.add_handler(urllib.request.HTTPHandler())
+        opener.add_handler(urllib.request.HTTPSHandler())
+        resp: HTTPResponse = opener.open(req, timeout=timeout)
+    else:
+        resp = urlopen(req, timeout=timeout)
+    
+    raw_headers = dict(resp.headers.items())
+    body = resp.read().decode('utf-8', errors='replace')
+    return HttpResponse(status_code=resp.status, text=body, headers=raw_headers)
 
 
 def http_get_with_retry(
     url: str,
-    retry_config: RetryConfig | None = None,
-    **kwargs: Any
-) -> requests.Response:
-    """HTTP GET with timeout and exponential backoff retry
-    
-    Args:
-        url: 请求 URL
-        retry_config: 重试配置，None 使用默认配置
-        **kwargs: 传递给 requests.get 的其他参数
-    
-    Returns:
-        requests.Response: 响应对象
-    
-    Raises:
-        requests.RequestException: 所有重试失败后抛出最后的异常
-    """
-    if retry_config is None:
-        retry_config = RetryConfig()
-    
-    kwargs.setdefault("timeout", retry_config.timeout)
+    *,
+    headers: dict[str, str] | None = None,
+    timeout: int = HTTP_TIMEOUT,
+    allow_redirects: bool = True,
+    max_retries: int = HTTP_RETRY,
+    backoff_factor: int = 2,
+) -> HttpResponse:
+    """HTTP GET with exponential backoff retry"""
     last_error: Exception | None = None
     
-    for attempt in range(1, retry_config.max_retries + 1):
+    for attempt in range(1, max_retries + 1):
         try:
             if attempt > 1:
-                sleep_time = retry_config.backoff_factor ** (attempt - 1)
-                logger.debug(f"  重试 {attempt}/{retry_config.max_retries}，等待 {sleep_time}s...")
+                sleep_time = backoff_factor ** (attempt - 1)
+                logger.debug(f"  重试 {attempt}/{max_retries}，等待 {sleep_time}s...")
                 time.sleep(sleep_time)
             
-            resp = requests.get(url, **kwargs)
+            resp = http_get(url, headers=headers, timeout=timeout, allow_redirects=allow_redirects)
             
-            # 检查是否需要重试的状态码
-            if resp.status_code in retry_config.retryable_status_codes:
-                raise requests.HTTPError(f"HTTP {resp.status_code}")
+            if resp.status_code in _RETRYABLE_CODES:
+                raise HTTPError(url='', code=resp.status_code, msg=f"HTTP {resp.status_code}", hdrs=None, fp=None)
             
             resp.raise_for_status()
             return resp
             
-        except requests.RequestException as e:
+        except (HTTPError, URLError, OSError) as e:
             last_error = e
             logger.debug(f"  请求失败: {e}")
     
-    assert last_error is not None, "重试循环应至少执行一次"
+    assert last_error is not None
     raise last_error
 
+
+def http_request(
+    method: str,
+    url: str,
+    *,
+    headers: dict[str, str] | None = None,
+    json_body: Any = None,
+    timeout: int = HTTP_TIMEOUT,
+) -> HttpResponse:
+    """通用 HTTP 请求（支持 POST/PATCH 等，用于 Gist API 等）"""
+    data = json.dumps(json_body).encode('utf-8') if json_body is not None else None
+    req = Request(url, data=data, headers=headers or {}, method=method)
+    if json_body is not None:
+        req.add_header('Content-Type', 'application/json')
+    
+    resp = urlopen(req, timeout=timeout)
+    raw_headers = dict(resp.headers.items())
+    body = resp.read().decode('utf-8', errors='replace')
+    return HttpResponse(status_code=resp.status, text=body, headers=raw_headers)
+
+
+# ========== 格式化工具 ==========
 
 def format_bytes(n: int) -> str:
     """将字节数格式化为人类可读字符串（B / KB / MB / GB / TB）"""
@@ -283,7 +312,6 @@ def format_bytes(n: int) -> str:
 
 
 def format_expire(timestamp: int | None) -> str:
-    """格式化到期时间"""
     if not timestamp:
         return "无"
     try:
@@ -296,7 +324,6 @@ _DOMAIN_SANITIZE_RE: re.Pattern[str] = re.compile(r'[^a-zA-Z0-9_-]')
 
 
 def _extract_name_from_url(url: str) -> str:
-    """从 URL 提取域名作为订阅名称"""
     try:
         domain = urlparse(url).netloc.replace("www.", "").split(":")[0]
         name = _DOMAIN_SANITIZE_RE.sub('_', domain)
