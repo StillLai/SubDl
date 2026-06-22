@@ -127,6 +127,7 @@ async function checkAndUpdateDeps(githubToken) {
  */
 async function batchConvertToSingbox(batchInput) {
     const GLOBAL_KEYS = ['require', 'window', 'document', 'self', 'navigator', 'location'];
+    const DOM_KEYS = GLOBAL_KEYS.filter(key => key !== 'require');
 
     // 保存原始全局变量状态
     const originals = new Map();
@@ -150,7 +151,7 @@ async function batchConvertToSingbox(batchInput) {
         url: 'https://localhost',
         pretendToBeVisual: true
     });
-    for (const key of ['window', 'document', 'self', 'navigator', 'location']) {
+    for (const key of DOM_KEYS) {
         setGlobal(key, key === 'document' ? dom.window.document : key === 'location' ? dom.window.location : dom.window);
     }
 

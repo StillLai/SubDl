@@ -15,7 +15,7 @@ from typing import Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from utils import (
-    logger, log, http_get_with_retry,
+    logger, http_get_with_retry,
     RULESET_SOURCE, RULESET_JSON_DIR, RULESET_SRS_DIR,
 )
 
@@ -286,7 +286,7 @@ def main() -> None:
     RULESET_SRS_DIR.mkdir(parents=True, exist_ok=True)
 
     result_file_names: list[str] = []
-    log(f"→ 并行处理 {len(links)} 个规则源...")
+    logger.info(f"→ 并行处理 {len(links)} 个规则源...")
 
     with ThreadPoolExecutor(max_workers=min(len(links), 8)) as executor:
         futures = {
@@ -302,7 +302,7 @@ def main() -> None:
             except Exception as e:
                 logger.error(f"  跳过 {link}: {e}")
 
-    log(f"✓ 共生成 {len(result_file_names)}/{len(links)} 个规则集（JSON + SRS）")
+    logger.info(f"✓ 共生成 {len(result_file_names)}/{len(links)} 个规则集（JSON + SRS）")
     for file_name in result_file_names:
         logger.info(f"  ✓ {Path(file_name).stem}")
 

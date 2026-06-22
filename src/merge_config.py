@@ -16,7 +16,7 @@ import copy
 import re
 from typing import Any
 
-from utils import logger, log
+from utils import logger
 
 
 def filter_nodes_by_regex(
@@ -116,7 +116,7 @@ def _ensure_compatible_outbound(outbounds: list[Any]) -> None:
     )
     if not has_compatible:
         outbounds.append({"tag": "Compatible", "type": "direct"})
-        log("[Merge] 已添加 Compatible outbound 定义")
+        logger.info("[Merge] 已添加 Compatible outbound 定义")
 
 
 def _fix_empty_selector_outbounds(outbounds: list[Any]) -> None:
@@ -145,25 +145,24 @@ def merge_config(
     all_nodes: list[dict[str, Any]] = []
     for sub_name, nodes in subscriptions_nodes.items():
         for node in nodes:
-            if isinstance(node, dict) and 'tag' in node:
-                node_copy = copy.deepcopy(node)
-                node_copy['tag'] = f"{sub_name}/{node_copy['tag']}"
-                all_nodes.append(node_copy)
-            else:
-                all_nodes.append(node)
-    log(f"[Merge] 已收集 {len(all_nodes)} 个节点并添加订阅前缀")
+            if not isinstance(node, dict):
+                continue
+            node_copy = copy.deepcopy(node)
+            node_copy['tag'] = f"{sub_name}/{node_copy['tag']}" if 'tag' in node_copy else node_copy.get('tag', '')
+            all_nodes.append(node_copy)
+    logger.info(f"[Merge] 已收集 {len(all_nodes)} 个节点并添加订阅前缀")
 
     # 步骤 2: 处理 providers 配置
     if 'providers' in config:
         process_providers(config, subscriptions_nodes)
-        log("[Merge] 已处理 providers 配置")
+        logger.info("[Merge] 已处理 providers 配置")
 
     # 步骤 3: 移除所有 include 和 exclude 字段
     remove_filter_fields(outbounds)
 
     # 步骤 4: 将代理节点添加到 outbounds 末尾
     outbounds.extend(all_nodes)
-    log(f"[Merge] 已添加 {len(all_nodes)} 个代理节点到配置")
+    logger.info(f"[Merge] 已添加 {len(all_nodes)} 个代理节点到配置")
 
     # 步骤 5: 处理空 outbound 的兼容性问题
     _fix_empty_selector_outbounds(outbounds)

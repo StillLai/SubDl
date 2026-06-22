@@ -86,13 +86,8 @@ class Logger:
         self._log(LogLevel.ERROR, msg)
 
 
-# 全局日志实例（可通过环境变量 SUBDL_LOG_LEVEL 配置）
-_level_name = os.environ.get('SUBDL_LOG_LEVEL', 'INFO').upper()
-_log_level = LogLevel[_level_name] if _level_name in LogLevel.__members__ else LogLevel.INFO
-logger = Logger(min_level=_log_level)
-
-# 兼容旧的 log() 函数
-log = logger.info
+# 全局日志实例
+logger = Logger(min_level=LogLevel.INFO)
 
 
 # ========== 数据模型 ==========
@@ -274,7 +269,8 @@ def http_get_with_retry(
             last_error = e
             logger.debug(f"  请求失败: {e}")
     
-    raise last_error  # type: ignore[misc]
+    assert last_error is not None, "重试循环应至少执行一次"
+    raise last_error
 
 
 def format_bytes(n: int) -> str:
@@ -296,11 +292,14 @@ def format_expire(timestamp: int | None) -> str:
         return "无"
 
 
+_DOMAIN_SANITIZE_RE: re.Pattern[str] = re.compile(r'[^a-zA-Z0-9_-]')
+
+
 def _extract_name_from_url(url: str) -> str:
     """从 URL 提取域名作为订阅名称"""
     try:
         domain = urlparse(url).netloc.replace("www.", "").split(":")[0]
-        name = re.sub(r'[^a-zA-Z0-9_-]', '_', domain)
+        name = _DOMAIN_SANITIZE_RE.sub('_', domain)
         return name[:50] if name else f"unknown_{int(time.time())}"
     except Exception:
         return f"unknown_{int(time.time())}"
