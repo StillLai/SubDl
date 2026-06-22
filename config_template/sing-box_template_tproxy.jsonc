@@ -949,9 +949,7 @@
       "type": "urltest",
       "tag": "🗂️ 备用自动",
       "url": "https://cp.cloudflare.com",
-      "providers": [
-        "山海"
-      ]
+      "use_all_providers": true
     },
     {
       "type": "urltest",
