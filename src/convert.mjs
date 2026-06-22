@@ -12,8 +12,6 @@
 
 import fs from 'fs';
 import path from 'path';
-import http from 'http';
-import https from 'https';
 import { fileURLToPath } from 'url';
 import { JSDOM } from 'jsdom';
 
@@ -29,63 +27,29 @@ const PROXY_UTILS_NAME = 'proxy-utils.esm.mjs';
 /**
  * 下载文件
  */
-function downloadFile(url, dest, headers = {}, maxRedirects = 5) {
-    const client = url.startsWith('https') ? https : http;
-    return new Promise((resolve, reject) => {
-        const file = fs.createWriteStream(dest);
-        const cleanup = () => {
-            file.close(() => { if (fs.existsSync(dest)) fs.unlinkSync(dest); });
-        };
-
-        client.get(url, { headers, timeout: 30000 }, (response) => {
-            if (response.statusCode === 302 || response.statusCode === 301) {
-                if (maxRedirects <= 0) {
-                    cleanup();
-                    reject(new Error('重定向次数过多'));
-                    return;
-                }
-                cleanup();
-                downloadFile(response.headers.location, dest, headers, maxRedirects - 1).then(resolve).catch(reject);
-                return;
-            }
-            if (response.statusCode !== 200) {
-                cleanup();
-                reject(new Error(`下载失败: ${response.statusCode}`));
-                return;
-            }
-            response.pipe(file);
-            file.on('finish', () => file.close(resolve));
-        }).on('error', (err) => { cleanup(); reject(err); });
-    });
+async function downloadFile(url, dest, headers = {}) {
+    const resp = await fetch(url, { headers });
+    if (!resp.ok) {
+        throw new Error(`下载失败: ${resp.status}`);
+    }
+    const buffer = Buffer.from(await resp.arrayBuffer());
+    fs.writeFileSync(dest, buffer);
 }
 
 /**
  * 获取GitHub Releases信息
  */
-function getLatestRelease(githubToken) {
-    return new Promise((resolve, reject) => {
-        const headers = {
-            'User-Agent': 'SubDl-Converter',
-            'Accept': 'application/vnd.github.v3+json'
-        };
-        if (githubToken) headers['Authorization'] = `token ${githubToken}`;
+async function getLatestRelease(githubToken) {
+    const headers = {
+        'User-Agent': 'SubDl-Converter',
+        'Accept': 'application/vnd.github.v3+json'
+    };
+    if (githubToken) headers['Authorization'] = `token ${githubToken}`;
 
-        https.get(RELEASES_API, { headers }, (response) => {
-            let data = '';
-            if (response.statusCode === 403) {
-                reject(new Error('API限流'));
-                return;
-            }
-            if (response.statusCode !== 200) {
-                reject(new Error(`API请求失败: ${response.statusCode}`));
-                return;
-            }
-            response.on('data', (chunk) => data += chunk);
-            response.on('end', () => {
-                try { resolve(JSON.parse(data)); } catch (e) { reject(e); }
-            });
-        }).on('error', reject);
-    });
+    const resp = await fetch(RELEASES_API, { headers });
+    if (resp.status === 403) throw new Error('API限流');
+    if (!resp.ok) throw new Error(`API请求失败: ${resp.status}`);
+    return resp.json();
 }
 
 /**

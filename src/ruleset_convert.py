@@ -61,13 +61,8 @@ def is_android_package_name(text: str) -> bool:
         return False
 
     parts = text.split('.')
-    for part in parts:
-        if not part:
-            return False
-        if not part[0].isalpha():
-            return False
-        if not _PACKAGE_PART_RE.match(part):
-            return False
+    if not all(part and part[0].isalpha() and _PACKAGE_PART_RE.match(part) for part in parts):
+        return False
 
     if parts[0] in _ANDROID_COMMON_PREFIXES:
         return True
@@ -88,13 +83,11 @@ def _parse_yaml_rows(yaml_data: Any) -> list[dict[str, str | None]]:
         if ',' not in item:
             if is_ipv4_or_ipv6(item):
                 pattern = 'IP-CIDR'
+            elif address_addr[0] in ('+', '.'):
+                pattern = 'DOMAIN-SUFFIX'
+                address_addr = address_addr.lstrip('+')
             else:
-                if address_addr.startswith('+') or address_addr.startswith('.'):
-                    pattern = 'DOMAIN-SUFFIX'
-                    if address_addr.startswith('+'):
-                        address_addr = address_addr[1:]
-                else:
-                    pattern = 'DOMAIN'
+                pattern = 'DOMAIN'
         else:
             pattern, address_addr = item.split(',', 1)
         rows.append({'pattern': pattern.strip(), 'address': address_addr.strip(), 'other': None})
@@ -147,10 +140,8 @@ def _compile_srs(file_name: str) -> None:
             ["sing-box", "rule-set", "compile", "--output", srs_path, file_name],
             check=True, capture_output=True, text=True
         )
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        log(f"  ✗ SRS 编译失败: {srs_filename} - {e}")
     except Exception as e:
-        log(f"  ✗ SRS 错误: {srs_filename} - {e}")
+        log(f"  ✗ SRS 编译失败: {srs_filename} - {e}")
 
 
 def prioritize_version_key(obj: Any) -> Any:

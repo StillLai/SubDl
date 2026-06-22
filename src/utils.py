@@ -7,6 +7,7 @@ import os
 import re
 import sys
 import time
+from pathlib import Path
 from typing import Any, IO
 
 import json5  # type: ignore[import-untyped]
@@ -27,14 +28,14 @@ def load_jsonc(filepath: str) -> dict[str, Any]:
 def discover_template_files(template_dir: str) -> list[tuple[str, str]]:
     """发现模板目录中所有 .json 和 .jsonc 文件，返回 [(完整路径, 基本名), ...]"""
     files: list[tuple[str, str]] = []
-    for name in os.listdir(template_dir):
-        if name.endswith('.jsonc'):
-            base = name[:-6]
-        elif name.endswith('.json'):
-            base = name[:-5]
+    for entry in Path(template_dir).iterdir():
+        if entry.name.endswith('.jsonc'):
+            base = entry.name[:-6]
+        elif entry.name.endswith('.json'):
+            base = entry.name[:-5]
         else:
             continue
-        files.append((os.path.join(template_dir, name), base))
+        files.append((str(entry), base))
 
     # 基础模板恒在首位，其余按字母序排列
     files.sort(key=lambda e: (e[1] != "sing-box_template", e[1]))

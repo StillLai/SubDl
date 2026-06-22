@@ -266,7 +266,12 @@ def generate_readme(subscription_info: list[dict[str, Any]]) -> str:
         used = flow.get('upload', 0) + flow.get('download', 0)
         node_count = info.get('node_count', 0)
         total_nodes += node_count
-        lines.append(f"| {info['name']} | {format_bytes(total)} | {format_bytes(used)} | {format_bytes(total - used if total > 0 else 0)} | {format_expire(flow.get('expire'))} | {get_status(flow)} | {node_count} |")
+        remaining = total - used if total > 0 else 0
+        lines.append(
+            f"| {info['name']} | {format_bytes(total)} | {format_bytes(used)}"
+            f" | {format_bytes(remaining)} | {format_expire(flow.get('expire'))}"
+            f" | {get_status(flow)} | {node_count} |"
+        )
 
     lines.append(f"| **合计** | | | | | | **{total_nodes}** |")
 
@@ -399,16 +404,23 @@ def _generate_all_template_variants() -> None:
         _generate_template_variant(suffix, label, transform, base_template)
 
 
+def _get_inbounds(template: dict[str, Any]) -> list[dict[str, Any]] | None:
+    """获取模板的 inbounds 列表，不存在或类型不对返回 None"""
+    inbounds = template.get('inbounds')
+    return inbounds if isinstance(inbounds, list) else None
+
+
 def _remove_tun_inbounds(template: dict[str, Any]) -> None:
     """移除所有 type=tun 的 inbound"""
-    if 'inbounds' in template and isinstance(template['inbounds'], list):
-        original_count = len(template['inbounds'])
-        template['inbounds'] = [
-            inbound for inbound in template['inbounds']
-            if not (isinstance(inbound, dict) and inbound.get('type') == 'tun')
-        ]
-        removed_count = original_count - len(template['inbounds'])
-        log(f"  ✓ 已移除 {removed_count} 个 tun inbound")
+    inbounds = _get_inbounds(template)
+    if inbounds is None:
+        return
+    original_count = len(inbounds)
+    template['inbounds'] = [
+        inbound for inbound in inbounds
+        if not (isinstance(inbound, dict) and inbound.get('type') == 'tun')
+    ]
+    log(f"  ✓ 已移除 {original_count - len(template['inbounds'])} 个 tun inbound")
 
 
 def _replace_tun_with_tproxy(template: dict[str, Any]) -> None:
@@ -416,23 +428,27 @@ def _replace_tun_with_tproxy(template: dict[str, Any]) -> None:
     tproxy_inbound: dict[str, Any] = {
         "type": "tproxy", "tag": "tproxy-in", "listen": "::", "listen_port": 1536
     }
-    if 'inbounds' in template and isinstance(template['inbounds'], list):
-        for i, inbound in enumerate(template['inbounds']):
-            if isinstance(inbound, dict) and inbound.get('type') == 'tun':
-                template['inbounds'][i] = tproxy_inbound
-                log("  ✓ 已将 tun inbound 替换为 tproxy inbound")
-                break
+    inbounds = _get_inbounds(template)
+    if inbounds is None:
+        return
+    for i, inbound in enumerate(inbounds):
+        if isinstance(inbound, dict) and inbound.get('type') == 'tun':
+            inbounds[i] = tproxy_inbound
+            log("  ✓ 已将 tun inbound 替换为 tproxy inbound")
+            break
 
 
 def _remove_auto_redirect(template: dict[str, Any]) -> None:
     """删除 tun inbound 中的 auto_redirect 字段"""
-    if 'inbounds' in template and isinstance(template['inbounds'], list):
-        for inbound in template['inbounds']:
-            if isinstance(inbound, dict) and inbound.get('type') == 'tun':
-                if 'auto_redirect' in inbound:
-                    del inbound['auto_redirect']
-                    log("  ✓ 已在 tun inbound 中删除 auto_redirect 字段")
-                break
+    inbounds = _get_inbounds(template)
+    if inbounds is None:
+        return
+    for inbound in inbounds:
+        if isinstance(inbound, dict) and inbound.get('type') == 'tun':
+            if 'auto_redirect' in inbound:
+                del inbound['auto_redirect']
+                log("  ✓ 已在 tun inbound 中删除 auto_redirect 字段")
+            break
 
 
 # ========== 模板遍历 — 共享抽象 ==========

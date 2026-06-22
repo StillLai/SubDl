@@ -59,12 +59,12 @@ def process_providers(
     providers: list[dict[str, Any]] = config['providers']
     provider_nodes: dict[str, list[str]] = {}  # provider_tag -> [节点标签列表]
 
-    # 展开每个 provider 的节点
+    # 展开每个 provider 的节点（tag 需带 sub_name 前缀，与 merge_config 步骤 1 一致）
     for provider in providers:
         tag: str = provider.get('tag', '')
         if tag in subscriptions_nodes:
             provider_nodes[tag] = [
-                node['tag'] for node in subscriptions_nodes[tag]
+                f"{tag}/{node['tag']}" for node in subscriptions_nodes[tag]
                 if isinstance(node, dict) and 'tag' in node
             ]
 
