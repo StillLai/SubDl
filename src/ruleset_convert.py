@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 import csv
 import subprocess
 import yaml
@@ -11,6 +10,7 @@ import ipaddress
 import re
 from io import StringIO
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -101,6 +101,8 @@ def _parse_yaml_rows(yaml_data: Any) -> list[dict[str, str | None]]:
 
     for item in items:
         address_addr = item.strip("'")
+        if not address_addr:
+            continue
         if ',' not in item:
             if is_ipv4_or_ipv6(item):
                 pattern = 'IP-CIDR'
@@ -152,13 +154,14 @@ def parse_and_convert_to_rows(link: str) -> list[dict[str, str | None]]:
 
 def _compile_srs(file_name: str) -> None:
     """使用 subprocess 安全调用 sing-box 编译 SRS，输出到 file_name 同级的 srs/ 目录"""
+    src = Path(file_name)
     srs_dir = RULESET_SRS_DIR
-    srs_filename = file_name.replace(".json", ".srs").split("/")[-1].split("\\")[-1]
-    srs_path = str(srs_dir / srs_filename)
+    srs_filename = src.stem + '.srs'
+    srs_path = srs_dir / srs_filename
     srs_dir.mkdir(parents=True, exist_ok=True)
     try:
         subprocess.run(
-            ["sing-box", "rule-set", "compile", "--output", srs_path, file_name],
+            ["sing-box", "rule-set", "compile", "--output", str(srs_path), file_name],
             check=True, capture_output=True, text=True
         )
     except Exception as e:
@@ -214,8 +217,9 @@ def _group_by_mapped(
 
 def parse_list_file(link: str, output_directory: str) -> str | None:
     """解析规则链接并生成 JSON/SRS 文件"""
-    os.makedirs(output_directory, exist_ok=True)
-    file_name = os.path.join(output_directory, f"{os.path.splitext(os.path.basename(link))[0]}.json")
+    out_dir = Path(output_directory)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    file_name = str(out_dir / f"{Path(link).stem}.json")
 
     # 如果是 .json 链接，仅处理 sing-box 规则集格式
     if link.endswith('.json'):
@@ -291,8 +295,7 @@ def main() -> None:
 
     log(f"✓ 共生成 {len(result_file_names)}/{len(links)} 个规则集（JSON + SRS）")
     for file_name in result_file_names:
-        name = file_name.replace('.json', '').split('/')[-1].split('\\')[-1]
-        logger.info(f"  ✓ {name}")
+        logger.info(f"  ✓ {Path(file_name).stem}")
 
 
 if __name__ == "__main__":

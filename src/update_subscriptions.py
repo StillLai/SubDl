@@ -343,12 +343,12 @@ def _remove_auto_redirect(template: dict[str, Any]) -> None:
 
 def _generate_template_variant(
     suffix: str, label: str, transform: Callable[[dict[str, Any]], None],
-    base_template: dict[str, Any] | None = None
+    base_template: dict[str, Any]
 ) -> None:
     """生成单个模板变体"""
     try:
         output_path = TEMPLATE_DIR / f'sing-box_template_{suffix}.jsonc'
-        template = copy.deepcopy(base_template) if base_template is not None else load_jsonc(TEMPLATE_BASE)
+        template = copy.deepcopy(base_template)
         transform(template)
         output_content = json.dumps(template, indent=2, ensure_ascii=False)
         with open(output_path, 'w', encoding='utf-8') as f:
@@ -564,7 +564,7 @@ def upload_to_gist(github_token: str, gist_id: str, files: dict[str, str]) -> st
 
     except requests.exceptions.HTTPError as e:
         logger.error(f"    Gist API 错误: {e}")
-        logger.error(f"      响应: {e.response.text if hasattr(e, 'response') else 'N/A'}")
+        logger.error(f"      响应: {e.response.text if hasattr(e, 'response') and e.response is not None else 'N/A'}")
         raise
     except Exception as e:
         logger.error(f"    Gist 上传异常: {e}")

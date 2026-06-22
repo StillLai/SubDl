@@ -70,13 +70,18 @@ def process_providers(
 
         include_regex = outbound.get('include')
         exclude_regex = outbound.get('exclude')
-        use_all = outbound.pop('use_all_providers', False)
+        use_all = outbound.get('use_all_providers', False)
 
         existing_outbounds = outbound.get('outbounds', [])
         fixed_outbounds = [o for o in existing_outbounds if isinstance(o, str)]
 
-        provider_tags = list(provider_nodes) if use_all else outbound.pop('providers', [])
+        provider_tags = list(provider_nodes) if use_all else outbound.get('providers', [])
         if not provider_tags and not use_all:
+            continue
+        # 移除已处理的过滤字段
+        outbound.pop('use_all_providers', None)
+        outbound.pop('providers', None)
+        if not provider_tags:
             continue
 
         expanded: list[str] = []
@@ -141,7 +146,7 @@ def merge_config(
     for sub_name, nodes in subscriptions_nodes.items():
         for node in nodes:
             if isinstance(node, dict) and 'tag' in node:
-                node_copy = node.copy()
+                node_copy = copy.deepcopy(node)
                 node_copy['tag'] = f"{sub_name}/{node_copy['tag']}"
                 all_nodes.append(node_copy)
             else:

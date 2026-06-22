@@ -87,8 +87,7 @@ class Logger:
 
 
 # 全局日志实例（可通过环境变量 SUBDL_LOG_LEVEL 配置）
-_LEVEL_MAP = {name: level for name, level in LogLevel.__members__.items()}
-_log_level = _LEVEL_MAP.get(os.environ.get('SUBDL_LOG_LEVEL', 'INFO').upper(), LogLevel.INFO)
+_log_level = {l.name: l for l in LogLevel}.get(os.environ.get('SUBDL_LOG_LEVEL', 'INFO').upper(), LogLevel.INFO)
 logger = Logger(min_level=_log_level)
 
 # 兼容旧的 log() 函数
@@ -113,7 +112,7 @@ class FlowInfo:
     @property
     def remaining(self) -> int:
         """剩余流量"""
-        return max(0, self.total - self.used) if self.total > 0 else 0
+        return max(0, self.total - self.used)
     
     @property
     def is_expired(self) -> bool:
@@ -199,13 +198,9 @@ def discover_template_files(template_dir: str | Path) -> list[tuple[str, str]]:
     
     files: list[tuple[str, str]] = []
     for entry in template_path.iterdir():
-        if entry.name.endswith('.jsonc'):
-            base = entry.name[:-6]
-        elif entry.name.endswith('.json'):
-            base = entry.name[:-5]
-        else:
+        if entry.suffix not in ('.json', '.jsonc'):
             continue
-        files.append((str(entry), base))
+        files.append((str(entry), entry.stem))
 
     # 基础模板恒在首位，其余按字母序排列
     files.sort(key=lambda e: (e[1] != "sing-box_template", e[1]))
@@ -231,20 +226,13 @@ def try_decode_base64(content: str) -> str:
 
 # ========== 网络请求 ==========
 
+@dataclass
 class RetryConfig:
     """重试配置"""
-    
-    def __init__(
-        self,
-        max_retries: int = HTTP_RETRY,
-        backoff_factor: int = 2,
-        retryable_status_codes: frozenset[int] = frozenset({429, 500, 502, 503, 504}),
-        timeout: int = HTTP_TIMEOUT
-    ):
-        self.max_retries = max_retries
-        self.backoff_factor = backoff_factor
-        self.retryable_status_codes = retryable_status_codes
-        self.timeout = timeout
+    max_retries: int = HTTP_RETRY
+    backoff_factor: int = 2
+    retryable_status_codes: frozenset[int] = frozenset({429, 500, 502, 503, 504})
+    timeout: int = HTTP_TIMEOUT
 
 
 def http_get_with_retry(
