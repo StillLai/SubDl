@@ -16,7 +16,7 @@ import copy
 import re
 from typing import Any
 
-from utils import log
+from utils import logger, log
 
 
 def filter_nodes_by_regex(
@@ -29,15 +29,11 @@ def filter_nodes_by_regex(
     include_pattern = re.compile(include_regex, re.IGNORECASE) if include_regex else None
     exclude_pattern = re.compile(exclude_regex, re.IGNORECASE) if exclude_regex else None
 
-    filtered: list[str] = []
-    for tag in node_tags:
-        if include_pattern and not include_pattern.search(tag):
-            continue
-        if exclude_pattern and exclude_pattern.search(tag):
-            continue
-        filtered.append(tag)
-
-    return filtered
+    return [
+        tag for tag in node_tags
+        if (not include_pattern or include_pattern.search(tag))
+        and (not exclude_pattern or not exclude_pattern.search(tag))
+    ]
 
 
 def process_providers(
@@ -46,32 +42,21 @@ def process_providers(
     """
     处理 providers 配置，将 providers 数组展开为节点标签（原地修改）
 
-    1. 检测模板是否有 providers 数组
-    2. 遍历 providers，将订阅节点展开为标签列表
-    3. 遍历 outbounds，找到有 providers 字段的项
-    4. 应用 include/exclude 筛选
-    5. 将 providers 字段替换为展开的节点标签列表
-    6. 从最终配置中移除 providers 字段
-
-    ⚠️ 前缀一致性约束：
+    前缀一致性约束：
        subscriptions_nodes 的 key 是 sub_name（即 provider 的 tag），
        merge_config 步骤 1 中会给所有节点 tag 加上 "{sub_name}/" 前缀
        再追加到 outbounds。因此本函数展开 provider 引用时，也必须使用
        相同的 "{provider_tag}/{node_tag}" 格式，否则 selector 中的引用
        会指向不存在的节点 tag，导致路由失效。
     """
-    if 'providers' not in config or not isinstance(config['providers'], list):
+    providers = config.get('providers')
+    if not isinstance(providers, list):
         return
 
-    providers: list[dict[str, Any]] = config['providers']
-    provider_nodes: dict[str, list[str]] = {}  # provider_tag -> [节点标签列表]
-
-    # 展开每个 provider 的节点，tag 必须带 "{sub_name}/" 前缀：
-    #   - subscriptions_nodes 的 key 就是 sub_name（等于 provider tag）
-    #   - merge_config 步骤 1 中所有节点 tag 都会加上 "{sub_name}/" 前缀
-    #   - 这里必须用相同的前缀格式，否则 selector 引用会断裂
+    # 展开每个 provider 的节点
+    provider_nodes: dict[str, list[str]] = {}
     for provider in providers:
-        tag: str = provider.get('tag', '')
+        tag = provider.get('tag', '')
         if tag in subscriptions_nodes:
             provider_nodes[tag] = [
                 f"{tag}/{node['tag']}" for node in subscriptions_nodes[tag]
@@ -83,11 +68,11 @@ def process_providers(
         if not isinstance(outbound, dict):
             continue
 
-        include_regex: str | None = outbound.get('include')
-        exclude_regex: str | None = outbound.get('exclude')
-        use_all: bool = outbound.pop('use_all_providers', False)
+        include_regex = outbound.get('include')
+        exclude_regex = outbound.get('exclude')
+        use_all = outbound.pop('use_all_providers', False)
 
-        existing_outbounds: list[Any] = outbound.get('outbounds', [])
+        existing_outbounds = outbound.get('outbounds', [])
         fixed_outbounds = [o for o in existing_outbounds if isinstance(o, str)]
 
         provider_tags = list(provider_nodes) if use_all else outbound.pop('providers', [])
@@ -102,8 +87,7 @@ def process_providers(
                 ))
         outbound['outbounds'] = fixed_outbounds + expanded
 
-    # 移除 providers 字段：本函数走"节点全部展开"路径，不再需要 providers 引用。
-    # 带 providers 的配置版本由 generate_provider_configs() 单独生成。
+    # 移除 providers 字段：本函数走"节点全部展开"路径
     del config['providers']
 
 
@@ -119,20 +103,40 @@ def remove_filter_fields(obj: Any) -> None:
             remove_filter_fields(item)
 
 
+def _ensure_compatible_outbound(outbounds: list[Any]) -> None:
+    """确保 outbounds 中存在 Compatible outbound 定义"""
+    has_compatible = any(
+        isinstance(o, dict) and o.get('tag') == 'Compatible'
+        for o in outbounds
+    )
+    if not has_compatible:
+        outbounds.append({"tag": "Compatible", "type": "direct"})
+        log("[Merge] 已添加 Compatible outbound 定义")
+
+
+def _fix_empty_selector_outbounds(outbounds: list[Any]) -> None:
+    """修复 selector/urltest 类型中空 outbounds 的兼容性问题"""
+    for outbound in outbounds:
+        if not isinstance(outbound, dict):
+            continue
+        outbound_type = outbound.get('type', '')
+        if outbound_type not in ('selector', 'urltest'):
+            continue
+        outbounds_list = outbound.get('outbounds', [])
+        if not isinstance(outbounds_list, list) or len(outbounds_list) == 0:
+            outbound['outbounds'] = ['Compatible']
+            logger.debug(f"  {outbound.get('tag')} -> 空 outbound，添加 Compatible")
+
+
 def merge_config(
     template_config: dict[str, Any],
     subscriptions_nodes: dict[str, list[dict[str, Any]]],
 ) -> dict[str, Any]:
     """合并配置"""
-    # 深拷贝配置模板
-    config: dict[str, Any] = copy.deepcopy(template_config)
+    config = copy.deepcopy(template_config)
+    outbounds = config.setdefault('outbounds', [])
 
-    if 'outbounds' not in config:
-        config['outbounds'] = []
-
-    # ========== 步骤 1: 收集所有节点并添加订阅前缀 ==========
-    # NOTE: 浅拷贝节点以避免修改 subscriptions_nodes 中的原始数据
-    #       （节点 dict 为单层结构，仅需修改 tag，无需深拷贝）
+    # 步骤 1: 收集所有节点并添加订阅前缀
     all_nodes: list[dict[str, Any]] = []
     for sub_name, nodes in subscriptions_nodes.items():
         for node in nodes:
@@ -142,45 +146,24 @@ def merge_config(
                 all_nodes.append(node_copy)
             else:
                 all_nodes.append(node)
-
     log(f"[Merge] 已收集 {len(all_nodes)} 个节点并添加订阅前缀")
 
-    # ========== 步骤 2: 处理 providers 配置 ==========
+    # 步骤 2: 处理 providers 配置
     if 'providers' in config:
         process_providers(config, subscriptions_nodes)
         log("[Merge] 已处理 providers 配置")
 
-    # ========== 步骤 3: 移除所有 include 和 exclude 字段 ==========
-    remove_filter_fields(config.get('outbounds', []))
+    # 步骤 3: 移除所有 include 和 exclude 字段
+    remove_filter_fields(outbounds)
 
-    # ========== 步骤 4: 将代理节点添加到 outbounds 末尾 ==========
-    config['outbounds'].extend(all_nodes)
+    # 步骤 4: 将代理节点添加到 outbounds 末尾
+    outbounds.extend(all_nodes)
     log(f"[Merge] 已添加 {len(all_nodes)} 个代理节点到配置")
 
-    # ========== 步骤 5: 处理空 outbound 的兼容性问题 ==========
-    for outbound in config['outbounds']:
-        if not isinstance(outbound, dict):
-            continue
+    # 步骤 5: 处理空 outbound 的兼容性问题
+    _fix_empty_selector_outbounds(outbounds)
 
-        outbound_type: str = outbound.get('type', '')
-        if outbound_type not in ('selector', 'urltest'):
-            continue
-
-        outbounds_list: list[Any] = outbound.get('outbounds', [])
-        if not isinstance(outbounds_list, list) or len(outbounds_list) == 0:
-            outbound['outbounds'] = ['Compatible']
-            log(f"[Merge]   {outbound.get('tag')} -> 空 outbound，添加 Compatible")
-
-    # ========== 步骤 6: 添加 Compatible outbound 定义 ==========
-    has_compatible = any(
-        isinstance(o, dict) and o.get('tag') == 'Compatible'
-        for o in config['outbounds']
-    )
-    if not has_compatible:
-        config['outbounds'].append({
-            "tag": "Compatible",
-            "type": "direct"
-        })
-        log("[Merge] 已添加 Compatible outbound 定义")
+    # 步骤 6: 添加 Compatible outbound 定义
+    _ensure_compatible_outbound(outbounds)
 
     return config

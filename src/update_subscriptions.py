@@ -1,51 +1,49 @@
 #!/usr/bin/env python3
 """
-Subscription Downloader and Gist Uploader
+订阅下载、转换、合并与上传模块
+
+主流程：
+  1. 解析环境变量获取订阅列表
+  2. 并行下载 + 验证（不做转换）
+  3. 批量转换（单次 Node.js 进程）
+  4. 合并配置、生成 README、上传 Gist
 """
 
 from __future__ import annotations
 
-import os
-import sys
-import re
-import time
+import copy
 import json
+import os
+import re
 import subprocess
+import sys
 import tempfile
+import threading
+import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any
-from urllib.parse import urlparse
 from datetime import datetime, timezone, timedelta
+from typing import Any
 
-import copy
-import threading
 import requests
 
-from utils import load_jsonc, discover_template_files, log, http_get_with_retry, try_decode_base64
+from utils import (
+    logger, log, load_jsonc, discover_template_files,
+    http_get_with_retry, try_decode_base64,
+    FlowInfo, Subscription, DownloadResult, SubscriptionInfo,
+    format_bytes, format_expire, get_env_var,
+    PROJECT_ROOT, TEMPLATE_DIR, WORKFLOW_PATH,
+    CONVERT_SCRIPT, TEMPLATE_BASE, USER_AGENT,
+)
 from merge_config import merge_config
 
 
-# ========== 路径常量 ==========
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
-TEMPLATE_DIR = os.path.join(PROJECT_ROOT, 'config_template')
-WORKFLOW_PATH = os.path.join(PROJECT_ROOT, '.github', 'workflows', 'subscriptions-update.yml')
-CONVERT_SCRIPT = os.path.join(SCRIPT_DIR, 'convert.mjs')
-TEMPLATE_BASE = os.path.join(TEMPLATE_DIR, 'sing-box_template.jsonc')
-
-
-def get_env_var(name: str, default: str | None = None, *, required: bool = False) -> str | None:
-    value = os.environ.get(name, default)
-    if required and not value:
-        raise ValueError(f"环境变量 {name} 未设置")
-    return value
-
+# ========== 流量解析 ==========
 
 _FLOW_KEY_PATTERN: re.Pattern[str] = re.compile(r'(\w+)=(\d+)')
 
 
-def parse_flow_info(headers: dict[str, str]) -> dict[str, int | None] | None:
+def parse_flow_info(headers: dict[str, str]) -> FlowInfo | None:
     """从响应头解析流量信息"""
     flow_header = headers.get('subscription-userinfo', '')
     if not flow_header:
@@ -56,64 +54,16 @@ def parse_flow_info(headers: dict[str, str]) -> dict[str, int | None] | None:
         key, value = match.group(1), int(match.group(2))
         if key in info:
             info[key] = value
-    return info
 
-
-def format_bytes(n: int) -> str:
-    """将字节数格式化为人类可读字符串（B / KB / MB / GB / TB）"""
-    if n == 0:
-        return "0 B"
-    units = ('B', 'KB', 'MB', 'GB', 'TB')
-    i = min(int(n.bit_length() - 1) // 10, len(units) - 1)
-    return f"{n / (1024 ** i):.2f} {units[i]}"
-
-
-def format_expire(timestamp: int | None) -> str:
-    """格式化到期时间"""
-    if not timestamp:
-        return "无"
-    try:
-        return datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d")
-    except Exception:
-        return "无"
-
-
-def get_status(flow_info: dict[str, int] | None) -> str:
-    """获取状态"""
-    if not flow_info:
-        return "❓ 无信息"
-
-    total = flow_info.get('total', 0)
-    used = flow_info.get('upload', 0) + flow_info.get('download', 0)
-    expire = flow_info.get('expire')
-
-    if expire and expire < time.time():
-        return "❌ 已过期"
-    if total > 0 and used >= total:
-        return "❌ 流量用完"
-    if expire and expire - time.time() < 7 * 24 * 3600:
-        return "⚠️ 即将到期"
-    return "✅ 正常"
-
-
-def download_subscription(
-    url: str, user_agent: str, timeout: int = 30
-) -> tuple[str, dict[str, int | None] | None]:
-    """下载订阅内容，带重试机制"""
-    headers = {"User-Agent": user_agent}
-    response = http_get_with_retry(
-        url, headers=headers, timeout=timeout, allow_redirects=True
+    return FlowInfo(
+        upload=info['upload'] or 0,  # type: ignore[arg-type]
+        download=info['download'] or 0,  # type: ignore[arg-type]
+        total=info['total'] or 0,  # type: ignore[arg-type]
+        expire=info['expire'],  # type: ignore[arg-type]
     )
-    content = response.text
 
-    # 尝试 Base64 解码
-    decoded = try_decode_base64(content)
-    if decoded is not content:
-        log("    ℹ 内容已从 Base64 解码")
-        content = decoded
 
-    return content, parse_flow_info(response.headers)
-
+# ========== 订阅验证 ==========
 
 _VALID_INDICATORS: tuple[str, ...] = (
     'proxies', 'proxy-providers', 'proxy-groups', 'servers',
@@ -121,27 +71,37 @@ _VALID_INDICATORS: tuple[str, ...] = (
 )
 
 
-def validate_subscription_content(content: str, sub_name: str) -> tuple[bool, str]:
-    """验证订阅内容是否有效"""
-    # 检查是否为空
+def _validate_subscription(content: str) -> str | None:
+    """验证订阅内容，返回失败原因或 None（有效）"""
     if not content or len(content.strip()) < 10:
-        return False, "内容为空或过短"
+        return "内容为空或过短"
 
-    # 检查是否为HTML页面
     content_lower = content.lower().strip()
     if content_lower.startswith('<!doctype') or content_lower.startswith('<html'):
-        return False, "返回的是网页而非订阅内容"
+        return "返回的是网页而非订阅内容"
 
-    # 检查是否为有效配置（至少有一些关键字）
     if not any(indicator in content_lower for indicator in _VALID_INDICATORS):
-        return False, "内容不包含有效的订阅配置"
+        return "内容不包含有效的订阅配置"
 
-    return True, "有效"
+    return None
 
 
-def parse_subscriptions() -> list[dict[str, str]]:
+# ========== 订阅解析 ==========
+
+def _parse_single_entry(value: str) -> Subscription | None:
+    """解析单个订阅条目（名称|URL 或纯 URL）"""
+    if "|" in value:
+        name, url = value.split("|", 1)
+        name, url = name.strip(), url.strip()
+    else:
+        url = value.strip()
+        name = None
+    return Subscription.from_url(url, name) if url else None
+
+
+def parse_subscriptions() -> list[Subscription]:
     """解析订阅配置 — 支持 SUB_URLS (JSON数组) 和 SUB_URL / SUB_URL_N 环境变量"""
-    subscriptions: list[dict[str, str]] = []
+    subscriptions: list[Subscription] = []
 
     # 优先解析 SUB_URLS（JSON 数组格式，可突破 GitHub Actions secrets 数量限制）
     sub_urls_json = os.environ.get('SUB_URLS', '').strip()
@@ -151,16 +111,15 @@ def parse_subscriptions() -> list[dict[str, str]]:
             if isinstance(items, list):
                 for item in items:
                     if isinstance(item, dict) and 'url' in item:
-                        name = item.get('name', extract_name_from_url(item['url']))
-                        url = item['url']
-                        subscriptions.append({"name": name, "url": url, "filename": f"{name}.yaml"})
+                        name = item.get('name')
+                        subscriptions.append(Subscription.from_url(item['url'], name))
                     elif isinstance(item, str):
-                        sub = _parse_subscription_entry(item)
+                        sub = _parse_single_entry(item)
                         if sub:
                             subscriptions.append(sub)
                 return subscriptions
         except json.JSONDecodeError as e:
-            log(f"  ⚠ SUB_URLS 解析失败，回退到 SUB_URL_N 模式: {e}")
+            logger.warn(f"  SUB_URLS 解析失败，回退到 SUB_URL_N 模式: {e}")
 
     # 回退：动态发现 SUB_URL / SUB_URL_N
     sub_keys = sorted(
@@ -171,89 +130,355 @@ def parse_subscriptions() -> list[dict[str, str]]:
         value = os.environ[env_name].strip()
         if not value:
             continue
-        sub = _parse_subscription_entry(value)
+        sub = _parse_single_entry(value)
         if sub:
             subscriptions.append(sub)
+
     return subscriptions
 
 
-def _parse_subscription_entry(value: str) -> dict[str, str] | None:
-    """解析单个订阅条目（名称|URL 或纯 URL）"""
-    if "|" in value:
-        name, url = value.split("|", 1)
-        name, url = name.strip(), url.strip()
-    else:
-        url = value
-        name = extract_name_from_url(url)
-    if name and url:
-        return {"name": name, "url": url, "filename": f"{name}.yaml"}
-    return None
+# ========== 订阅下载 ==========
 
-
-def extract_name_from_url(url: str) -> str:
-    """从 URL 提取域名作为订阅名称"""
+def _download_subscription(sub: Subscription, user_agent: str) -> DownloadResult:
+    """下载单个订阅，返回结果"""
     try:
-        domain = urlparse(url).netloc.replace("www.", "").split(":")[0]
-        name = re.sub(r'[^a-zA-Z0-9_-]', '_', domain)
-        return name[:50] if name else f"unknown_{int(time.time())}"
-    except Exception:
-        return f"unknown_{int(time.time())}"
+        headers = {"User-Agent": user_agent}
+        response = http_get_with_retry(sub.url, headers=headers, allow_redirects=True)
+        content = response.text
 
+        # 尝试 Base64 解码
+        decoded = try_decode_base64(content)
+        if decoded is not content:
+            logger.debug(f"    {sub.name}: 内容已从 Base64 解码")
+            content = decoded
 
-def upload_to_gist(github_token: str, gist_id: str, files: dict[str, str]) -> str:
-    headers = {"Authorization": f"token {github_token}", "Accept": "application/vnd.github.v3+json"}
-    gist_files = {filename: {"content": content} for filename, content in files.items()}
+        flow = parse_flow_info(response.headers)
+        reason = _validate_subscription(content)
+        if reason:
+            return DownloadResult(name=sub.name, status="invalid", flow=flow, reason=reason, filename=sub.filename)
 
-    try:
-        if not gist_id:
-            log("    创建新的 Gist...")
-            response = requests.post("https://api.github.com/gists", headers=headers, json={
-                "description": "SubDl Subscriptions", "public": False, "files": gist_files
-            }, timeout=30)
-            response.raise_for_status()
-            new_id: str = response.json()["id"]
-            log(f"    ✓ 创建成功，Gist ID: {new_id}")
-            return new_id
+        return DownloadResult(name=sub.name, status="ok", flow=flow, filename=sub.filename, raw_content=content)
 
-        log(f"    更新 Gist: {gist_id}")
-        response = requests.patch(f"https://api.github.com/gists/{gist_id}", headers=headers, json={"files": gist_files}, timeout=30)
-        response.raise_for_status()
-        log("    ✓ 更新成功")
-        return gist_id
-    except requests.exceptions.HTTPError as e:
-        log(f"    ✗ Gist API 错误: {e}")
-        log(f"      响应: {e.response.text if hasattr(e, 'response') else 'N/A'}")
-        raise
     except Exception as e:
-        log(f"    ✗ Gist 上传异常: {e}")
-        raise
+        return DownloadResult(name=sub.name, status="error", reason=str(e), filename=sub.filename)
 
 
-def parse_cron_interval() -> str:
+def _download_all(subscriptions: list[Subscription], user_agent: str) -> list[DownloadResult]:
+    """并行下载所有订阅"""
+    log(f"→ 并行下载 {len(subscriptions)} 个订阅...")
+    results: list[DownloadResult] = []
+
+    with ThreadPoolExecutor(max_workers=min(len(subscriptions), 8)) as executor:
+        futures = {
+            executor.submit(_download_subscription, sub, user_agent): sub
+            for sub in subscriptions
+        }
+        for future in as_completed(futures):
+            result = future.result()
+            results.append(result)
+            if result.is_success:
+                logger.debug(f"  ✓ {result.name}: 下载成功")
+            else:
+                logger.warn(f"  ✗ {result.name}: {result.reason}")
+
+    return results
+
+
+# ========== 批量转换 ==========
+
+def _convert_batch(contents_dict: dict[str, str]) -> dict[str, dict[str, Any] | None]:
+    """批量转换：将所有 Clash 内容一次性传给单个 Node.js 进程
+    
+    Args:
+        contents_dict: {订阅名称: clash内容, ...}
+    
+    Returns:
+        {订阅名称: singbox配置dict | None, ...} — None 表示转换失败
+    """
+    if not contents_dict:
+        return {}
+
+    batch_input_file: str | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode='w', suffix='.json', delete=False, encoding='utf-8'
+        ) as f:
+            json.dump(contents_dict, f, ensure_ascii=False)
+            batch_input_file = f.name
+
+        log(f"  → 批量转换 {len(contents_dict)} 个订阅（单进程）...")
+        result = subprocess.run(
+            ['node', str(CONVERT_SCRIPT), 'batch-convert', batch_input_file],
+            capture_output=True, text=True, encoding='utf-8'
+        )
+
+        if result.returncode != 0:
+            logger.error(f"  批量转换失败 (exit {result.returncode}): {result.stderr}")
+            return {name: None for name in contents_dict}
+
+        stdout = result.stdout.strip()
+        if not stdout:
+            logger.error(f"  批量转换输出为空 (stderr: {result.stderr.strip() or '(无)'})")
+            return {name: None for name in contents_dict}
+
+        raw_result = json.loads(stdout)
+        return {
+            name: val if isinstance(val, dict) else None
+            for name, val in ((n, raw_result.get(n)) for n in contents_dict)
+        }
+
+    except Exception as e:
+        logger.error(f"  批量转换异常: {e}")
+        return {name: None for name in contents_dict}
+    finally:
+        if batch_input_file:
+            os.unlink(batch_input_file)
+
+
+# ========== 结果聚合 ==========
+
+def _aggregate_results(
+    download_results: list[DownloadResult],
+) -> tuple[dict[str, str], list[SubscriptionInfo], dict[str, list[dict[str, Any]]]]:
+    """聚合下载结果：批量转换 → 收集文件、订阅信息和节点字典"""
+    # 收集需要转换的内容
+    contents_to_convert = {
+        r.name: r.raw_content
+        for r in download_results
+        if r.is_success and r.raw_content
+    }
+    converted = _convert_batch(contents_to_convert) if contents_to_convert else {}
+
+    files: dict[str, str] = {}
+    subscription_info: list[SubscriptionInfo] = []
+    subs_nodes_dict: dict[str, list[dict[str, Any]]] = {}
+    skipped: list[str] = []
+
+    for result in download_results:
+        if not result.is_success:
+            skipped.append(f"{result.name} ({result.reason})")
+            subscription_info.append(SubscriptionInfo(
+                name=result.name, flow=result.flow, node_count=0, status=result.status
+            ))
+            continue
+
+        # 保存原始内容
+        files[result.filename] = result.raw_content  # type: ignore[assignment]
+
+        # 处理转换结果
+        singbox_config = converted.get(result.name)
+        if singbox_config is None:
+            skipped.append(f"{result.name} (转换失败)")
+            subscription_info.append(SubscriptionInfo(
+                name=result.name, flow=result.flow, node_count=0, status="convert_failed"
+            ))
+            continue
+
+        singbox_nodes = singbox_config.get('outbounds', []) + singbox_config.get('endpoints', [])
+        node_count = len(singbox_nodes)
+        singbox_content = json.dumps(singbox_config, indent=2, ensure_ascii=False)
+        files[f"{result.name}-singbox.json"] = singbox_content
+
+        if node_count > 0:
+            subs_nodes_dict[result.name] = singbox_nodes
+            logger.info(f"  ✓ {result.name}: 转换成功 ({len(singbox_content)} 字节, {node_count} 个节点)")
+        else:
+            skipped.append(f"{result.name} (空节点)")
+
+        subscription_info.append(SubscriptionInfo(
+            name=result.name, flow=result.flow, node_count=node_count, status="ok"
+        ))
+
+    if skipped:
+        logger.warn(f"⚠️ {len(skipped)} 个订阅跳过: {', '.join(skipped)}")
+
+    return files, subscription_info, subs_nodes_dict
+
+
+# ========== 模板生成 ==========
+
+def _get_inbounds(template: dict[str, Any]) -> list[dict[str, Any]] | None:
+    """获取模板的 inbounds 列表"""
+    inbounds = template.get('inbounds')
+    return inbounds if isinstance(inbounds, list) else None
+
+
+def _remove_tun_inbounds(template: dict[str, Any]) -> None:
+    """移除所有 type=tun 的 inbound"""
+    inbounds = _get_inbounds(template)
+    if inbounds is None:
+        return
+    original = len(inbounds)
+    template['inbounds'] = [
+        ib for ib in inbounds
+        if not (isinstance(ib, dict) and ib.get('type') == 'tun')
+    ]
+    logger.debug(f"  已移除 {original - len(template['inbounds'])} 个 tun inbound")
+
+
+def _replace_tun_with_tproxy(template: dict[str, Any]) -> None:
+    """将第一个 type=tun inbound 替换为 tproxy"""
+    inbounds = _get_inbounds(template)
+    if inbounds is None:
+        return
+    for i, ib in enumerate(inbounds):
+        if isinstance(ib, dict) and ib.get('type') == 'tun':
+            inbounds[i] = {"type": "tproxy", "tag": "tproxy-in", "listen": "::", "listen_port": 1536}
+            logger.debug("  已将 tun inbound 替换为 tproxy inbound")
+            break
+
+
+def _remove_auto_redirect(template: dict[str, Any]) -> None:
+    """删除 tun inbound 中的 auto_redirect 字段"""
+    inbounds = _get_inbounds(template)
+    if inbounds is None:
+        return
+    for ib in inbounds:
+        if isinstance(ib, dict) and ib.get('type') == 'tun':
+            if 'auto_redirect' in ib:
+                del ib['auto_redirect']
+                logger.debug("  已在 tun inbound 中删除 auto_redirect 字段")
+            break
+
+
+def _generate_template_variant(
+    suffix: str, label: str, transform: Callable[[dict[str, Any]], None],
+    base_template: dict[str, Any] | None = None
+) -> None:
+    """生成单个模板变体"""
+    try:
+        output_path = TEMPLATE_DIR / f'sing-box_template_{suffix}.jsonc'
+        template = copy.deepcopy(base_template) if base_template is not None else load_jsonc(TEMPLATE_BASE)
+        transform(template)
+        output_content = json.dumps(template, indent=2, ensure_ascii=False)
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write(output_content)
+        logger.debug(f"  ✓ 已生成 {label} 模板")
+    except Exception as e:
+        logger.error(f"  ✗ 生成 {label} 模板异常: {e}")
+
+
+def generate_all_template_variants() -> None:
+    """生成所有模板变体（noTun / tproxy / tun_for_win）"""
+    base_template = load_jsonc(TEMPLATE_BASE)
+    for suffix, label, transform in [
+        ('noTun', 'noTun', _remove_tun_inbounds),
+        ('tproxy', 'tproxy', _replace_tun_with_tproxy),
+        ('tun_for_win', 'tun_for_win', _remove_auto_redirect),
+    ]:
+        _generate_template_variant(suffix, label, transform, base_template)
+
+
+# ========== 遍历模板生成配置 ==========
+
+def _process_templates(
+    process_fn: Callable[[str, str], tuple[str, str] | None]
+) -> dict[str, str]:
+    """遍历所有模板文件，并行处理"""
+    templates = discover_template_files(TEMPLATE_DIR)
+    if not templates:
+        logger.error("  模板目录中没有找到模板文件")
+        return {}
+
+    logger.debug(f"  找到 {len(templates)} 个模板文件")
+    results: dict[str, str] = {}
+
+    with ThreadPoolExecutor(max_workers=min(len(templates), 4)) as executor:
+        futures = {
+            executor.submit(process_fn, path, name): (path, name)
+            for path, name in templates
+        }
+        for future in as_completed(futures):
+            entry = future.result()
+            if entry:
+                filename, content = entry
+                results[filename] = content
+
+    return results
+
+
+def merge_all_templates(subs_nodes_dict: dict[str, list[dict[str, Any]]]) -> dict[str, str]:
+    """遍历所有模板文件并生成合并配置"""
+    def _merge_one(template_path: str, base_name: str) -> tuple[str, str] | None:
+        config_filename = base_name.replace('template', 'config') + '.json'
+        log(f"  → 处理模板: {os.path.basename(template_path)}")
+        merged = merge_singbox_config(subs_nodes_dict, template_path)
+        if merged:
+            content = json.dumps(merged, indent=2, ensure_ascii=False)
+            total_nodes = sum(len(nodes) for nodes in subs_nodes_dict.values())
+            logger.info(f"    ✓ 生成 {config_filename} ({len(content)} 字节, {total_nodes} 个节点)")
+            return config_filename, content
+        return None
+
+    return _process_templates(_merge_one)
+
+
+def generate_provider_configs(sub_url_map: dict[str, str]) -> dict[str, str]:
+    """生成 providers 版本的配置文件"""
+    def _fill_one(template_path: str, base_name: str) -> tuple[str, str] | None:
+        template = load_jsonc(template_path)
+        filled = 0
+        for provider in template.get('providers', []):
+            tag = provider.get('tag', '')
+            if tag in sub_url_map:
+                provider['url'] = sub_url_map[tag]
+                filled += 1
+
+        if filled > 0:
+            config_filename = base_name.replace('template', 'with_providers_config') + '.json'
+            logger.debug(f"  → {os.path.basename(template_path)} -> {config_filename} ({filled} 个 providers)")
+            return config_filename, json.dumps(template, indent=2, ensure_ascii=False)
+        return None
+
+    return _process_templates(_fill_one)
+
+
+# ========== 配置合并入口 ==========
+
+def merge_singbox_config(
+    subs_nodes_dict: dict[str, list[dict[str, Any]]], template_path: str | None = None
+) -> dict[str, Any] | None:
+    """将订阅节点合并到配置模板"""
+    if template_path is None:
+        template_path = str(TEMPLATE_BASE)
+    if not os.path.exists(template_path):
+        logger.error(f"  配置模板不存在: {template_path}")
+        return None
+
+    try:
+        template = load_jsonc(template_path)
+        return merge_config(template, subs_nodes_dict)
+    except Exception as e:
+        logger.error(f"  合并异常: {e}")
+        return None
+
+
+# ========== cron 解析 ==========
+
+def _parse_cron_interval() -> str:
     """从 workflow 文件解析 cron 间隔"""
     try:
-        with open(WORKFLOW_PATH, 'r', encoding='utf-8') as f:
-            content = f.read()
-            match = re.search(r"cron:\s*['\"](\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)['\"]", content)
-            if match:
-                minute, hour, day, month, weekday = match.groups()
-                if minute != '*' and hour == '*':
-                    return "每小时"
-                elif minute == '*' and hour == '*':
-                    return "每分钟"
-                elif hour.startswith('*/'):
-                    return f"每 {hour[2:]} 小时"
+        content = WORKFLOW_PATH.read_text(encoding='utf-8')
+        match = re.search(r"cron:\s*['\"](\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)['\"]", content)
+        if match:
+            _, hour = match.group(1), match.group(2)
+            if hour.startswith('*/'):
+                return f"每 {hour[2:]} 小时"
     except Exception as e:
-        log(f"  ⚠ cron 解析失败: {e}，使用默认值")
+        logger.debug(f"  cron 解析失败: {e}，使用默认值")
     return "每小时"
 
 
-def generate_readme(subscription_info: list[dict[str, Any]]) -> str:
+# ========== README 生成 ==========
+
+def generate_readme(subscription_info: list[SubscriptionInfo]) -> str:
     """生成 README 内容"""
-    interval = parse_cron_interval()
+    interval = _parse_cron_interval()
+    now = datetime.now(timezone(timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S CST')
+
     lines = [
         "# SubDl", "",
-        f"> 最后更新: {datetime.now(timezone(timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S CST')}", "",
+        f"> 最后更新: {now}", "",
         "## 订阅状态", "",
         "| 订阅 | 总流量 | 已用 | 剩余 | 到期时间 | 状态 | 节点数 |",
         "|------|--------|------|------|----------|------|--------|",
@@ -261,16 +486,20 @@ def generate_readme(subscription_info: list[dict[str, Any]]) -> str:
 
     total_nodes = 0
     for info in subscription_info:
-        flow = info.get('flow', {})
-        total = flow.get('total', 0)
-        used = flow.get('upload', 0) + flow.get('download', 0)
-        node_count = info.get('node_count', 0)
-        total_nodes += node_count
-        remaining = total - used if total > 0 else 0
+        flow = info.flow
+        if flow:
+            total, used, remaining = flow.total, flow.used, flow.remaining
+            expire_str = format_expire(flow.expire)
+            status_str = flow.status
+        else:
+            total, used, remaining = 0, 0, 0
+            expire_str, status_str = "无", "❓ 无信息"
+
+        total_nodes += info.node_count
         lines.append(
-            f"| {info['name']} | {format_bytes(total)} | {format_bytes(used)}"
-            f" | {format_bytes(remaining)} | {format_expire(flow.get('expire'))}"
-            f" | {get_status(flow)} | {node_count} |"
+            f"| {info.name} | {format_bytes(total)} | {format_bytes(used)}"
+            f" | {format_bytes(remaining)} | {expire_str}"
+            f" | {status_str} | {info.node_count} |"
         )
 
     lines.append(f"| **合计** | | | | | | **{total_nodes}** |")
@@ -287,7 +516,7 @@ def generate_readme(subscription_info: list[dict[str, Any]]) -> str:
         "## 说明", "",
         f"- {interval}自动更新订阅",
         "- 订阅内容上传到 Gist，不保存在仓库",
-        "- `sing-box-config.json` 是可直接使用的完整sing-box配置文件",
+        "- `sing-box-config.json` 是可直接使用的完整 sing-box 配置文件",
         "- 参考 [sub-store](https://github.com/sub-store-org/Sub-Store) 实现", "",
         "## 🚀 sing-box 路由规则集", "",
         "本项目自动将多种格式的规则源（Clash、Surge 等）转换为 sing-box 支持的规则集格式，支持：", "",
@@ -306,362 +535,74 @@ def generate_readme(subscription_info: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-def convert_to_singbox_batch(contents_dict: dict[str, str]) -> dict[str, dict[str, Any] | None]:
-    """批量转换：将所有订阅内容一次性传给单个 Node.js 进程
-    
-    Args:
-        contents_dict: {订阅名称: clash内容, ...}
-    
-    Returns:
-        {订阅名称: singbox配置dict | None, ...}  — None 表示转换失败
-    """
-    if not contents_dict:
-        return {}
+# ========== Gist 上传 ==========
 
-    batch_input_file: str | None = None
+def upload_to_gist(github_token: str, gist_id: str, files: dict[str, str]) -> str:
+    """上传文件到 GitHub Gist"""
+    headers = {"Authorization": f"token {github_token}", "Accept": "application/vnd.github.v3+json"}
+    gist_files = {name: {"content": content} for name, content in files.items()}
+
     try:
-        with tempfile.NamedTemporaryFile(
-            mode='w', suffix='.json', delete=False, encoding='utf-8'
-        ) as f:
-            json.dump(contents_dict, f, ensure_ascii=False)
-            batch_input_file = f.name
+        if not gist_id:
+            log("    创建新的 Gist...")
+            resp = requests.post("https://api.github.com/gists", headers=headers, json={
+                "description": "SubDl Subscriptions", "public": False, "files": gist_files
+            }, timeout=30)
+            resp.raise_for_status()
+            new_id: str = resp.json()["id"]
+            log(f"    ✓ 创建成功，Gist ID: {new_id}")
+            return new_id
 
-        log(f"  → 批量转换 {len(contents_dict)} 个订阅（单进程）...")
-        result = subprocess.run(
-            ['node', CONVERT_SCRIPT, 'batch-convert', batch_input_file],
-            capture_output=True, text=True, encoding='utf-8'
+        log(f"    更新 Gist: {gist_id}")
+        resp = requests.patch(
+            f"https://api.github.com/gists/{gist_id}",
+            headers=headers, json={"files": gist_files}, timeout=30
         )
+        resp.raise_for_status()
+        log("    ✓ 更新成功")
+        return gist_id
 
-        if result.returncode != 0:
-            log(f"  ✗ 批量转换失败 (exit {result.returncode}): {result.stderr}")
-            return {name: None for name in contents_dict}
-
-        stdout = result.stdout.strip()
-        if not stdout:
-            log(f"  ✗ 批量转换输出为空 (stderr: {result.stderr.strip() or '(无)'})")
-            return {name: None for name in contents_dict}
-
-        raw_result: dict[str, Any] = json.loads(stdout)
-        return {
-            name: val if isinstance(val, dict) else None
-            for name, val in ((n, raw_result.get(n)) for n in contents_dict)
-        }
-
+    except requests.exceptions.HTTPError as e:
+        logger.error(f"    Gist API 错误: {e}")
+        logger.error(f"      响应: {e.response.text if hasattr(e, 'response') else 'N/A'}")
+        raise
     except Exception as e:
-        log(f"  ✗ 批量转换异常: {e}")
-        return {name: None for name in contents_dict}
-    finally:
-        if batch_input_file:
-            os.unlink(batch_input_file)
+        logger.error(f"    Gist 上传异常: {e}")
+        raise
 
 
-def merge_singbox_config(
-    subs_nodes_dict: dict[str, list[dict[str, Any]]], template_path: str | None = None
-) -> dict[str, Any] | None:
-    """将多个sing-box订阅节点合并到配置模板
-
-    NOTE: 直接 import 调用而非 subprocess，省去进程启动开销 (~1-2s)。
-    convert.mjs 批量转换通过 convert_to_singbox_batch 完成（跨语言调用，单进程）。
-    """
-    if template_path is None:
-        template_path = TEMPLATE_BASE
-    if not os.path.exists(template_path):
-        log(f"  ✗ 配置模板不存在: {template_path}")
-        return None
-
-    try:
-        template = load_jsonc(template_path)
-        return merge_config(template, subs_nodes_dict)
-    except Exception as e:
-        log(f"  ✗ 合并异常: {e}")
-        return None
-
-
-# ========== 模板生成 — 通用抽象 ==========
-
-def _generate_template_variant(suffix: str, label: str, transform_fn: Callable[[dict[str, Any]], None], base_template: dict[str, Any] | None = None) -> None:
-    """通用模板变体生成器（可复用预加载的基础模板）"""
-    try:
-        output_path = os.path.join(TEMPLATE_DIR, f'sing-box_template_{suffix}.jsonc')
-        template = copy.deepcopy(base_template) if base_template is not None else load_jsonc(TEMPLATE_BASE)
-        transform_fn(template)
-        output_content = json.dumps(template, indent=2, ensure_ascii=False)
-        with open(output_path, 'w', encoding='utf-8') as f:
-            f.write(output_content)
-        log(f"  ✓ 已生成 {label} 模板: config_template/sing-box_template_{suffix}.jsonc")
-    except Exception as e:
-        log(f"  ✗ 生成 {label} 模板异常: {e}")
-
-
-def _generate_all_template_variants() -> None:
-    """生成所有模板变体（noTun / tproxy / tun_for_win），串行处理"""
-    base_template = load_jsonc(TEMPLATE_BASE)
-    for suffix, label, transform in [
-        ('noTun', 'noTun', _remove_tun_inbounds),
-        ('tproxy', 'tproxy', _replace_tun_with_tproxy),
-        ('tun_for_win', 'tun_for_win', _remove_auto_redirect),
-    ]:
-        _generate_template_variant(suffix, label, transform, base_template)
-
-
-def _get_inbounds(template: dict[str, Any]) -> list[dict[str, Any]] | None:
-    """获取模板的 inbounds 列表，不存在或类型不对返回 None"""
-    inbounds = template.get('inbounds')
-    return inbounds if isinstance(inbounds, list) else None
-
-
-def _remove_tun_inbounds(template: dict[str, Any]) -> None:
-    """移除所有 type=tun 的 inbound"""
-    inbounds = _get_inbounds(template)
-    if inbounds is None:
-        return
-    original_count = len(inbounds)
-    template['inbounds'] = [
-        inbound for inbound in inbounds
-        if not (isinstance(inbound, dict) and inbound.get('type') == 'tun')
-    ]
-    log(f"  ✓ 已移除 {original_count - len(template['inbounds'])} 个 tun inbound")
-
-
-def _replace_tun_with_tproxy(template: dict[str, Any]) -> None:
-    """将第一个 type=tun inbound 替换为 tproxy"""
-    tproxy_inbound: dict[str, Any] = {
-        "type": "tproxy", "tag": "tproxy-in", "listen": "::", "listen_port": 1536
-    }
-    inbounds = _get_inbounds(template)
-    if inbounds is None:
-        return
-    for i, inbound in enumerate(inbounds):
-        if isinstance(inbound, dict) and inbound.get('type') == 'tun':
-            inbounds[i] = tproxy_inbound
-            log("  ✓ 已将 tun inbound 替换为 tproxy inbound")
-            break
-
-
-def _remove_auto_redirect(template: dict[str, Any]) -> None:
-    """删除 tun inbound 中的 auto_redirect 字段"""
-    inbounds = _get_inbounds(template)
-    if inbounds is None:
-        return
-    for inbound in inbounds:
-        if isinstance(inbound, dict) and inbound.get('type') == 'tun':
-            if 'auto_redirect' in inbound:
-                del inbound['auto_redirect']
-                log("  ✓ 已在 tun inbound 中删除 auto_redirect 字段")
-            break
-
-
-# ========== 模板遍历 — 共享抽象 ==========
-
-def _process_templates(
-    process_fn: Callable[[str, str], tuple[str, str] | None]
-) -> dict[str, str]:
-    """遍历所有模板文件，并行处理每个模板 process_fn(template_path, base_name)"""
-    templates = discover_template_files(TEMPLATE_DIR)
-    if not templates:
-        log("  ✗ 模板目录中没有找到模板文件")
-        return {}
-
-    log(f"  找到 {len(templates)} 个模板文件")
-
-    results: dict[str, str] = {}
-    with ThreadPoolExecutor(max_workers=min(len(templates), 4)) as executor:
-        future_to_template = {
-            executor.submit(process_fn, template_path, base_name): (template_path, base_name)
-            for template_path, base_name in templates
-        }
-        for future in as_completed(future_to_template):
-            entry = future.result()
-            if entry:
-                filename, content = entry
-                results[filename] = content
-    return results
-
-
-def merge_all_templates(subs_nodes_dict: dict[str, list[dict[str, Any]]]) -> dict[str, str]:
-    """遍历所有模板文件并生成配置文件"""
-    def _merge_one(template_path: str, base_name: str) -> tuple[str, str] | None:
-        template_file = os.path.basename(template_path)
-        config_filename = base_name.replace('template', 'config') + '.json'
-        log(f"  → 处理模板: {template_file}")
-        merged_config = merge_singbox_config(subs_nodes_dict, template_path)
-        if merged_config:
-            content = json.dumps(merged_config, indent=2, ensure_ascii=False)
-            total_nodes = sum(len(nodes) for nodes in subs_nodes_dict.values())
-            log(f"    ✓ 生成 {config_filename} ({len(content)} 字节, {total_nodes} 个节点)")
-            return config_filename, content
-        return None
-
-    return _process_templates(_merge_one)
-
-
-def generate_provider_configs(sub_url_map: dict[str, str]) -> dict[str, str]:
-    """生成 providers 版本的配置文件（直接填充 url，不做其他处理）"""
-    def _fill_one(template_path: str, base_name: str) -> tuple[str, str] | None:
-        template_file = os.path.basename(template_path)
-        template = load_jsonc(template_path)
-
-        filled_count = 0
-        for provider in template.get('providers', []):
-            provider_tag = provider.get('tag', '')
-            if provider_tag in sub_url_map:
-                provider['url'] = sub_url_map[provider_tag]
-                filled_count += 1
-
-        if filled_count > 0:
-            config_filename = base_name.replace('template', 'with_providers_config') + '.json'
-            log(f"  → 处理模板: {template_file} -> {config_filename} ({filled_count} 个 providers 已填充)")
-            return config_filename, json.dumps(template, indent=2, ensure_ascii=False)
-        return None
-
-    return _process_templates(_fill_one)
-
-
-# ========== 订阅下载 ==========
-
-def _process_subscription_download_only(sub: dict[str, str], user_agent: str) -> dict[str, Any]:
-    """处理单个订阅（仅下载 + 验证，不做转换），返回结果字典"""
-    result: dict[str, Any] = {"name": sub["name"], "status": "ok"}
-    try:
-        content, flow_info = download_subscription(sub["url"], user_agent)
-        result["flow"] = flow_info
-
-        is_valid, reason = validate_subscription_content(content, sub['name'])
-        if not is_valid:
-            result["status"] = "invalid"
-            result["reason"] = reason
-            return result
-
-        result["raw_content"] = content
-    except Exception as e:
-        result["status"] = "error"
-        result["reason"] = str(e)
-    return result
-
-
-def _batch_convert_and_collect(
-    download_results: dict[str, dict[str, Any]]
-) -> tuple[dict[str, str], list[dict[str, Any]], dict[str, list[dict[str, Any]]]]:
-    """将下载结果批量转换，并收集最终的文件、订阅信息和节点字典"""
-    # 收集所有需要转换的有效订阅内容
-    contents_to_convert: dict[str, str] = {}
-    for name, result in download_results.items():
-        if result["status"] == "ok":
-            contents_to_convert[name] = result["raw_content"]
-    
-    # 一次性批量转换
-    converted: dict[str, dict[str, Any] | None] = {}
-    if contents_to_convert:
-        converted = convert_to_singbox_batch(contents_to_convert)
-    
-    files: dict[str, str] = {}
-    subscription_info: list[dict[str, Any]] = []
-    subs_nodes_dict: dict[str, list[dict[str, Any]]] = {}
-    skipped_subs: list[str] = []
-    
-    for name, result in download_results.items():
-        status: str = result["status"]
-        flow_info: dict[str, int | None] | None = result.get("flow")
-        reason: str = result.get("reason", "未知")
-        filename = result.get("filename", f"{name}.yaml")
-        
-        info_entry: dict[str, Any] = {"name": name, "flow": flow_info, "node_count": 0, "status": status}
-        
-        if status == "ok":
-            raw_content: str = result["raw_content"]
-            files[filename] = raw_content
-            
-            singbox_config = converted.get(name)
-            if singbox_config is not None:
-                singbox_nodes = singbox_config.get('outbounds', []) + singbox_config.get('endpoints', [])
-                node_count = len(singbox_nodes)
-                singbox_content = json.dumps(singbox_config, indent=2, ensure_ascii=False)
-                
-                files[f"{name}-singbox.json"] = singbox_content
-                log(f"  ✓ {name}: 转换成功 ({len(singbox_content)} 字节, {node_count} 个节点)")
-                
-                if node_count > 0:
-                    subs_nodes_dict[name] = singbox_nodes
-                    log(f"    → '{name}': {node_count} 个节点")
-                else:
-                    skipped_subs.append(f"{name} (空节点)")
-                
-                info_entry.update({"node_count": node_count, "status": "ok"})
-            else:
-                log(f"  ⚠️ {name}: 转换失败")
-                skipped_subs.append(f"{name} (转换失败)")
-                info_entry["status"] = "convert_failed"
-        
-        elif status == "invalid":
-            log(f"  ⚠️ {name}: 内容无效 - {reason}")
-            skipped_subs.append(f"{name} (无效)")
-        
-        else:  # error
-            log(f"  ✗ {name}: {reason}")
-            skipped_subs.append(f"{name} (错误)")
-            
-        subscription_info.append(info_entry)
-    
-    if skipped_subs:
-        log(f"⚠️ {len(skipped_subs)} 个订阅跳过: {', '.join(skipped_subs)}")
-    
-    return files, subscription_info, subs_nodes_dict
-
-
-def _download_all_subscriptions(
-    subscriptions: list[dict[str, str]], user_agent: str
-) -> tuple[dict[str, str], list[dict[str, Any]], dict[str, list[dict[str, Any]]]]:
-    """并行下载所有订阅 → 批量转换 → 返回 (files, subscription_info, subs_nodes_dict)"""
-    
-    # ========== 阶段1: 并行下载 + 验证（不做转换）==========
-    download_results: dict[str, dict[str, Any]] = {}
-    
-    log(f"→ 并行下载 {len(subscriptions)} 个订阅...")
-    with ThreadPoolExecutor(max_workers=min(len(subscriptions), 8)) as executor:
-        future_to_sub = {
-            executor.submit(_process_subscription_download_only, sub, user_agent): sub
-            for sub in subscriptions
-        }
-        for future in as_completed(future_to_sub):
-            sub = future_to_sub[future]
-            result = future.result()
-            name: str = result["name"]
-            result["filename"] = sub["filename"]
-            download_results[name] = result
-    
-    # ========== 阶段2: 批量转换（单次 Node.js 进程）==========
-    return _batch_convert_and_collect(download_results)
-
-
-# ========== 配置生成与上传 ==========
+# ========== 主流程 ==========
 
 def _generate_and_upload(
     files: dict[str, str],
     subs_nodes_dict: dict[str, list[dict[str, Any]]],
-    subscriptions: list[dict[str, str]],
-    subscription_info: list[dict[str, Any]],
+    subscriptions: list[Subscription],
+    subscription_info: list[SubscriptionInfo],
     github_token: str,
     gist_id: str,
 ) -> str:
     """生成合并配置、providers 配置，并上传到 Gist"""
 
-    def _merge_and_log(src: dict[str, str], label: str) -> None:
-        """合并配置字典到 files 并记录日志"""
-        files.update(src)
-        if src:
-            log(f"  ✓ 共生成 {len(src)} 个{label}")
-
     log("→ 生成合并配置和 providers 配置...")
-    sub_url_map = {sub['name']: sub['url'] for sub in subscriptions}
-    _merge_and_log(merge_all_templates(subs_nodes_dict), "配置文件")
-    _merge_and_log(generate_provider_configs(sub_url_map), "providers配置文件")
+    sub_url_map = {sub.name: sub.url for sub in subscriptions}
 
-    readme_path = os.path.join(PROJECT_ROOT, "README.md")
+    merged = merge_all_templates(subs_nodes_dict)
+    files.update(merged)
+    if merged:
+        log(f"  ✓ 共生成 {len(merged)} 个配置文件")
+
+    providers = generate_provider_configs(sub_url_map)
+    files.update(providers)
+    if providers:
+        log(f"  ✓ 共生成 {len(providers)} 个 providers 配置文件")
+
+    # 生成 README
+    readme_path = PROJECT_ROOT / "README.md"
     readme_content = generate_readme(subscription_info)
-    with open(readme_path, "w", encoding="utf-8") as f:
-        f.write(readme_content)
+    readme_path.write_text(readme_content, encoding="utf-8")
     log("✓ README 已更新")
 
+    # 上传到 Gist
     log(f"上传 {len(files)} 个文件到 Gist...")
     new_gist_id = upload_to_gist(github_token, gist_id, files)
 
@@ -672,9 +613,8 @@ def _generate_and_upload(
     return new_gist_id
 
 
-# ========== 主入口 ==========
-
 def main() -> None:
+    """主入口"""
     log("=" * 60)
     log("SubDl - Subscription Downloader")
     log(f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -682,40 +622,45 @@ def main() -> None:
 
     github_token = get_env_var("GH_TOKEN", required=True)
     gist_id = get_env_var("GIST_ID", default="")
-    user_agent = get_env_var("USER_AGENT", default="clash-verge/v2.4.4")
+    user_agent = get_env_var("USER_AGENT", default=USER_AGENT)
 
-    # 并行执行：模板生成（后台线程）+ 订阅下载（主线程）
-    # 两者完全互不依赖，可同时进行
+    # 解析订阅配置
     subscriptions = parse_subscriptions()
     if not subscriptions:
         log("错误: 未找到订阅配置")
         sys.exit(1)
-
     log(f"找到 {len(subscriptions)} 个订阅")
 
+    # 并行执行：模板生成（后台线程）+ 订阅下载（主线程）
     log("::group::Download & Convert subscriptions")
-    templates_thread = threading.Thread(target=_generate_all_template_variants)
+    templates_thread = threading.Thread(target=generate_all_template_variants)
     templates_thread.start()
-    files, subscription_info, subs_nodes_dict = _download_all_subscriptions(subscriptions, user_agent)
+
+    download_results = _download_all(subscriptions, user_agent)
     templates_thread.join()
     log("::endgroup::")
 
-    valid_count = sum(1 for info in subscription_info if info['status'] == 'ok')
-    if valid_count == 0:
+    # 检查有效性
+    valid_results = [r for r in download_results if r.is_success]
+    if not valid_results:
         log("错误: 所有订阅下载失败或内容无效")
         sys.exit(1)
-    log(f"✓ 有效订阅: {valid_count}/{len(subscriptions)}")
+    log(f"✓ 有效订阅: {len(valid_results)}/{len(subscriptions)}")
+
+    # 聚合结果
+    files, subscription_info, subs_nodes_dict = _aggregate_results(download_results)
 
     if not subs_nodes_dict:
         log("✗ 错误: 没有有效的订阅节点，将不上传配置文件")
         sys.exit(1)
     log(f"✓ 合并节点: {len(subs_nodes_dict)}/{len(subscriptions)}")
 
+    # 生成配置并上传
     log("::group::Generate configs & Upload to Gist")
     _generate_and_upload(files, subs_nodes_dict, subscriptions, subscription_info, github_token, gist_id)
     log("::endgroup::")
 
-    log(f"完成! 成功处理 {valid_count} 个订阅，共 {len(files)} 个文件")
+    log(f"完成! 成功处理 {len(valid_results)} 个订阅，共 {len(files)} 个文件")
 
 
 if __name__ == "__main__":
