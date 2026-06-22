@@ -27,9 +27,6 @@ const PROXY_UTILS_NAME = 'proxy-utils.esm.mjs';
 // 可通过环境变量配置缓存 TTL（毫秒），默认 6 小时
 const CACHE_TTL_MS = parseInt(process.env.SUB_STORE_CACHE_TTL || '21600000', 10);
 
-/**
- * 获取 GitHub Releases 最新信息
- */
 async function getLatestRelease(githubToken) {
     const headers = {
         'User-Agent': 'SubDl-Converter',
@@ -43,9 +40,6 @@ async function getLatestRelease(githubToken) {
     return resp.json();
 }
 
-/**
- * 缓存版本读写
- */
 async function getCachedVersion() {
     try {
         const cached = (await fs.readFile(VERSION_FILE, 'utf8')).trim();
@@ -56,9 +50,6 @@ async function getCachedVersion() {
     }
 }
 
-/**
- * 下载并安装 Sub-Store 依赖
- */
 async function downloadAndInstall(asset, tagName) {
     console.error(`[Convert] 下载依赖 ${tagName}...`);
     const tmpFile = PROXY_UTILS_FILE + '.tmp';
@@ -70,9 +61,6 @@ async function downloadAndInstall(asset, tagName) {
     console.error('[Convert] 依赖更新成功');
 }
 
-/**
- * 检查并更新 Sub-Store 依赖（带本地缓存）
- */
 async function checkAndUpdateDeps(githubToken) {
     const hasLocal = existsSync(PROXY_UTILS_FILE);
 
@@ -82,8 +70,7 @@ async function checkAndUpdateDeps(githubToken) {
 
         // 缓存未过期，直接使用
         if (cachedVersion && cachedTime && age < CACHE_TTL_MS) {
-            const hours = Math.round(age / 3600000);
-            console.error(`[Convert] 使用缓存版本 (${cachedVersion}, ${hours}h 前检查)`);
+            console.error(`[Convert] 使用缓存版本 (${cachedVersion}, ${Math.round(age / 3600000)}h 前检查)`);
             return;
         }
 
@@ -107,7 +94,6 @@ async function checkAndUpdateDeps(githubToken) {
 
         if (!asset) {
             if (!hasLocal) throw new Error('未找到依赖文件且本地无缓存');
-            // 有本地缓存时刷新时间戳避免下次再请求
             await fs.writeFile(VERSION_FILE, `${cachedVersion}\n${Date.now()}`);
             console.error('[Convert] 未找到新版本资产，使用本地缓存');
             return;
@@ -124,8 +110,6 @@ async function checkAndUpdateDeps(githubToken) {
 
 /**
  * 批量转换：一次加载模块，转换多个订阅内容
- * @param {Object<string, string>} batchInput - { "sub_name": "clash_content", ... }
- * @returns {Object<string, any>} - { "sub_name": <singbox_result>, ... }
  */
 async function batchConvertToSingbox(batchInput) {
     const GLOBAL_KEYS = ['require', 'window', 'document', 'self', 'navigator', 'location'];
@@ -180,9 +164,6 @@ async function batchConvertToSingbox(batchInput) {
     }
 }
 
-/**
- * 主函数
- */
 async function main() {
     const args = process.argv.slice(2);
     const command = args[0];
@@ -196,18 +177,12 @@ async function main() {
         if (!existsSync(DEPS_DIR)) mkdirSync(DEPS_DIR, { recursive: true });
         await checkAndUpdateDeps(githubToken);
 
-        if (command !== 'batch-convert') {
+        if (command !== 'batch-convert' || !args[1]) {
             console.error('用法: node convert.mjs batch-convert <input-file>');
             process.exit(1);
         }
 
-        const inputFile = args[1];
-        if (!inputFile) {
-            console.error('用法: node convert.mjs batch-convert <input-file>');
-            process.exit(1);
-        }
-
-        const batchInput = JSON.parse(await fs.readFile(inputFile, 'utf8'));
+        const batchInput = JSON.parse(await fs.readFile(args[1], 'utf8'));
         const results = await batchConvertToSingbox(batchInput);
 
         // 恢复 console.log，只输出 JSON 到 stdout

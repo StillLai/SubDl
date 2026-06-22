@@ -13,11 +13,6 @@ concurrency:
   group: subscriptions-update
   cancel-in-progress: false
 
-# 缓存经验法则：仅当「直接下载/重新生成」比 8s cache restore 更慢时才用 actions/cache
-#   - 适合：克隆大仓库、重新生成很贵的场景
-#   - 不适合：源端本身快（PyPI / GitHub Releases / npm registry）
-#   - 当前不 cache：actions/cache post-job cleanup 8s 抵消了大部分收益
-
 permissions:
   contents: write
 

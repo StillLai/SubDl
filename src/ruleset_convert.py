@@ -9,7 +9,6 @@ import yaml
 import ipaddress
 import re
 from io import StringIO
-from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -137,7 +136,7 @@ def _parse_csv_rows(data: str) -> list[dict[str, str | None]]:
     return rows
 
 
-_PARSERS: dict[str, Callable[[str], Any]] = {
+_PARSERS: dict[str, callable] = {
     'json': json.loads,
     'yaml': yaml.safe_load,
     'csv': _parse_csv_rows,
@@ -151,8 +150,8 @@ def parse_and_convert_to_rows(link: str) -> list[dict[str, str | None]]:
             return _parse_yaml_rows(_fetch_parsed(link, 'yaml'))
         except Exception as e:
             logger.warn(f"  YAML 解析失败 {link}: {e}，回退到 CSV 格式解析")
-            return _fetch_parsed(link, 'csv')  # type: ignore[return-value]
-    return _fetch_parsed(link, 'csv')  # type: ignore[return-value]
+            return _fetch_parsed(link, 'csv')
+    return _fetch_parsed(link, 'csv')
 
 
 # ========== SRS 编译 ==========
@@ -179,9 +178,9 @@ def prioritize_version_key(obj: Any) -> Any:
         result: dict[str, Any] = {}
         if "version" in obj:
             result["version"] = prioritize_version_key(obj["version"])
-        for k in obj:
+        for k, v in obj.items():
             if k != "version":
-                result[k] = prioritize_version_key(obj[k])
+                result[k] = prioritize_version_key(v)
         return result
     elif isinstance(obj, list):
         return [prioritize_version_key(x) for x in obj]
@@ -198,7 +197,7 @@ def _group_by_mapped(
     seen: set[tuple[str, str]] = set()
 
     for row in rows:
-        pattern: str = row['pattern']  # type: ignore[assignment]
+        pattern: str = row['pattern']
         if '#' in pattern:
             continue
         pattern_upper = pattern.upper()

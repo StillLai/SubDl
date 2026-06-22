@@ -18,8 +18,6 @@ import re
 import subprocess
 import sys
 import tempfile
-import threading
-import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone, timedelta
@@ -29,7 +27,7 @@ from utils import (
     logger, load_jsonc, discover_template_files,
     http_get_with_retry, http_request, try_decode_base64,
     FlowInfo, Subscription, DownloadResult, SubscriptionInfo,
-    format_bytes, format_expire, get_env_var,
+    get_env_var,
     PROJECT_ROOT, TEMPLATE_DIR, WORKFLOW_PATH,
     CONVERT_SCRIPT, TEMPLATE_BASE, USER_AGENT,
 )
@@ -47,23 +45,21 @@ def parse_flow_info(headers: dict[str, str]) -> FlowInfo | None:
     if not flow_header:
         return None
 
-    upload = download = total = 0
-    expire: int | None = None
+    fields: dict[str, int | None] = {'upload': 0, 'download': 0, 'total': 0, 'expire': None}
     for match in _FLOW_KEY_PATTERN.finditer(flow_header):
         key, value = match.group(1), int(match.group(2))
-        if key == 'upload':
-            upload = value
-        elif key == 'download':
-            download = value
-        elif key == 'total':
-            total = value
-        elif key == 'expire':
-            expire = value
+        if key in fields:
+            fields[key] = value
 
-    return FlowInfo(upload=upload, download=download, total=total, expire=expire)
+    return FlowInfo(
+        upload=fields['upload'] or 0,
+        download=fields['download'] or 0,
+        total=fields['total'] or 0,
+        expire=fields['expire'],
+    )
 
 
-# ========== 订阅验证 ==========
+# ========== 订阅解析与验证 ==========
 
 _VALID_INDICATORS: tuple[str, ...] = (
     'proxies', 'proxy-providers', 'proxy-groups', 'servers',
@@ -86,35 +82,24 @@ def _validate_subscription(content: str) -> str | None:
     return None
 
 
-# ========== 订阅解析 ==========
-
-def _parse_single_entry(value: str) -> Subscription | None:
-    """解析单个订阅条目（名称|URL 或纯 URL）"""
-    if "|" in value:
-        name, url = value.split("|", 1)
-        name, url = name.strip(), url.strip()
-    else:
-        url = value.strip()
-        name = None
-    return Subscription.from_url(url, name) if url else None
-
-
 def parse_subscriptions() -> list[Subscription]:
     """解析订阅配置 — 从 SUB_URL / SUB_URL_N 环境变量获取"""
-    subscriptions: list[Subscription] = []
-
     sub_keys = sorted(
         (k for k in os.environ if re.match(r'^SUB_URL(_\d+)?$', k)),
         key=lambda k: -1 if k == 'SUB_URL' else int(k.split('_')[-1])
     )
+    subscriptions: list[Subscription] = []
     for env_name in sub_keys:
         value = os.environ[env_name].strip()
         if not value:
             continue
-        sub = _parse_single_entry(value)
+        if "|" in value:
+            name, url = value.split("|", 1)
+            sub = Subscription.from_url(url.strip(), name.strip())
+        else:
+            sub = Subscription.from_url(value.strip())
         if sub:
             subscriptions.append(sub)
-
     return subscriptions
 
 
@@ -123,11 +108,9 @@ def parse_subscriptions() -> list[Subscription]:
 def _download_subscription(sub: Subscription, user_agent: str) -> DownloadResult:
     """下载单个订阅，返回结果"""
     try:
-        headers = {"User-Agent": user_agent}
-        response = http_get_with_retry(sub.url, headers=headers)
+        response = http_get_with_retry(sub.url, headers={"User-Agent": user_agent})
         content = response.text
 
-        # 尝试 Base64 解码
         decoded = try_decode_base64(content)
         if decoded is not content:
             logger.debug(f"    {sub.name}: 内容已从 Base64 解码")
@@ -169,10 +152,10 @@ def _download_all(subscriptions: list[Subscription], user_agent: str) -> list[Do
 
 def _convert_batch(contents_dict: dict[str, str]) -> dict[str, dict[str, Any] | None]:
     """批量转换：将所有 Clash 内容一次性传给单个 Node.js 进程
-    
+
     Args:
         contents_dict: {订阅名称: clash内容, ...}
-    
+
     Returns:
         {订阅名称: singbox配置dict | None, ...} — None 表示转换失败
     """
@@ -222,7 +205,6 @@ def _aggregate_results(
     download_results: list[DownloadResult],
 ) -> tuple[dict[str, str], list[SubscriptionInfo], dict[str, list[dict[str, Any]]]]:
     """聚合下载结果：批量转换 → 收集文件、订阅信息和节点字典"""
-    # 收集需要转换的内容
     contents_to_convert = {
         r.name: r.raw_content
         for r in download_results
@@ -243,13 +225,11 @@ def _aggregate_results(
             ))
             continue
 
-        # 保存原始内容
         if result.raw_content is None:
             skipped.append(f"{result.name} (原始内容为空)")
             continue
         files[result.filename] = result.raw_content
 
-        # 处理转换结果
         singbox_config = converted.get(result.name)
         if singbox_config is None:
             skipped.append(f"{result.name} (转换失败)")
@@ -279,86 +259,63 @@ def _aggregate_results(
     return files, subscription_info, subs_nodes_dict
 
 
-# ========== 模板生成 ==========
+# ========== 模板变体生成 ==========
 
-def _get_inbounds(template: dict[str, Any]) -> list[dict[str, Any]] | None:
+_TEMPLATE_VARIANTS: list[tuple[str, str, str]] = [
+    ('noTun', 'noTun', 'remove_tun'),
+    ('tproxy', 'tproxy', 'replace_tun_with_tproxy'),
+    ('tun_for_win', 'tun_for_win', 'remove_auto_redirect'),
+]
+
+
+def _get_inbounds(template: dict[str, Any]) -> list[dict[str, Any]]:
     """获取模板的 inbounds 列表"""
     inbounds = template.get('inbounds')
-    return inbounds if isinstance(inbounds, list) else None
+    return inbounds if isinstance(inbounds, list) else []
 
 
-def _remove_tun_inbounds(template: dict[str, Any]) -> None:
-    """移除所有 type=tun 的 inbound"""
+def _transform_template(template: dict[str, Any], action: str) -> None:
+    """对模板执行指定变换"""
     inbounds = _get_inbounds(template)
-    if inbounds is None:
-        return
-    original = len(inbounds)
-    template['inbounds'] = [
-        ib for ib in inbounds
-        if not (isinstance(ib, dict) and ib.get('type') == 'tun')
-    ]
-    logger.debug(f"  已移除 {original - len(template['inbounds'])} 个 tun inbound")
 
-
-def _replace_tun_with_tproxy(template: dict[str, Any]) -> None:
-    """将第一个 type=tun inbound 替换为 tproxy"""
-    inbounds = _get_inbounds(template)
-    if inbounds is None:
-        return
-    for i, ib in enumerate(inbounds):
-        if isinstance(ib, dict) and ib.get('type') == 'tun':
-            inbounds[i] = {"type": "tproxy", "tag": "tproxy-in", "listen": "::", "listen_port": 1536}
-            logger.debug("  已将 tun inbound 替换为 tproxy inbound")
-            break
-
-
-def _remove_auto_redirect(template: dict[str, Any]) -> None:
-    """删除 tun inbound 中的 auto_redirect 字段"""
-    inbounds = _get_inbounds(template)
-    if inbounds is None:
-        return
-    for ib in inbounds:
-        if isinstance(ib, dict) and ib.get('type') == 'tun':
-            if 'auto_redirect' in ib:
-                del ib['auto_redirect']
-                logger.debug("  已在 tun inbound 中删除 auto_redirect 字段")
-            break
-
-
-def _generate_template_variant(
-    suffix: str, label: str, transform: Callable[[dict[str, Any]], None],
-    base_template: dict[str, Any]
-) -> None:
-    """生成单个模板变体"""
-    try:
-        output_path = TEMPLATE_DIR / f'sing-box_template_{suffix}.jsonc'
-        template = copy.deepcopy(base_template)
-        transform(template)
-        output_content = json.dumps(template, indent=2, ensure_ascii=False)
-        with open(output_path, 'w', encoding='utf-8') as f:
-            f.write(output_content)
-        logger.debug(f"  ✓ 已生成 {label} 模板")
-    except Exception as e:
-        logger.error(f"  ✗ 生成 {label} 模板异常: {e}")
+    if action == 'remove_tun':
+        template['inbounds'] = [
+            ib for ib in inbounds
+            if not (isinstance(ib, dict) and ib.get('type') == 'tun')
+        ]
+    elif action == 'replace_tun_with_tproxy':
+        for i, ib in enumerate(inbounds):
+            if isinstance(ib, dict) and ib.get('type') == 'tun':
+                inbounds[i] = {"type": "tproxy", "tag": "tproxy-in", "listen": "::", "listen_port": 1536}
+                break
+    elif action == 'remove_auto_redirect':
+        for ib in inbounds:
+            if isinstance(ib, dict) and ib.get('type') == 'tun':
+                ib.pop('auto_redirect', None)
+                break
 
 
 def generate_all_template_variants() -> None:
     """生成所有模板变体（noTun / tproxy / tun_for_win）"""
     base_template = load_jsonc(TEMPLATE_BASE)
-    for suffix, label, transform in [
-        ('noTun', 'noTun', _remove_tun_inbounds),
-        ('tproxy', 'tproxy', _replace_tun_with_tproxy),
-        ('tun_for_win', 'tun_for_win', _remove_auto_redirect),
-    ]:
-        _generate_template_variant(suffix, label, transform, base_template)
+    for suffix, label, action in _TEMPLATE_VARIANTS:
+        try:
+            template = copy.deepcopy(base_template)
+            _transform_template(template, action)
+            output_path = TEMPLATE_DIR / f'sing-box_template_{suffix}.jsonc'
+            with open(output_path, 'w', encoding='utf-8') as f:
+                json.dump(template, f, indent=2, ensure_ascii=False)
+            logger.debug(f"  ✓ 已生成 {label} 模板")
+        except Exception as e:
+            logger.error(f"  ✗ 生成 {label} 模板异常: {e}")
 
 
-# ========== 遍历模板生成配置 ==========
+# ========== 模板遍历处理 ==========
 
 def _process_templates(
     process_fn: Callable[[str, str], tuple[str, str] | None]
 ) -> dict[str, str]:
-    """遍历所有模板文件，并行处理"""
+    """遍历所有模板文件，串行处理"""
     templates = discover_template_files(TEMPLATE_DIR)
     if not templates:
         logger.error("  模板目录中没有找到模板文件")
@@ -367,18 +324,32 @@ def _process_templates(
     logger.debug(f"  找到 {len(templates)} 个模板文件")
     results: dict[str, str] = {}
 
-    with ThreadPoolExecutor(max_workers=min(len(templates), 4)) as executor:
-        futures = {
-            executor.submit(process_fn, path, name): (path, name)
-            for path, name in templates
-        }
-        for future in as_completed(futures):
-            entry = future.result()
-            if entry:
-                filename, content = entry
-                results[filename] = content
+    for path, name in templates:
+        entry = process_fn(path, name)
+        if entry:
+            results[entry[0]] = entry[1]
 
     return results
+
+
+# ========== 配置合并 ==========
+
+def merge_singbox_config(
+    subs_nodes_dict: dict[str, list[dict[str, Any]]], template_path: str | None = None
+) -> dict[str, Any] | None:
+    """将订阅节点合并到配置模板"""
+    if template_path is None:
+        template_path = str(TEMPLATE_BASE)
+    if not os.path.exists(template_path):
+        logger.error(f"  配置模板不存在: {template_path}")
+        return None
+
+    try:
+        template = load_jsonc(template_path)
+        return merge_config(template, subs_nodes_dict)
+    except Exception as e:
+        logger.error(f"  合并异常: {e}")
+        return None
 
 
 def merge_all_templates(subs_nodes_dict: dict[str, list[dict[str, Any]]]) -> dict[str, str]:
@@ -417,27 +388,26 @@ def generate_provider_configs(sub_url_map: dict[str, str]) -> dict[str, str]:
     return _process_templates(_fill_one)
 
 
-# ========== 配置合并入口 ==========
+# ========== README 生成 ==========
 
-def merge_singbox_config(
-    subs_nodes_dict: dict[str, list[dict[str, Any]]], template_path: str | None = None
-) -> dict[str, Any] | None:
-    """将订阅节点合并到配置模板"""
-    if template_path is None:
-        template_path = str(TEMPLATE_BASE)
-    if not os.path.exists(template_path):
-        logger.error(f"  配置模板不存在: {template_path}")
-        return None
+def _format_bytes(n: int) -> str:
+    """将字节数格式化为人类可读字符串"""
+    if n == 0:
+        return "0 B"
+    units = ('B', 'KB', 'MB', 'GB', 'TB')
+    i = min(int(n.bit_length() - 1) // 10, len(units) - 1)
+    return f"{n / (1024 ** i):.2f} {units[i]}"
 
+
+def _format_expire(timestamp: int | None) -> str:
+    """格式化过期时间"""
+    if not timestamp:
+        return "无"
     try:
-        template = load_jsonc(template_path)
-        return merge_config(template, subs_nodes_dict)
-    except Exception as e:
-        logger.error(f"  合并异常: {e}")
-        return None
+        return datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d")
+    except Exception:
+        return "无"
 
-
-# ========== cron 解析 ==========
 
 def _parse_cron_interval() -> str:
     """从 workflow 文件解析 cron 间隔"""
@@ -445,15 +415,13 @@ def _parse_cron_interval() -> str:
         content = WORKFLOW_PATH.read_text(encoding='utf-8')
         match = re.search(r"cron:\s*['\"](\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)['\"]", content)
         if match:
-            _, hour = match.group(1), match.group(2)
+            hour = match.group(2)
             if hour.startswith('*/'):
                 return f"每 {hour[2:]} 小时"
-    except Exception as e:
-        logger.debug(f"  cron 解析失败: {e}，使用默认值")
+    except Exception:
+        pass
     return "每小时"
 
-
-# ========== README 生成 ==========
 
 def generate_readme(subscription_info: list[SubscriptionInfo]) -> str:
     """生成 README 内容"""
@@ -470,21 +438,16 @@ def generate_readme(subscription_info: list[SubscriptionInfo]) -> str:
 
     total_nodes = 0
     for info in subscription_info:
-        flow = info.flow
-        if flow:
-            total, used, remaining = flow.total, flow.used, flow.remaining
-            expire_str = format_expire(flow.expire)
-            status_str = flow.status
+        if info.flow:
+            f = info.flow
+            lines.append(
+                f"| {info.name} | {_format_bytes(f.total)} | {_format_bytes(f.used)}"
+                f" | {_format_bytes(f.remaining)} | {_format_expire(f.expire)}"
+                f" | {f.status} | {info.node_count} |"
+            )
         else:
-            total, used, remaining = 0, 0, 0
-            expire_str, status_str = "无", "❓ 无信息"
-
+            lines.append(f"| {info.name} | 0 B | 0 B | 0 B | 无 | ❓ 无信息 | {info.node_count} |")
         total_nodes += info.node_count
-        lines.append(
-            f"| {info.name} | {format_bytes(total)} | {format_bytes(used)}"
-            f" | {format_bytes(remaining)} | {expire_str}"
-            f" | {status_str} | {info.node_count} |"
-        )
 
     lines.append(f"| **合计** | | | | | | **{total_nodes}** |")
 
@@ -523,8 +486,6 @@ def generate_readme(subscription_info: list[SubscriptionInfo]) -> str:
 
 def upload_to_gist(github_token: str, gist_id: str, files: dict[str, str]) -> str:
     """上传文件到 GitHub Gist"""
-    from urllib.error import HTTPError as UrllibHTTPError
-
     headers = {"Authorization": f"token {github_token}", "Accept": "application/vnd.github.v3+json"}
     gist_files = {name: {"content": content} for name, content in files.items()}
 
@@ -545,7 +506,7 @@ def upload_to_gist(github_token: str, gist_id: str, files: dict[str, str]) -> st
         logger.info("    ✓ 更新成功")
         return gist_id
 
-    except UrllibHTTPError as e:
+    except HTTPError as e:
         logger.error(f"    Gist API 错误: {e}")
         logger.error(f"      响应: {e.read().decode('utf-8', errors='replace')}")
         raise
@@ -579,13 +540,10 @@ def _generate_and_upload(
     if providers:
         logger.info(f"  ✓ 共生成 {len(providers)} 个 providers 配置文件")
 
-    # 生成 README
-    readme_path = PROJECT_ROOT / "README.md"
     readme_content = generate_readme(subscription_info)
-    readme_path.write_text(readme_content, encoding="utf-8")
+    (PROJECT_ROOT / "README.md").write_text(readme_content, encoding="utf-8")
     logger.info("✓ README 已更新")
 
-    # 上传到 Gist
     logger.info(f"上传 {len(files)} 个文件到 Gist...")
     new_gist_id = upload_to_gist(github_token, gist_id, files)
 
@@ -606,23 +564,20 @@ def main() -> None:
     github_token = get_env_var("GH_TOKEN", required=True)
     gist_id = get_env_var("GIST_ID", default="")
 
-    # 解析订阅配置
     subscriptions = parse_subscriptions()
     if not subscriptions:
         logger.info("错误: 未找到订阅配置")
         sys.exit(1)
     logger.info(f"找到 {len(subscriptions)} 个订阅")
 
-    # 并行执行：模板生成（后台线程）+ 订阅下载（主线程）
+    # 模板变体生成
     logger.info("::group::Download & Convert subscriptions")
-    templates_thread = threading.Thread(target=generate_all_template_variants)
-    templates_thread.start()
+    generate_all_template_variants()
 
+    # 并行下载
     download_results = _download_all(subscriptions, USER_AGENT)
-    templates_thread.join()
     logger.info("::endgroup::")
 
-    # 检查有效性
     valid_results = [r for r in download_results if r.is_success]
     if not valid_results:
         logger.info("错误: 所有订阅下载失败或内容无效")
