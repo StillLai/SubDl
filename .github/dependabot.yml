@@ -1,6 +1,6 @@
 version: 2
 updates:
-  # npm 依赖（jsdom / dotenv）
+  # npm 依赖（jsdom — Sub-Store proxy-utils 运行时依赖）
   - package-ecosystem: "npm"
     directory: "/src"
     schedule:
@@ -18,7 +18,7 @@ updates:
       - "dependencies"
       - "npm"
 
-  # Python 依赖（requests / brotli / json5 / pyyaml）
+  # Python 依赖（json5 / pyyaml）
   - package-ecosystem: "pip"
     directory: "/src"
     schedule:

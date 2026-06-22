@@ -92,16 +92,12 @@ def process_providers(
     del config['providers']
 
 
-def _remove_filter_fields(obj: Any) -> None:
-    """递归移除对象中的 include 和 exclude 字段"""
-    if isinstance(obj, dict):
-        obj.pop('include', None)
-        obj.pop('exclude', None)
-        for value in obj.values():
-            _remove_filter_fields(value)
-    elif isinstance(obj, list):
-        for item in obj:
-            _remove_filter_fields(item)
+def _strip_filter_fields(outbounds: list[Any]) -> None:
+    """移除 outbounds 中每个 dict 的 include/exclude 字段（O(n) 常数时间）"""
+    for outbound in outbounds:
+        if isinstance(outbound, dict):
+            outbound.pop('include', None)
+            outbound.pop('exclude', None)
 
 
 def _fix_empty_outbounds(outbounds: list[Any]) -> None:
@@ -149,8 +145,8 @@ def merge_config(
         process_providers(config, subscriptions_nodes)
         logger.info("[Merge] 已处理 providers 配置")
 
-    # 步骤 3: 移除所有 include 和 exclude 字段
-    _remove_filter_fields(outbounds)
+    # 步骤 3: 移除 outbounds 中的 include/exclude 字段
+    _strip_filter_fields(outbounds)
 
     # 步骤 4: 将代理节点添加到 outbounds 末尾
     outbounds.extend(all_nodes)

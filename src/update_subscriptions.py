@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-订阅下载、转换、合并与上传模块
+"""订阅下载、转换、合并与上传模块
 
 主流程：
   1. 解析环境变量获取订阅列表
@@ -18,18 +17,16 @@ import re
 import subprocess
 import sys
 import tempfile
-from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone, timedelta
 from typing import Any
 
 from utils import (
-    logger, load_jsonc, discover_template_files,
+    logger, load_jsonc,
     http_get_with_retry, http_request, try_decode_base64,
     FlowInfo, Subscription, DownloadResult, SubscriptionInfo,
-    get_env_var,
-    PROJECT_ROOT, TEMPLATE_DIR, WORKFLOW_PATH,
-    CONVERT_SCRIPT, TEMPLATE_BASE, USER_AGENT,
+    PROJECT_ROOT, TEMPLATE_DIR, TEMPLATE_BASE,
+    CONVERT_SCRIPT, USER_AGENT,
 )
 from merge_config import merge_config
 
@@ -151,14 +148,7 @@ def _download_all(subscriptions: list[Subscription], user_agent: str) -> list[Do
 # ========== 批量转换 ==========
 
 def _convert_batch(contents_dict: dict[str, str]) -> dict[str, dict[str, Any] | None]:
-    """批量转换：将所有 Clash 内容一次性传给单个 Node.js 进程
-
-    Args:
-        contents_dict: {订阅名称: clash内容, ...}
-
-    Returns:
-        {订阅名称: singbox配置dict | None, ...} — None 表示转换失败
-    """
+    """批量转换：将所有 Clash 内容一次性传给单个 Node.js 进程"""
     if not contents_dict:
         return {}
 
@@ -268,15 +258,11 @@ _TEMPLATE_VARIANTS: list[tuple[str, str, str]] = [
 ]
 
 
-def _get_inbounds(template: dict[str, Any]) -> list[dict[str, Any]]:
-    """获取模板的 inbounds 列表"""
-    inbounds = template.get('inbounds')
-    return inbounds if isinstance(inbounds, list) else []
-
-
 def _transform_template(template: dict[str, Any], action: str) -> None:
     """对模板执行指定变换"""
-    inbounds = _get_inbounds(template)
+    inbounds = template.get('inbounds', [])
+    if not isinstance(inbounds, list):
+        return
 
     if action == 'remove_tun':
         template['inbounds'] = [
@@ -310,25 +296,27 @@ def generate_all_template_variants() -> None:
             logger.error(f"  ✗ 生成 {label} 模板异常: {e}")
 
 
-# ========== 模板遍历处理 ==========
+# ========== 模板文件列表 ==========
+
+# 硬编码模板列表，避免运行时遍历目录
+_TEMPLATES: list[tuple[str, str]] = [
+    (str(TEMPLATE_BASE), TEMPLATE_BASE.stem),
+] + [
+    (str(TEMPLATE_DIR / f'sing-box_template_{s}.jsonc'), f'sing-box_template_{s}')
+    for s, _, _ in _TEMPLATE_VARIANTS
+]
+
 
 def _process_templates(
-    process_fn: Callable[[str, str], tuple[str, str] | None]
+    process_fn: Any,
 ) -> dict[str, str]:
     """遍历所有模板文件，串行处理"""
-    templates = discover_template_files(TEMPLATE_DIR)
-    if not templates:
-        logger.error("  模板目录中没有找到模板文件")
-        return {}
-
-    logger.debug(f"  找到 {len(templates)} 个模板文件")
+    logger.debug(f"  处理 {len(_TEMPLATES)} 个模板文件")
     results: dict[str, str] = {}
-
-    for path, name in templates:
+    for path, name in _TEMPLATES:
         entry = process_fn(path, name)
         if entry:
             results[entry[0]] = entry[1]
-
     return results
 
 
@@ -409,23 +397,8 @@ def _format_expire(timestamp: int | None) -> str:
         return "无"
 
 
-def _parse_cron_interval() -> str:
-    """从 workflow 文件解析 cron 间隔"""
-    try:
-        content = WORKFLOW_PATH.read_text(encoding='utf-8')
-        match = re.search(r"cron:\s*['\"](\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)['\"]", content)
-        if match:
-            hour = match.group(2)
-            if hour.startswith('*/'):
-                return f"每 {hour[2:]} 小时"
-    except Exception:
-        pass
-    return "每小时"
-
-
 def generate_readme(subscription_info: list[SubscriptionInfo]) -> str:
     """生成 README 内容"""
-    interval = _parse_cron_interval()
     now = datetime.now(timezone(timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S CST')
 
     lines = [
@@ -461,23 +434,10 @@ def generate_readme(subscription_info: list[SubscriptionInfo]) -> str:
         "   - `SUB_URL_1`, `SUB_URL_2`...: 更多订阅（可选）",
         "3. 在 Actions → Subscriptions Update 中点击 Run workflow", "",
         "## 说明", "",
-        f"- {interval}自动更新订阅",
+        "- 每小时自动更新订阅",
         "- 订阅内容上传到 Gist，不保存在仓库",
         "- `sing-box-config.json` 是可直接使用的完整 sing-box 配置文件",
         "- 参考 [sub-store](https://github.com/sub-store-org/Sub-Store) 实现", "",
-        "## 🚀 sing-box 路由规则集", "",
-        "本项目自动将多种格式的规则源（Clash、Surge 等）转换为 sing-box 支持的规则集格式，支持：", "",
-        "- 🔄 **自动更新**：每 6 小时自动抓取最新规则并重新生成",
-        "- 📦 **双格式输出**：同时生成 JSON 格式（`ruleset/json/`）和 SRS 二进制格式（`ruleset/srs/`）",
-        "- ⚡ **性能优化**：SRS 格式加载更快，推荐使用",
-        "- 🛠️ **自定义规则**：修改 `ruleset/custom_rule/` 目录下的文件即可添加个人规则", "",
-        "### 自定义规则", "",
-        "| 文件 | 用途 |",
-        "|------|------|",
-        "| `custom_direct.list` | 直连域名/IP |",
-        "| `custom_proxy.list` | 代理域名/IP |",
-        "| `custom_block.list` | 屏蔽域名/IP |",
-        "| `custom_whitelist.list` | 白名单（强制直连） |", "",
     ])
     return "\n".join(lines)
 
@@ -506,10 +466,6 @@ def upload_to_gist(github_token: str, gist_id: str, files: dict[str, str]) -> st
         logger.info("    ✓ 更新成功")
         return gist_id
 
-    except HTTPError as e:
-        logger.error(f"    Gist API 错误: {e}")
-        logger.error(f"      响应: {e.read().decode('utf-8', errors='replace')}")
-        raise
     except Exception as e:
         logger.error(f"    Gist 上传异常: {e}")
         raise
@@ -561,12 +517,15 @@ def main() -> None:
     logger.info(f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     logger.info("=" * 60)
 
-    github_token = get_env_var("GH_TOKEN", required=True)
-    gist_id = get_env_var("GIST_ID", default="")
+    github_token = os.environ.get("GH_TOKEN")
+    if not github_token:
+        logger.error("环境变量 GH_TOKEN 未设置")
+        sys.exit(1)
+    gist_id = os.environ.get("GIST_ID", "")
 
     subscriptions = parse_subscriptions()
     if not subscriptions:
-        logger.info("错误: 未找到订阅配置")
+        logger.error("未找到订阅配置")
         sys.exit(1)
     logger.info(f"找到 {len(subscriptions)} 个订阅")
 
@@ -580,7 +539,7 @@ def main() -> None:
 
     valid_results = [r for r in download_results if r.is_success]
     if not valid_results:
-        logger.info("错误: 所有订阅下载失败或内容无效")
+        logger.error("所有订阅下载失败或内容无效")
         sys.exit(1)
     logger.info(f"✓ 有效订阅: {len(valid_results)}/{len(subscriptions)}")
 
@@ -588,7 +547,7 @@ def main() -> None:
     files, subscription_info, subs_nodes_dict = _aggregate_results(download_results)
 
     if not subs_nodes_dict:
-        logger.info("✗ 错误: 没有有效的订阅节点，将不上传配置文件")
+        logger.error("没有有效的订阅节点，将不上传配置文件")
         sys.exit(1)
     logger.info(f"✓ 合并节点: {len(subs_nodes_dict)}/{len(subscriptions)}")
 

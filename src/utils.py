@@ -12,11 +12,9 @@ import re
 import sys
 import time
 from dataclasses import dataclass
-from datetime import datetime
-from enum import Enum
 from http.client import HTTPResponse
 from pathlib import Path
-from typing import Any, IO
+from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
@@ -33,7 +31,6 @@ RULESET_DIR = PROJECT_ROOT / 'ruleset'
 RULESET_SOURCE = RULESET_DIR / 'ruleset_source.txt'
 RULESET_JSON_DIR = RULESET_DIR / 'json'
 RULESET_SRS_DIR = RULESET_DIR / 'srs'
-WORKFLOW_PATH = PROJECT_ROOT / '.github' / 'workflows' / 'subscriptions-update.yml'
 CONVERT_SCRIPT = SCRIPT_DIR / 'convert.mjs'
 TEMPLATE_BASE = TEMPLATE_DIR / 'sing-box_template.jsonc'
 
@@ -46,47 +43,32 @@ USER_AGENT = "clash-verge/v2.4.4"
 _RETRYABLE_CODES: frozenset[int] = frozenset({429, 500, 502, 503, 504})
 
 
-# ========== 日志系统 ==========
+# ========== 日志 ==========
 
-class LogLevel(Enum):
-    """日志级别枚举（值为数值，支持大小比较）"""
-    DEBUG = 10
-    INFO = 20
-    WARN = 30
-    ERROR = 40
+def _log(level: str, msg: str) -> None:
+    """输出日志到 stderr（避免污染 stdout 数据流）"""
+    prefix = f"[{level}] " if level != "INFO" else ""
+    print(f"{prefix}{msg}", file=sys.stderr)
 
 
-class Logger:
-    """统一日志管理器
+class logger:
+    """极简日志命名空间，与原 API 兼容"""
 
-    输出到 stderr，避免污染 stdout 数据流。
-    支持按级别过滤，便于 CI 调试。
-    """
+    @staticmethod
+    def debug(msg: str) -> None:
+        _log("DEBUG", msg)
 
-    def __init__(self, min_level: LogLevel = LogLevel.INFO, file: IO[str] = sys.stderr):
-        self.min_level = min_level
-        self.file = file
+    @staticmethod
+    def info(msg: str) -> None:
+        _log("INFO", msg)
 
-    def _log(self, level: LogLevel, msg: str) -> None:
-        if level.value >= self.min_level.value:
-            prefix = f"[{level.name}]" if level != LogLevel.INFO else ""
-            print(f"{prefix} {msg}" if prefix else msg, file=self.file)
+    @staticmethod
+    def warn(msg: str) -> None:
+        _log("WARN", msg)
 
-    def debug(self, msg: str) -> None:
-        self._log(LogLevel.DEBUG, msg)
-
-    def info(self, msg: str) -> None:
-        self._log(LogLevel.INFO, msg)
-
-    def warn(self, msg: str) -> None:
-        self._log(LogLevel.WARN, msg)
-
-    def error(self, msg: str) -> None:
-        self._log(LogLevel.ERROR, msg)
-
-
-# 全局日志实例
-logger = Logger(min_level=LogLevel.INFO)
+    @staticmethod
+    def error(msg: str) -> None:
+        _log("ERROR", msg)
 
 
 # ========== 数据模型 ==========
@@ -117,6 +99,18 @@ class FlowInfo:
         if self.expire and self.expire - now < 7 * 24 * 3600:
             return "⚠️ 即将到期"
         return "✅ 正常"
+
+
+_DOMAIN_SANITIZE_RE: re.Pattern[str] = re.compile(r'[^a-zA-Z0-9_-]')
+
+
+def _extract_name_from_url(url: str) -> str:
+    try:
+        domain = urlparse(url).netloc.replace("www.", "").split(":")[0]
+        name = _DOMAIN_SANITIZE_RE.sub('_', domain)
+        return name[:50] if name else f"unknown_{int(time.time())}"
+    except Exception:
+        return f"unknown_{int(time.time())}"
 
 
 @dataclass(frozen=True)
@@ -157,45 +151,12 @@ class SubscriptionInfo:
     status: str
 
 
-# ========== 格式化工具 ==========
-
-_DOMAIN_SANITIZE_RE: re.Pattern[str] = re.compile(r'[^a-zA-Z0-9_-]')
-
-
-def _extract_name_from_url(url: str) -> str:
-    try:
-        domain = urlparse(url).netloc.replace("www.", "").split(":")[0]
-        name = _DOMAIN_SANITIZE_RE.sub('_', domain)
-        return name[:50] if name else f"unknown_{int(time.time())}"
-    except Exception:
-        return f"unknown_{int(time.time())}"
-
-
-def get_env_var(name: str, default: str | None = None, *, required: bool = False) -> str | None:
-    """获取环境变量"""
-    value = os.environ.get(name, default)
-    if required and not value:
-        raise ValueError(f"环境变量 {name} 未设置")
-    return value
-
-
 # ========== 基础工具函数 ==========
 
 def load_jsonc(filepath: str | Path) -> Any:
     """加载 JSONC/JSON5 文件（支持 // 和 /* */ 注释）"""
     with open(filepath, 'r', encoding='utf-8') as f:
         return json5.load(f)
-
-
-def discover_template_files(template_dir: str | Path) -> list[tuple[str, str]]:
-    """发现模板目录中所有 .json 和 .jsonc 文件，返回 [(完整路径, 基本名), ...]"""
-    template_path = Path(template_dir)
-    if not template_path.exists():
-        return []
-
-    files = [(str(e), e.stem) for e in template_path.iterdir() if e.suffix in ('.json', '.jsonc')]
-    files.sort(key=lambda e: (e[1] != "sing-box_template", e[1]))
-    return files
 
 
 _B64_PATTERN: re.Pattern[str] = re.compile(r'^[A-Za-z0-9+/=\s]+$')
@@ -256,17 +217,6 @@ def http_request(
     return HttpResponse(status_code=resp.status, text=body, headers=raw_headers)
 
 
-def http_get(
-    url: str,
-    *,
-    headers: dict[str, str] | None = None,
-    timeout: int = HTTP_TIMEOUT,
-    allow_redirects: bool = True,
-) -> HttpResponse:
-    """HTTP GET 请求"""
-    return http_request('GET', url, headers=headers, timeout=timeout, allow_redirects=allow_redirects)
-
-
 def http_get_with_retry(
     url: str,
     *,
@@ -286,7 +236,7 @@ def http_get_with_retry(
                 logger.debug(f"  重试 {attempt}/{max_retries}，等待 {sleep_time}s...")
                 time.sleep(sleep_time)
 
-            resp = http_get(url, headers=headers, timeout=timeout, allow_redirects=allow_redirects)
+            resp = http_request('GET', url, headers=headers, timeout=timeout, allow_redirects=allow_redirects)
 
             if resp.status_code in _RETRYABLE_CODES:
                 raise HTTPError(url='', code=resp.status_code, msg=f"HTTP {resp.status_code}", hdrs=None, fp=None)
