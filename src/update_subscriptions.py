@@ -432,22 +432,23 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo]) -> str:
     pad = 20
     card_radius = 12
     row_h = 56
-    svg_w = 720
     title_h = 70
     col_header_h = 36
-    rows_total_h = len(subscription_info) * row_h
-    footer_h = 56
-    svg_h = title_h + col_header_h + rows_total_h + footer_h + pad * 2
 
     # 列定义: (名称, 宽度, 对齐)
     cols = [
         ('订阅', 100, 'left'),
-        ('流量使用', 400, 'left'),
+        ('流量使用', 280, 'left'),
         ('到期时间', 90, 'center'),
         ('状态', 70, 'center'),
         ('节点', 60, 'center'),
     ]
+    svg_w = sum(c[1] for c in cols) + pad * 2
     content_w = svg_w - pad * 2
+
+    rows_total_h = len(subscription_info) * row_h
+    footer_h = 56
+    svg_h = title_h + col_header_h + rows_total_h + footer_h + pad * 2
 
     # 收集数据行
     rows_data = []
