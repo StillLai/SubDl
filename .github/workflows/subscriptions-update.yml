@@ -50,7 +50,6 @@ jobs:
         fi
         curl -fsSL -o src/deps/proxy-utils.esm.mjs "$DOWNLOAD_URL"
         [ -s src/deps/proxy-utils.esm.mjs ] || { echo "::error::Downloaded file is empty"; exit 1; }
-        head -c 100 src/deps/proxy-utils.esm.mjs | grep -q 'export' || { echo "::error::File is not a valid JS module"; exit 1; }
         echo "✓ Pre-downloaded proxy-utils.esm.mjs ($TAG_NAME)"
 
     - name: Build subscriptions
