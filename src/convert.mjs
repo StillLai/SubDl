@@ -33,7 +33,11 @@ async function batchConvertToSingbox(batchInput) {
     global.window = dom.window;
     global.document = dom.window.document;
     global.self = dom.window;
-    global.navigator = dom.window;
+    Object.defineProperty(global, 'navigator', {
+        value: dom.window,
+        writable: true,
+        configurable: true,
+    });
     global.location = dom.window.location;
 
     const { parse, produce } = await import('file://' + PROXY_UTILS_FILE);
