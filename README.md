@@ -1,6 +1,6 @@
 # SubDl
 
-![订阅状态](https://raw.githubusercontent.com/StillLai/SubDl/gh-pages/status.svg)
+![订阅状态](https://github.com/StillLai/SubDl/raw/refs/heads/assets/status.svg)
 
 ## 快速配置
 

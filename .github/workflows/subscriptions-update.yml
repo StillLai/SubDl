@@ -11,9 +11,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 jobs:
   update:
@@ -67,47 +65,18 @@ jobs:
         SUB_URL_9: ${{ secrets.SUB_URL_9 }}
       run: python src/update_subscriptions.py
 
-    - name: Prepare Pages content
+    - name: Deploy SVG to assets branch
       run: |
-        mkdir -p _pages
-        cp status.svg _pages/status.svg
-        # 用 HTML 包装 SVG，使其作为网页正确显示
-        cat > _pages/index.html <<'EOF'
-        <!DOCTYPE html>
-        <html lang="zh-CN">
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>SubDl 订阅状态</title>
-          <style>
-            body { margin: 0; padding: 20px; background: #0d1117; display: flex; justify-content: center; align-items: center; min-height: 100vh; box-sizing: border-box; }
-            img { max-width: 100%; height: auto; }
-          </style>
-        </head>
-        <body>
-          <img src="status.svg" alt="SubDl 订阅状态">
-        </body>
-        </html>
-        EOF
-
-    - name: Upload Pages artifact
-      uses: actions/upload-pages-artifact@v5
-      with:
-        path: _pages
-
-  deploy:
-    needs: update
-    runs-on: ubuntu-latest
-
-    permissions:
-      pages: write
-      id-token: write
-
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-
-    steps:
-    - name: Deploy to GitHub Pages
-      id: deployment
-      uses: actions/deploy-pages@v5
+        # 在独立目录初始化 git 并推送到 assets 分支（避免污染工作区）
+        REPO_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+        mkdir -p /tmp/assets-deploy
+        cp status.svg /tmp/assets-deploy/
+        cd /tmp/assets-deploy
+        git init
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add status.svg
+        git commit -m "Update status SVG [skip ci]"
+        git push --force "$REPO_URL" HEAD:assets
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
