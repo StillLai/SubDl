@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import base64
 import json
-import os
 import re
 import sys
 import time
@@ -81,34 +80,11 @@ class FlowInfo:
     total: int = 0
     expire: int | None = None
 
-    @property
-    def used(self) -> int:
-        return self.upload + self.download
-
-    @property
-    def remaining(self) -> int:
-        return max(0, self.total - self.used)
-
-    @property
-    def status(self) -> str:
-        now = time.time()
-        if self.expire and self.expire < now:
-            return "❌ 已过期"
-        if self.total > 0 and self.used >= self.total:
-            return "❌ 流量用完"
-        if self.expire and self.expire - now < 7 * 24 * 3600:
-            return "⚠️ 即将到期"
-        return "✅ 正常"
-
-
-_DOMAIN_SANITIZE_RE: re.Pattern[str] = re.compile(r'[^a-zA-Z0-9_-]')
-
 
 def _extract_name_from_url(url: str) -> str:
     try:
-        domain = urlparse(url).netloc.replace("www.", "").split(":")[0]
-        name = _DOMAIN_SANITIZE_RE.sub('_', domain)
-        return name[:50] if name else f"unknown_{int(time.time())}"
+        name = urlparse(url).netloc.replace("www.", "").split(":")[0]
+        return name or f"unknown_{int(time.time())}"
     except Exception:
         return f"unknown_{int(time.time())}"
 
@@ -227,10 +203,10 @@ def http_get_with_retry(
 
             resp = http_request('GET', url, headers=headers, timeout=timeout)
 
-            if resp.status_code in _RETRYABLE_CODES:
-                raise HTTPError(url='', code=resp.status_code, msg=f"HTTP {resp.status_code}", hdrs=None, fp=None)
-
-            resp.raise_for_status()
+            if resp.status_code >= 400:
+                if resp.status_code in _RETRYABLE_CODES:
+                    raise HTTPError(url='', code=resp.status_code, msg=f"HTTP {resp.status_code}", hdrs=None, fp=None)
+                resp.raise_for_status()
             return resp
 
         except (HTTPError, URLError, OSError) as e:

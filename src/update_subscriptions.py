@@ -16,6 +16,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone, timedelta
 from typing import Any
@@ -24,7 +25,7 @@ from utils import (
     logger, load_jsonc,
     http_get_with_retry, http_request, try_decode_base64,
     FlowInfo, Subscription, DownloadResult, SubscriptionInfo,
-    PROJECT_ROOT, TEMPLATE_DIR, TEMPLATE_BASE,
+    PROJECT_ROOT, TEMPLATE_DIR,
     CONVERT_SCRIPT, USER_AGENT,
 )
 from merge_config import merge_config
@@ -78,10 +79,13 @@ def _validate_subscription(content: str) -> str | None:
     return None
 
 
+_SUB_URL_KEY_RE: re.Pattern[str] = re.compile(r'^SUB_URL(_\d+)?$')
+
+
 def parse_subscriptions() -> list[Subscription]:
     """解析订阅配置 — 从 SUB_URL / SUB_URL_N 环境变量获取"""
     sub_keys = sorted(
-        (k for k in os.environ if re.match(r'^SUB_URL(_\d+)?$', k)),
+        (k for k in os.environ if _SUB_URL_KEY_RE.match(k)),
         key=lambda k: -1 if k == 'SUB_URL' else int(k.split('_')[-1])
     )
     subscriptions: list[Subscription] = []
@@ -248,117 +252,98 @@ def _aggregate_results(
     return files, subscription_info, subs_nodes_dict
 
 
-# ========== 模板文件列表 ==========
+# ========== 模板处理 ==========
 
-def _load_templates() -> list[tuple[str, str]]:
+def _iter_templates() -> list[tuple[str, str]]:
     """扫描 config_template 目录，收集所有 sing-box_template*.jsonc 模板文件"""
-    templates: list[tuple[str, str]] = []
     if not TEMPLATE_DIR.is_dir():
-        return templates
-    for f in sorted(TEMPLATE_DIR.iterdir()):
-        if f.is_file() and f.suffix == '.jsonc' and f.stem.startswith('sing-box_template'):
-            templates.append((str(f), f.stem))
-    return templates
+        return []
+    return [
+        (str(f), f.stem) for f in sorted(TEMPLATE_DIR.iterdir())
+        if f.is_file() and f.suffix == '.jsonc' and f.stem.startswith('sing-box_template')
+    ]
 
-
-def _process_templates(
-    process_fn: Any,
-) -> dict[str, str]:
-    """遍历所有模板文件，串行处理"""
-    templates = _load_templates()
-    logger.debug(f"  处理 {len(templates)} 个模板文件")
-    results: dict[str, str] = {}
-    for path, name in templates:
-        entry = process_fn(path, name)
-        if entry:
-            results[entry[0]] = entry[1]
-    return results
-
-
-# ========== 配置合并 ==========
 
 def merge_all_templates(subs_nodes_dict: dict[str, list[dict[str, Any]]]) -> dict[str, str]:
     """遍历所有模板文件并生成合并配置"""
-    def _merge_one(template_path: str, base_name: str) -> tuple[str, str] | None:
+    total_nodes = sum(len(nodes) for nodes in subs_nodes_dict.values())
+    results: dict[str, str] = {}
+    for path, base_name in _iter_templates():
         config_filename = base_name.replace('template', 'config') + '.json'
-        logger.info(f"  → 处理模板: {os.path.basename(template_path)}")
+        logger.info(f"  → 处理模板: {os.path.basename(path)}")
         try:
-            template = load_jsonc(template_path)
+            template = load_jsonc(path)
             merged = merge_config(template, subs_nodes_dict)
         except Exception as e:
             logger.error(f"  合并异常: {e}")
-            return None
+            continue
         content = json.dumps(merged, indent=2, ensure_ascii=False)
-        total_nodes = sum(len(nodes) for nodes in subs_nodes_dict.values())
         logger.info(f"    ✓ 生成 {config_filename} ({len(content)} 字节, {total_nodes} 个节点)")
-        return config_filename, content
-
-    return _process_templates(_merge_one)
+        results[config_filename] = content
+    return results
 
 
 def generate_provider_configs(sub_url_map: dict[str, str]) -> dict[str, str]:
     """生成 providers 版本的配置文件"""
-    def _fill_one(template_path: str, base_name: str) -> tuple[str, str] | None:
-        template = load_jsonc(template_path)
+    results: dict[str, str] = {}
+    for path, base_name in _iter_templates():
+        template = load_jsonc(path)
         filled = 0
         for provider in template.get('providers', []):
             tag = provider.get('tag', '')
             if tag in sub_url_map:
                 provider['url'] = sub_url_map[tag]
                 filled += 1
-
         if filled > 0:
             config_filename = base_name.replace('template', 'with_providers_config') + '.json'
-            logger.debug(f"  → {os.path.basename(template_path)} -> {config_filename} ({filled} 个 providers)")
-            return config_filename, json.dumps(template, indent=2, ensure_ascii=False)
-        return None
-
-    return _process_templates(_fill_one)
+            logger.debug(f"  → {os.path.basename(path)} -> {config_filename} ({filled} 个 providers)")
+            results[config_filename] = json.dumps(template, indent=2, ensure_ascii=False)
+    return results
 
 
-# ========== README 生成 ==========
-
-def _format_bytes(n: int) -> str:
-    """将字节数格式化为人类可读字符串"""
-    if n == 0:
-        return "0 B"
-    units = ('B', 'KB', 'MB', 'GB', 'TB')
-    i = min(int(n.bit_length() - 1) // 10, len(units) - 1)
-    return f"{n / (1024 ** i):.2f} {units[i]}"
-
-
-def _format_expire(timestamp: int | None) -> str:
-    """格式化过期时间"""
-    if not timestamp:
-        return "无"
-    try:
-        return datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d")
-    except Exception:
-        return "无"
-
+# ========== SVG 状态图生成 ==========
 
 def generate_status_svg(subscription_info: list[SubscriptionInfo]) -> str:
     """生成订阅状态 SVG 图片（浅色高级感风格）"""
-    now = datetime.now(timezone(timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S CST')
+
+    def _fmt_bytes(n: int) -> str:
+        if n == 0:
+            return "0 B"
+        units = ('B', 'KB', 'MB', 'GB', 'TB')
+        i = min(int(n.bit_length() - 1) // 10, len(units) - 1)
+        return f"{n / (1024 ** i):.2f} {units[i]}"
+
+    def _fmt_expire(ts: int | None) -> str:
+        if not ts:
+            return "无"
+        try:
+            return datetime.fromtimestamp(ts).strftime("%Y-%m-%d")
+        except Exception:
+            return "无"
+
+    def _flow_status(f: FlowInfo) -> tuple[str, str]:
+        """返回 (status_text, color)"""
+        now = time.time()
+        if f.expire and f.expire < now:
+            return "❌ 已过期", accent_red
+        used = f.upload + f.download
+        if f.total > 0 and used >= f.total:
+            return "❌ 流量用完", accent_red
+        if f.expire and f.expire - now < 7 * 24 * 3600:
+            return "⚠️ 即将到期", accent_orange
+        return "✅ 正常", accent_green
 
     def _esc(s: str) -> str:
-        """XML 转义"""
         amp = chr(38)
         s = s.replace(amp, amp + "amp;")
         s = s.replace(chr(60), amp + "lt;")
         s = s.replace(chr(62), amp + "gt;")
         return s
 
-    def _pct(used: int, total: int) -> float:
-        """计算使用百分比"""
-        if total <= 0:
-            return 0.0
-        return min(used / total * 100, 100.0)
+    now = datetime.now(timezone(timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S CST')
 
-    # 配色 - 浅色高级感
+    # 配色
     bg_color = '#f0f2f5'
-    card_bg = '#ffffff'
-    header_bg = '#f8fafc'
     border_color = '#e2e8f0'
     text_primary = '#1e293b'
     text_secondary = '#64748b'
@@ -391,39 +376,30 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo]) -> str:
     svg_h = title_h + col_header_h + rows_total_h + footer_h + pad * 2
 
     # 收集数据行
+    _BAR_GRAD_MAP = {accent_green: 'barGreenGrad', accent_orange: 'barOrangeGrad', accent_red: 'barRedGrad'}
     rows_data = []
     total_nodes = 0
     for info in subscription_info:
         if info.flow:
             f = info.flow
-            pct = _pct(f.used, f.total)
-            if pct >= 90:
-                bar_color = accent_red
-            elif pct >= 70:
-                bar_color = accent_orange
-            else:
-                bar_color = accent_green
-            if '✅' in f.status:
-                status_color = accent_green
-            elif '❌' in f.status:
-                status_color = accent_red
-            else:
-                status_color = accent_orange
+            used = f.upload + f.download
+            pct = min(used / f.total * 100, 100.0) if f.total > 0 else 0.0
+            bar_color = accent_red if pct >= 90 else (accent_orange if pct >= 70 else accent_green)
+            status_text, status_color = _flow_status(f)
             rows_data.append({
                 'name': _esc(info.name),
-                'used': _format_bytes(f.used),
-                'total': _format_bytes(f.total),
-                'remaining': _format_bytes(f.remaining),
+                'used': _fmt_bytes(used),
+                'total': _fmt_bytes(f.total),
                 'pct': pct,
                 'bar_color': bar_color,
-                'expire': _format_expire(f.expire),
-                'status': f.status,
+                'expire': _fmt_expire(f.expire),
+                'status': status_text,
                 'status_color': status_color,
                 'nodes': str(info.node_count),
             })
         else:
             rows_data.append({
-                'name': _esc(info.name), 'used': '—', 'total': '—', 'remaining': '—',
+                'name': _esc(info.name), 'used': '—', 'total': '—',
                 'pct': 0, 'bar_color': text_secondary, 'expire': '—',
                 'status': '❓ 无信息', 'status_color': text_secondary, 'nodes': str(info.node_count),
             })
@@ -495,7 +471,6 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo]) -> str:
     parts.append(f'  <line x1="{pad}" y1="{col_y + col_header_h}" x2="{pad + content_w}" y2="{col_y + col_header_h}" stroke="{border_color}" stroke-width="1"/>')
 
     # 数据行
-    _BAR_GRAD_MAP = {accent_green: 'barGreenGrad', accent_orange: 'barOrangeGrad', accent_red: 'barRedGrad'}
     rows_start_y = col_y + col_header_h
     for i, rd in enumerate(rows_data):
         ry = rows_start_y + i * row_h
