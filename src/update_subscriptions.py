@@ -413,7 +413,7 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo]) -> str:
     headers = ['订阅', '总流量', '已用', '剩余', '到期时间', '状态', '节点数']
     row_h = 40
     svg_w = sum(col_widths)
-    header_h = 65
+    header_h = 80
     svg_h = header_h + len(subscription_info) * row_h + row_h
 
     # 表头背景色
@@ -459,18 +459,18 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo]) -> str:
     # 表头 SVG
     header_svg = [f'  <rect x="0" y="0" width="{svg_w}" height="{header_h}" fill="{header_bg}"/>']
     header_svg.append(
-        f'  <text x="{svg_w // 2}" y="25" text-anchor="middle"'
+        f'  <text x="{svg_w // 2}" y="30" text-anchor="middle"'
         f' font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif"'
         f' font-size="16" font-weight="bold" fill="#ffffff">SubDl 订阅状态</text>'
     )
     header_svg.append(
-        f'  <text x="{svg_w // 2}" y="45" text-anchor="middle"'
+        f'  <text x="{svg_w // 2}" y="52" text-anchor="middle"'
         f' font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif"'
         f' font-size="11" fill="#8b949e">最后更新: {_esc(now)}</text>'
     )
 
     # 列标题
-    col_header_y = header_h - 8
+    col_header_y = header_h - 10
     x = 0
     for j, h in enumerate(headers):
         cx = x + col_widths[j] // 2
