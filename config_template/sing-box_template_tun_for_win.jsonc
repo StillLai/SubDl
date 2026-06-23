@@ -46,7 +46,7 @@
     }
   ],
   "dns": {
-    "strategy": "prefer_ipv6",
+    "strategy": "prefer_ipv4",
     "servers": [
       {
         "tag": "DNS-Resolver",
