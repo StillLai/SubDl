@@ -597,11 +597,7 @@ def main() -> None:
         sys.exit(1)
     logger.info(f"找到 {len(subscriptions)} 个订阅")
 
-    # 模板变体生成
     logger.info("::group::Download & Convert subscriptions")
-    generate_all_template_variants()
-
-    # 并行下载
     download_results = _download_all(subscriptions, USER_AGENT)
     logger.info("::endgroup::")
 

@@ -4,9 +4,6 @@ on:
   schedule:
     - cron: '0 * * * *'
   workflow_dispatch:
-  push:
-    paths:
-      - 'config_template/sing-box_template.jsonc'
 
 # 防止多次运行重叠（保证 Gist 状态一致）
 concurrency:
@@ -67,15 +64,6 @@ jobs:
         SUB_URL_8: ${{ secrets.SUB_URL_8 }}
         SUB_URL_9: ${{ secrets.SUB_URL_9 }}
       run: python src/update_subscriptions.py
-
-    - name: Commit template variants (only on push)
-      if: github.event_name == 'push'
-      run: |
-        git config user.name "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
-        git add config_template/sing-box_template_noTun.jsonc config_template/sing-box_template_tproxy.jsonc config_template/sing-box_template_tun_for_win.jsonc
-        git diff --quiet && git diff --staged --quiet || git commit -m "Update template variants [skip ci]"
-        git push
 
     - name: Deploy SVG to GitHub Pages
       run: |
