@@ -31,6 +31,7 @@
 | `GIST_ID` | ✅ | 上一步创建的 Gist ID |
 | `SUB_URL` | ✅ | 主订阅链接，格式为 `名称\|URL` |
 | `SUB_URL_1` ~ `SUB_URL_9` | ❌ | 更多订阅（可选，格式同上） |
+| `GIST_OWNER` | ❌ | Gist 所有者用户名（可选，自动通过 API 获取） |
 
 **订阅链接示例：**
 ```
@@ -38,6 +39,16 @@ SUB_URL = 我的机场|https://example.com/api/sub?token=xxx
 SUB_URL_1 = 备用订阅|https://example2.com/clash/config
 SUB_URL_2 = https://example3.com/sub   # 省略名称时自动从 URL 提取
 ```
+
+**Provider 指向 Gist：**
+
+在订阅名称前加 `*`，可让该订阅在 `with_providers_config` 配置中的 provider `url` 指向 Gist 上已转换的 sing-box 文件（`{名称}-singbox.json`），而非原始订阅地址。Gist 所有者用户名会自动通过 API 获取，也可通过可选的 `GIST_OWNER` 环境变量手动指定。
+
+```
+SUB_URL = *山海|https://example.com/api/sub?token=xxx
+```
+
+这在 sing-box 客户端无法直接解析 Clash 订阅格式时很有用——provider 会直接拉取已在服务端转换好的 sing-box JSON。
 
 ### 4. 运行
 

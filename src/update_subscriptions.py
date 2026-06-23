@@ -88,7 +88,11 @@ _SUB_URL_KEY_RE: re.Pattern[str] = re.compile(r'^SUB_URL(_\d+)?$')
 
 
 def parse_subscriptions() -> list[Subscription]:
-    """解析订阅配置 — 从 SUB_URL / SUB_URL_N 环境变量获取"""
+    """解析订阅配置 — 从 SUB_URL / SUB_URL_N 环境变量获取
+    
+    名称前加 * 表示该订阅的 provider 应指向 Gist 上已转换的文件，
+    例如: SUB_URL = *山海|https://example.com/sub
+    """
     sub_keys = sorted(
         (k for k in os.environ if _SUB_URL_KEY_RE.match(k)),
         key=lambda k: -1 if k == 'SUB_URL' else int(k.split('_')[-1])
@@ -100,7 +104,10 @@ def parse_subscriptions() -> list[Subscription]:
             continue
         if "|" in value:
             name, url = value.split("|", 1)
-            sub = Subscription.from_url(url.strip(), name.strip())
+            use_gist = name.startswith("*")
+            if use_gist:
+                name = name[1:]
+            sub = Subscription.from_url(url.strip(), name.strip(), use_gist=use_gist)
         else:
             sub = Subscription.from_url(value.strip())
         if sub:
@@ -306,8 +313,20 @@ def merge_all_templates(
 def generate_provider_configs(
     sub_url_map: dict[str, str],
     templates: list[tuple[str, str, dict[str, Any]]],
+    gist_subs: set[str] | None = None,
+    gist_owner: str = '',
+    gist_id: str = '',
 ) -> dict[str, str]:
-    """生成 providers 版本的配置文件"""
+    """生成 providers 版本的配置文件
+    
+    Args:
+        sub_url_map: 订阅名称 -> 原始 URL 的映射
+        templates: 模板列表
+        gist_subs: 标记为使用 Gist 的订阅名称集合
+        gist_owner: Gist 所有者用户名
+        gist_id: Gist ID
+    """
+    gist_subs = gist_subs or set()
     results: dict[str, str] = {}
     for path, base_name, template in templates:
         try:
@@ -315,7 +334,10 @@ def generate_provider_configs(
             for provider in template.get('providers', []):
                 tag = provider.get('tag', '')
                 if tag in sub_url_map:
-                    provider['url'] = sub_url_map[tag]
+                    if tag in gist_subs and gist_owner and gist_id:
+                        provider['url'] = f"https://gist.githubusercontent.com/{gist_owner}/{gist_id}/raw/{tag}-singbox.json"
+                    else:
+                        provider['url'] = sub_url_map[tag]
                     filled += 1
             if filled > 0:
                 config_filename = base_name.replace('template', 'with_providers_config') + '.json'
@@ -564,6 +586,18 @@ def upload_to_gist(github_token: str, gist_id: str, files: dict[str, str]) -> No
 
 # ========== 主流程 ==========
 
+def _get_gist_owner(github_token: str) -> str | None:
+    """通过 GitHub API 获取当前认证用户的用户名"""
+    try:
+        headers = {"Authorization": f"token {github_token}", "Accept": "application/vnd.github.v3+json"}
+        resp = http_request("GET", "https://api.github.com/user", headers=headers)
+        resp.raise_for_status()
+        return json.loads(resp.text).get("login")
+    except Exception as e:
+        logger.warn(f"获取 Gist 所有者用户名失败: {e}")
+        return None
+
+
 def _generate_and_upload(
     files: dict[str, str],
     subs_nodes_dict: dict[str, list[dict[str, Any]]],
@@ -578,12 +612,26 @@ def _generate_and_upload(
     templates = _load_templates()
     sub_url_map = {sub.name: sub.url for sub in subscriptions}
 
+    # 收集标记为使用 Gist 的订阅名称
+    gist_subs = {sub.name for sub in subscriptions if sub.use_gist}
+    gist_owner = ''
+    if gist_subs:
+        gist_owner = os.environ.get("GIST_OWNER") or ''
+        if not gist_owner:
+            owner = _get_gist_owner(github_token)
+            if owner:
+                gist_owner = owner
+        if gist_owner:
+            logger.info(f"  → {len(gist_subs)} 个订阅的 provider 将指向 Gist: {gist_owner}/{gist_id}")
+        else:
+            logger.warn(f"  ⚠ 无法获取 Gist 所有者，provider 将使用原始订阅 URL")
+
     merged = merge_all_templates(subs_nodes_dict, templates)
     files.update(merged)
     if merged:
         logger.info(f"  ✓ 共生成 {len(merged)} 个配置文件")
 
-    providers = generate_provider_configs(sub_url_map, templates)
+    providers = generate_provider_configs(sub_url_map, templates, gist_subs, gist_owner, gist_id)
     files.update(providers)
     if providers:
         logger.info(f"  ✓ 共生成 {len(providers)} 个 providers 配置文件")

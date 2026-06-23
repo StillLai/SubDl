@@ -96,12 +96,13 @@ class Subscription:
     name: str
     url: str
     filename: str
+    use_gist: bool = False
 
     @classmethod
-    def from_url(cls, url: str, name: str | None = None) -> Subscription:
+    def from_url(cls, url: str, name: str | None = None, use_gist: bool = False) -> Subscription:
         if name is None:
             name = _extract_name_from_url(url)
-        return cls(name=name, url=url, filename=f"{name}.yaml")
+        return cls(name=name, url=url, filename=f"{name}.yaml", use_gist=use_gist)
 
 
 @dataclass
