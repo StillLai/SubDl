@@ -37,4 +37,4 @@ jobs:
       uses: benc-uk/workflow-dispatch@v1
       with:
         workflow: subscriptions-update.yml
-        token: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ secrets.GH_TOKEN }}
