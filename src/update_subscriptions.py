@@ -10,7 +10,6 @@
 
 from __future__ import annotations
 
-import copy
 import json
 import os
 import re
@@ -249,62 +248,20 @@ def _aggregate_results(
     return files, subscription_info, subs_nodes_dict
 
 
-# ========== 模板变体生成 ==========
-
-_TEMPLATE_VARIANTS: list[tuple[str, str, str]] = [
-    ('noTun', 'noTun', 'remove_tun'),
-    ('tproxy', 'tproxy', 'replace_tun_with_tproxy'),
-    ('tun_for_win', 'tun_for_win', 'remove_auto_redirect'),
-]
-
-
-def _transform_template(template: dict[str, Any], action: str) -> None:
-    """对模板执行指定变换"""
-    inbounds = template.get('inbounds', [])
-    if not isinstance(inbounds, list):
-        return
-
-    if action == 'remove_tun':
-        template['inbounds'] = [
-            ib for ib in inbounds
-            if not (isinstance(ib, dict) and ib.get('type') == 'tun')
-        ]
-    elif action == 'replace_tun_with_tproxy':
-        for i, ib in enumerate(inbounds):
-            if isinstance(ib, dict) and ib.get('type') == 'tun':
-                inbounds[i] = {"type": "tproxy", "tag": "tproxy-in", "listen": "::", "listen_port": 1536}
-                break
-    elif action == 'remove_auto_redirect':
-        for ib in inbounds:
-            if isinstance(ib, dict) and ib.get('type') == 'tun':
-                ib.pop('auto_redirect', None)
-                break
-
-
-def generate_all_template_variants() -> None:
-    """生成所有模板变体（noTun / tproxy / tun_for_win）"""
-    base_template = load_jsonc(TEMPLATE_BASE)
-    for suffix, label, action in _TEMPLATE_VARIANTS:
-        try:
-            template = copy.deepcopy(base_template)
-            _transform_template(template, action)
-            output_path = TEMPLATE_DIR / f'sing-box_template_{suffix}.jsonc'
-            with open(output_path, 'w', encoding='utf-8') as f:
-                json.dump(template, f, indent=2, ensure_ascii=False)
-            logger.debug(f"  ✓ 已生成 {label} 模板")
-        except Exception as e:
-            logger.error(f"  ✗ 生成 {label} 模板异常: {e}")
-
-
 # ========== 模板文件列表 ==========
 
-# 硬编码模板列表，避免运行时遍历目录
-_TEMPLATES: list[tuple[str, str]] = [
-    (str(TEMPLATE_BASE), TEMPLATE_BASE.stem),
-] + [
-    (str(TEMPLATE_DIR / f'sing-box_template_{s}.jsonc'), f'sing-box_template_{s}')
-    for s, _, _ in _TEMPLATE_VARIANTS
-]
+def _load_templates() -> list[tuple[str, str]]:
+    """扫描 config_template 目录，收集所有 sing-box_template*.jsonc 模板文件"""
+    templates: list[tuple[str, str]] = []
+    if not TEMPLATE_DIR.is_dir():
+        return templates
+    for f in sorted(TEMPLATE_DIR.iterdir()):
+        if f.is_file() and f.suffix == '.jsonc' and f.stem.startswith('sing-box_template'):
+            templates.append((str(f), f.stem))
+    return templates
+
+
+_TEMPLATES: list[tuple[str, str]] = _load_templates()
 
 
 def _process_templates(

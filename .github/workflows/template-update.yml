@@ -23,7 +23,8 @@ jobs:
       run: pip install -r requirements.txt
 
     - name: Generate template variants
-      run: python -c "import sys; sys.path.insert(0, 'src'); from update_subscriptions import generate_all_template_variants; generate_all_template_variants()"
+      working-directory: src
+      run: python template_update.py
 
     - name: Commit and push template variants
       run: |
