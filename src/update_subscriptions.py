@@ -335,7 +335,7 @@ def generate_provider_configs(
                 tag = provider.get('tag', '')
                 if tag in sub_url_map:
                     if tag in gist_subs and gist_owner and gist_id:
-                        provider['url'] = f"https://gist.githubusercontent.com/{gist_owner}/{gist_id}/raw/{tag}-singbox.json"
+                        provider['url'] = f"https://gist.github.com/{gist_owner}/{gist_id}/raw/{tag}-singbox.json"
                     else:
                         provider['url'] = sub_url_map[tag]
                     filled += 1
