@@ -279,36 +279,21 @@ def _process_templates(
 
 # ========== 配置合并 ==========
 
-def merge_singbox_config(
-    subs_nodes_dict: dict[str, list[dict[str, Any]]], template_path: str | None = None
-) -> dict[str, Any] | None:
-    """将订阅节点合并到配置模板"""
-    if template_path is None:
-        template_path = str(TEMPLATE_BASE)
-    if not os.path.exists(template_path):
-        logger.error(f"  配置模板不存在: {template_path}")
-        return None
-
-    try:
-        template = load_jsonc(template_path)
-        return merge_config(template, subs_nodes_dict)
-    except Exception as e:
-        logger.error(f"  合并异常: {e}")
-        return None
-
-
 def merge_all_templates(subs_nodes_dict: dict[str, list[dict[str, Any]]]) -> dict[str, str]:
     """遍历所有模板文件并生成合并配置"""
     def _merge_one(template_path: str, base_name: str) -> tuple[str, str] | None:
         config_filename = base_name.replace('template', 'config') + '.json'
         logger.info(f"  → 处理模板: {os.path.basename(template_path)}")
-        merged = merge_singbox_config(subs_nodes_dict, template_path)
-        if merged:
-            content = json.dumps(merged, indent=2, ensure_ascii=False)
-            total_nodes = sum(len(nodes) for nodes in subs_nodes_dict.values())
-            logger.info(f"    ✓ 生成 {config_filename} ({len(content)} 字节, {total_nodes} 个节点)")
-            return config_filename, content
-        return None
+        try:
+            template = load_jsonc(template_path)
+            merged = merge_config(template, subs_nodes_dict)
+        except Exception as e:
+            logger.error(f"  合并异常: {e}")
+            return None
+        content = json.dumps(merged, indent=2, ensure_ascii=False)
+        total_nodes = sum(len(nodes) for nodes in subs_nodes_dict.values())
+        logger.info(f"    ✓ 生成 {config_filename} ({len(content)} 字节, {total_nodes} 个节点)")
+        return config_filename, content
 
     return _process_templates(_merge_one)
 

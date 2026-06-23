@@ -21,56 +21,35 @@ const PROXY_UTILS_FILE = path.join(__dirname, 'deps', 'proxy-utils.esm.mjs');
  * 批量转换：一次加载模块，转换多个订阅内容
  */
 async function batchConvertToSingbox(batchInput) {
-    const GLOBAL_KEYS = ['require', 'window', 'document', 'self', 'navigator', 'location'];
-    const DOM_KEYS = GLOBAL_KEYS.filter(key => key !== 'require');
-
-    // 保存原始全局变量状态
-    const originals = new Map();
-    for (const key of GLOBAL_KEYS) {
-        if (key in global) originals.set(key, global[key]);
-    }
-
-    const setGlobal = (key, value) => {
-        try { global[key] = value; }
-        catch { Object.defineProperty(global, key, { value, configurable: true, writable: true, enumerable: true }); }
-    };
-
     // 注入 require（Sub-Store 内部隐式依赖 dotenv）
     const { createRequire } = await import('module');
-    setGlobal('require', createRequire(PROXY_UTILS_FILE));
+    global.require = createRequire(PROXY_UTILS_FILE);
 
     // 创建 jsdom 环境
     const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
         url: 'https://localhost',
         pretendToBeVisual: true,
     });
-    for (const key of DOM_KEYS) {
-        setGlobal(key, key === 'document' ? dom.window.document : key === 'location' ? dom.window.location : dom.window);
-    }
+    global.window = dom.window;
+    global.document = dom.window.document;
+    global.self = dom.window;
+    global.navigator = dom.window;
+    global.location = dom.window.location;
 
-    try {
-        const { parse, produce } = await import('file://' + PROXY_UTILS_FILE);
-        console.error(`[Convert] 模块加载成功，开始转换 ${Object.keys(batchInput).length} 个订阅`);
+    const { parse, produce } = await import('file://' + PROXY_UTILS_FILE);
+    console.error(`[Convert] 模块加载成功，开始转换 ${Object.keys(batchInput).length} 个订阅`);
 
-        const results = {};
-        for (const [name, clashContent] of Object.entries(batchInput)) {
-            try {
-                results[name] = JSON.parse(produce(parse(clashContent), 'singbox'));
-                console.error(`[Convert]   ✓ ${name}`);
-            } catch (err) {
-                console.error(`[Convert]   ✗ ${name}: ${err.message}`);
-                results[name] = null;
-            }
+    const results = {};
+    for (const [name, clashContent] of Object.entries(batchInput)) {
+        try {
+            results[name] = JSON.parse(produce(parse(clashContent), 'singbox'));
+            console.error(`[Convert]   ✓ ${name}`);
+        } catch (err) {
+            console.error(`[Convert]   ✗ ${name}: ${err.message}`);
+            results[name] = null;
         }
-        return results;
-    } finally {
-        // 恢复原始全局变量
-        for (const key of GLOBAL_KEYS) {
-            if (originals.has(key)) setGlobal(key, originals.get(key));
-            else delete global[key];
-        }
-        dom.window.close();
     }
+    return results;
 }
 
 async function main() {

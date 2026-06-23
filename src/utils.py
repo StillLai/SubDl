@@ -195,7 +195,6 @@ def http_request(
     headers: dict[str, str] | None = None,
     json_body: Any = None,
     timeout: int = HTTP_TIMEOUT,
-    allow_redirects: bool = True,
 ) -> HttpResponse:
     """通用 HTTP 请求"""
     data = json.dumps(json_body).encode('utf-8') if json_body is not None else None
@@ -203,15 +202,7 @@ def http_request(
     if json_body is not None:
         req.add_header('Content-Type', 'application/json')
 
-    if not allow_redirects:
-        import urllib.request
-        opener = urllib.request.OpenerDirector()
-        opener.add_handler(urllib.request.HTTPHandler())
-        opener.add_handler(urllib.request.HTTPSHandler())
-        resp: HTTPResponse = opener.open(req, timeout=timeout)
-    else:
-        resp = urlopen(req, timeout=timeout)
-
+    resp: HTTPResponse = urlopen(req, timeout=timeout)
     raw_headers = {k.lower(): v for k, v in resp.headers.items()}
     body = resp.read().decode('utf-8', errors='replace')
     return HttpResponse(status_code=resp.status, text=body, headers=raw_headers)
@@ -222,7 +213,6 @@ def http_get_with_retry(
     *,
     headers: dict[str, str] | None = None,
     timeout: int = HTTP_TIMEOUT,
-    allow_redirects: bool = True,
     max_retries: int = HTTP_RETRY,
     backoff_factor: int = 2,
 ) -> HttpResponse:
@@ -236,7 +226,7 @@ def http_get_with_retry(
                 logger.debug(f"  重试 {attempt}/{max_retries}，等待 {sleep_time}s...")
                 time.sleep(sleep_time)
 
-            resp = http_request('GET', url, headers=headers, timeout=timeout, allow_redirects=allow_redirects)
+            resp = http_request('GET', url, headers=headers, timeout=timeout)
 
             if resp.status_code in _RETRYABLE_CODES:
                 raise HTTPError(url='', code=resp.status_code, msg=f"HTTP {resp.status_code}", hdrs=None, fp=None)
