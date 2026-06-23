@@ -398,7 +398,7 @@ def _format_expire(timestamp: int | None) -> str:
 
 
 def generate_status_svg(subscription_info: list[SubscriptionInfo]) -> str:
-    """生成订阅状态 SVG 图片（用于 GitHub Pages 展示）"""
+    """生成订阅状态 SVG 图片（深色科技风格）"""
     now = datetime.now(timezone(timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S CST')
 
     def _esc(s: str) -> str:
@@ -409,102 +409,186 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo]) -> str:
         s = s.replace(chr(62), amp + "gt;")
         return s
 
-    col_widths = [140, 100, 100, 100, 100, 100, 80]
-    headers = ['订阅', '总流量', '已用', '剩余', '到期时间', '状态', '节点数']
-    row_h = 40
-    svg_w = sum(col_widths)
-    header_h = 80
-    svg_h = header_h + len(subscription_info) * row_h + row_h
+    def _pct(used: int, total: int) -> float:
+        """计算使用百分比"""
+        if total <= 0:
+            return 0.0
+        return min(used / total * 100, 100.0)
 
-    # 表头背景色
-    header_bg = '#2d333b'
-    # 行背景色交替
-    row_colors = ['#ffffff', '#f6f8fa']
+    # 配色
+    bg_color = '#0d1117'
+    card_bg = '#161b22'
+    header_bg = '#1c2333'
+    border_color = '#30363d'
+    text_primary = '#e6edf3'
+    text_secondary = '#8b949e'
+    accent_blue = '#58a6ff'
+    accent_green = '#3fb950'
+    accent_orange = '#d29922'
+    accent_red = '#f85149'
+    bar_bg = '#21262d'
 
-    rows = []
+    # 布局参数
+    pad = 20
+    card_radius = 12
+    row_h = 56
+    svg_w = 720
+    title_h = 70
+    col_header_h = 36
+    rows_total_h = len(subscription_info) * row_h
+    footer_h = 56
+    svg_h = title_h + col_header_h + rows_total_h + footer_h + pad * 2
+
+    # 列定义: (名称, 宽度, 对齐)
+    cols = [
+        ('订阅', 100, 'left'),
+        ('流量使用', 200, 'left'),
+        ('到期时间', 90, 'center'),
+        ('状态', 70, 'center'),
+        ('节点', 60, 'center'),
+    ]
+    content_w = svg_w - pad * 2
+
+    # 收集数据行
+    rows_data = []
     total_nodes = 0
     for info in subscription_info:
         if info.flow:
             f = info.flow
-            rows.append([
-                _esc(info.name), _format_bytes(f.total), _format_bytes(f.used),
-                _format_bytes(f.remaining), _format_expire(f.expire),
-                f.status, str(info.node_count),
-            ])
+            pct = _pct(f.used, f.total)
+            if pct >= 90:
+                bar_color = accent_red
+            elif pct >= 70:
+                bar_color = accent_orange
+            else:
+                bar_color = accent_green
+            if '✅' in f.status:
+                status_color = accent_green
+            elif '❌' in f.status:
+                status_color = accent_red
+            else:
+                status_color = accent_orange
+            rows_data.append({
+                'name': _esc(info.name),
+                'used': _format_bytes(f.used),
+                'total': _format_bytes(f.total),
+                'remaining': _format_bytes(f.remaining),
+                'pct': pct,
+                'bar_color': bar_color,
+                'expire': _format_expire(f.expire),
+                'status': f.status,
+                'status_color': status_color,
+                'nodes': str(info.node_count),
+            })
         else:
-            rows.append([_esc(info.name), '0 B', '0 B', '0 B', '无', '❓ 无信息', str(info.node_count)])
+            rows_data.append({
+                'name': _esc(info.name), 'used': '—', 'total': '—', 'remaining': '—',
+                'pct': 0, 'bar_color': text_secondary, 'expire': '—',
+                'status': '❓ 无信息', 'status_color': text_secondary, 'nodes': str(info.node_count),
+            })
         total_nodes += info.node_count
 
-    # 生成行 SVG
-    rows_svg = []
-    for i, row in enumerate(rows):
-        y = header_h + i * row_h
-        bg = row_colors[i % 2]
-        rows_svg.append(f'  <rect x="0" y="{y}" width="{svg_w}" height="{row_h}" fill="{bg}"/>')
-        x = 0
-        for j, cell in enumerate(row):
-            cx = x + col_widths[j] // 2
-            cy = y + row_h // 2 + 5
-            rows_svg.append(
-                f'  <text x="{cx}" y="{cy}" text-anchor="middle"'
-                f' font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif"'
-                f' font-size="13" fill="#24292f">{cell}</text>'
-            )
-            x += col_widths[j]
-    # 分隔线
-    for i in range(len(rows) + 1):
-        y = header_h + i * row_h
-        rows_svg.append(f'  <line x1="0" y1="{y}" x2="{svg_w}" y2="{y}" stroke="#d0d7de" stroke-width="1"/>')
-
-    # 表头 SVG
-    header_svg = [f'  <rect x="0" y="0" width="{svg_w}" height="{header_h}" fill="{header_bg}"/>']
-    header_svg.append(
-        f'  <text x="{svg_w // 2}" y="30" text-anchor="middle"'
-        f' font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif"'
-        f' font-size="16" font-weight="bold" fill="#ffffff">SubDl 订阅状态</text>'
-    )
-    header_svg.append(
-        f'  <text x="{svg_w // 2}" y="52" text-anchor="middle"'
-        f' font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif"'
-        f' font-size="11" fill="#8b949e">最后更新: {_esc(now)}</text>'
-    )
+    # 构建 SVG
+    parts = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{svg_w}" height="{svg_h}" viewBox="0 0 {svg_w} {svg_h}">',
+        # 背景
+        f'  <rect width="{svg_w}" height="{svg_h}" rx="{card_radius}" fill="{bg_color}"/>',
+        # 渐变定义
+        '  <defs>',
+        '    <linearGradient id="headerGrad" x1="0" y1="0" x2="1" y2="0">',
+        '      <stop offset="0%" stop-color="#1a1e2e"/>',
+        '      <stop offset="50%" stop-color="#1c2333"/>',
+        '      <stop offset="100%" stop-color="#1a2538"/>',
+        '    </linearGradient>',
+        '    <linearGradient id="accentGrad" x1="0" y1="0" x2="1" y2="0">',
+        '      <stop offset="0%" stop-color="#58a6ff"/>',
+        '      <stop offset="100%" stop-color="#3fb950"/>',
+        '    </linearGradient>',
+        '  </defs>',
+        # 标题栏
+        f'  <rect x="{pad}" y="{pad}" width="{content_w}" height="{title_h}" rx="8" fill="url(#headerGrad)"/>',
+        f'  <line x1="{pad}" y1="{pad + title_h - 1}" x2="{pad + content_w}" y2="{pad + title_h - 1}" stroke="{accent_blue}" stroke-width="1.5" opacity="0.5"/>',
+        # 标题文字
+        f'  <text x="{pad + 20}" y="{pad + 32}" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="18" font-weight="bold" fill="{text_primary}">SubDl</text>',
+        f'  <text x="{pad + 80}" y="{pad + 32}" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="18" fill="{text_secondary}">订阅状态</text>',
+        f'  <text x="{pad + content_w - 20}" y="{pad + 32}" text-anchor="end" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="11" fill="{text_secondary}">{_esc(now)}</text>',
+        # 统计摘要
+        f'  <text x="{pad + 20}" y="{pad + 56}" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="12" fill="{text_secondary}">共 {len(subscription_info)} 个订阅 · {total_nodes} 个节点</text>',
+    ]
 
     # 列标题
-    col_header_y = header_h - 10
-    x = 0
-    for j, h in enumerate(headers):
-        cx = x + col_widths[j] // 2
-        header_svg.append(
-            f'  <text x="{cx}" y="{col_header_y}" text-anchor="middle"'
+    col_y = pad + title_h + 8
+    x_offset = pad
+    for col_name, col_w, _ in cols:
+        if col_name == '订阅':
+            tx = x_offset + 16
+            anchor = 'start'
+        elif col_name == '流量使用':
+            tx = x_offset + 16
+            anchor = 'start'
+        else:
+            tx = x_offset + col_w // 2
+            anchor = 'middle'
+        parts.append(
+            f'  <text x="{tx}" y="{col_y + 22}" text-anchor="{anchor}"'
             f' font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif"'
-            f' font-size="12" font-weight="bold" fill="#e6edf3">{h}</text>'
+            f' font-size="11" font-weight="600" fill="{text_secondary}" letter-spacing="0.5">{col_name}</text>'
         )
-        x += col_widths[j]
+        x_offset += col_w
+    parts.append(f'  <line x1="{pad}" y1="{col_y + col_header_h}" x2="{pad + content_w}" y2="{col_y + col_header_h}" stroke="{border_color}" stroke-width="1"/>')
 
-    # 合计行
-    total_y = header_h + len(rows) * row_h
-    total_svg = [
-        f'  <rect x="0" y="{total_y}" width="{svg_w}" height="{row_h}" fill="#ddf4ff"/>',
-        f'  <text x="{svg_w // 2}" y="{total_y + row_h // 2 + 5}" text-anchor="middle"'
+    # 数据行
+    rows_start_y = col_y + col_header_h
+    for i, rd in enumerate(rows_data):
+        ry = rows_start_y + i * row_h
+        # 交替行背景（微妙）
+        if i % 2 == 1:
+            parts.append(f'  <rect x="{pad}" y="{ry}" width="{content_w}" height="{row_h}" fill="{card_bg}" opacity="0.3"/>')
+        # 行底部分隔线
+        if i > 0:
+            parts.append(f'  <line x1="{pad + 16}" y1="{ry}" x2="{pad + content_w - 16}" y2="{ry}" stroke="{border_color}" stroke-width="0.5"/>')
+
+        x_offset = pad
+        cy = ry + row_h // 2 + 5
+
+        # 订阅名
+        parts.append(f'  <text x="{x_offset + 16}" y="{cy}" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="13" font-weight="600" fill="{text_primary}">{rd["name"]}</text>')
+        x_offset += cols[0][1]
+
+        # 流量使用 - 文字 + 进度条
+        bar_x = x_offset + 16
+        bar_y = ry + 12
+        bar_w = cols[1][1] - 32
+        bar_h = 8
+        fill_w = max(bar_w * rd['pct'] / 100, 0)
+        parts.append(f'  <rect x="{bar_x}" y="{bar_y}" width="{bar_w}" height="{bar_h}" rx="4" fill="{bar_bg}"/>')
+        if fill_w > 0:
+            parts.append(f'  <rect x="{bar_x}" y="{bar_y}" width="{fill_w}" height="{bar_h}" rx="4" fill="{rd["bar_color"]}"/>')
+        flow_text = f'{rd["used"]} / {rd["total"]}  ({rd["pct"]:.0f}%)'
+        parts.append(f'  <text x="{bar_x}" y="{bar_y + bar_h + 16}" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="11" fill="{text_secondary}">{flow_text}</text>')
+        x_offset += cols[1][1]
+
+        # 到期时间
+        parts.append(f'  <text x="{x_offset + cols[2][1] // 2}" y="{cy}" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="12" fill="{text_secondary}">{rd["expire"]}</text>')
+        x_offset += cols[2][1]
+
+        # 状态
+        parts.append(f'  <text x="{x_offset + cols[3][1] // 2}" y="{cy}" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="13" fill="{rd["status_color"]}">{rd["status"]}</text>')
+        x_offset += cols[3][1]
+
+        # 节点数
+        parts.append(f'  <text x="{x_offset + cols[4][1] // 2}" y="{cy}" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="13" font-weight="600" fill="{accent_blue}">{rd["nodes"]}</text>')
+
+    # 底部合计栏
+    footer_y = rows_start_y + rows_total_h + 8
+    parts.append(f'  <line x1="{pad}" y1="{footer_y}" x2="{pad + content_w}" y2="{footer_y}" stroke="{border_color}" stroke-width="1"/>')
+    parts.append(
+        f'  <text x="{pad + content_w // 2}" y="{footer_y + 32}" text-anchor="middle"'
         f' font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif"'
-        f' font-size="13" font-weight="bold" fill="#24292f">合计: {total_nodes} 个节点</text>',
-    ]
+        f' font-size="13" fill="{text_secondary}">合计: <tspan font-weight="700" fill="{accent_blue}">{total_nodes}</tspan> 个节点</text>'
+    )
 
-    # 外边框
-    border = [
-        f'<rect x="0" y="0" width="{svg_w}" height="{svg_h}" rx="8" ry="8"'
-        f' fill="none" stroke="#d0d7de" stroke-width="1"/>'
-    ]
-
-    parts = [
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{svg_w}" height="{svg_h}">'
-        f'<rect x="0" y="0" width="{svg_w}" height="{svg_h}" rx="8" ry="8" fill="#ffffff"/>',
-        *header_svg,
-        *rows_svg,
-        *total_svg,
-        *border,
-        '</svg>',
-    ]
+    parts.append('</svg>')
     return '\n'.join(parts)
 
 
