@@ -212,7 +212,7 @@ def http_request(
     else:
         resp = urlopen(req, timeout=timeout)
 
-    raw_headers = dict(resp.headers.items())
+    raw_headers = {k.lower(): v for k, v in resp.headers.items()}
     body = resp.read().decode('utf-8', errors='replace')
     return HttpResponse(status_code=resp.status, text=body, headers=raw_headers)
 
