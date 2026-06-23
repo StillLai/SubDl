@@ -89,8 +89,6 @@ def process_providers(
                 ))
         outbound['outbounds'] = fixed_outbounds + expanded
 
-    del config['providers']
-
 
 def _strip_filter_fields(outbounds: list[Any]) -> None:
     """移除 outbounds 中每个 dict 的 include/exclude 字段（O(n) 常数时间）"""
@@ -143,6 +141,7 @@ def merge_config(
     # 步骤 2: 处理 providers 配置
     if 'providers' in config:
         process_providers(config, subscriptions_nodes)
+        del config['providers']
         logger.info("[Merge] 已处理 providers 配置")
 
     # 步骤 3: 移除 outbounds 中的 include/exclude 字段

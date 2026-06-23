@@ -148,7 +148,6 @@ class SubscriptionInfo:
     name: str
     flow: FlowInfo | None
     node_count: int
-    status: str
 
 
 # ========== 基础工具函数 ==========

@@ -136,7 +136,7 @@ def _parse_csv_rows(data: str) -> list[dict[str, str | None]]:
     return rows
 
 
-_PARSERS: dict[str, callable] = {
+_PARSERS: dict[str, Any] = {
     'json': json.loads,
     'yaml': yaml.safe_load,
     'csv': _parse_csv_rows,

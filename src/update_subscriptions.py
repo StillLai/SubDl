@@ -210,7 +210,7 @@ def _aggregate_results(
         if not result.is_success:
             skipped.append(f"{result.name} ({result.reason})")
             subscription_info.append(SubscriptionInfo(
-                name=result.name, flow=result.flow, node_count=0, status=result.status
+                name=result.name, flow=result.flow, node_count=0
             ))
             continue
 
@@ -223,7 +223,7 @@ def _aggregate_results(
         if singbox_config is None:
             skipped.append(f"{result.name} (转换失败)")
             subscription_info.append(SubscriptionInfo(
-                name=result.name, flow=result.flow, node_count=0, status="convert_failed"
+                name=result.name, flow=result.flow, node_count=0
             ))
             continue
 
@@ -239,7 +239,7 @@ def _aggregate_results(
             skipped.append(f"{result.name} (空节点)")
 
         subscription_info.append(SubscriptionInfo(
-            name=result.name, flow=result.flow, node_count=node_count, status="ok"
+            name=result.name, flow=result.flow, node_count=node_count
         ))
 
     if skipped:
@@ -261,16 +261,14 @@ def _load_templates() -> list[tuple[str, str]]:
     return templates
 
 
-_TEMPLATES: list[tuple[str, str]] = _load_templates()
-
-
 def _process_templates(
     process_fn: Any,
 ) -> dict[str, str]:
     """遍历所有模板文件，串行处理"""
-    logger.debug(f"  处理 {len(_TEMPLATES)} 个模板文件")
+    templates = _load_templates()
+    logger.debug(f"  处理 {len(templates)} 个模板文件")
     results: dict[str, str] = {}
-    for path, name in _TEMPLATES:
+    for path, name in templates:
         entry = process_fn(path, name)
         if entry:
             results[entry[0]] = entry[1]
@@ -345,7 +343,7 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo]) -> str:
 
     def _esc(s: str) -> str:
         """XML 转义"""
-        amp = chr(38)  # &
+        amp = chr(38)
         s = s.replace(amp, amp + "amp;")
         s = s.replace(chr(60), amp + "lt;")
         s = s.replace(chr(62), amp + "gt;")
@@ -497,6 +495,7 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo]) -> str:
     parts.append(f'  <line x1="{pad}" y1="{col_y + col_header_h}" x2="{pad + content_w}" y2="{col_y + col_header_h}" stroke="{border_color}" stroke-width="1"/>')
 
     # 数据行
+    _BAR_GRAD_MAP = {accent_green: 'barGreenGrad', accent_orange: 'barOrangeGrad', accent_red: 'barRedGrad'}
     rows_start_y = col_y + col_header_h
     for i, rd in enumerate(rows_data):
         ry = rows_start_y + i * row_h
@@ -522,11 +521,9 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo]) -> str:
         fill_w = max(bar_w * rd['pct'] / 100, 0)
         parts.append(f'  <rect x="{bar_x}" y="{bar_y}" width="{bar_w}" height="{bar_h}" rx="4" fill="{bar_bg}"/>')
         if fill_w > 0:
-            bar_grad = 'barGreenGrad' if rd['bar_color'] == accent_green else ('barOrangeGrad' if rd['bar_color'] == accent_orange else ('barRedGrad' if rd['bar_color'] == accent_red else None))
-            if bar_grad:
-                parts.append(f'  <rect x="{bar_x}" y="{bar_y}" width="{fill_w}" height="{bar_h}" rx="4" fill="url(#{bar_grad})"/>')
-            else:
-                parts.append(f'  <rect x="{bar_x}" y="{bar_y}" width="{fill_w}" height="{bar_h}" rx="4" fill="{rd["bar_color"]}"/>')
+            bar_grad = _BAR_GRAD_MAP.get(rd['bar_color'])
+            fill_val = f"url(#{bar_grad})" if bar_grad else rd['bar_color']
+            parts.append(f'  <rect x="{bar_x}" y="{bar_y}" width="{fill_w}" height="{bar_h}" rx="4" fill="{fill_val}"/>')
         flow_text = f'{rd["used"]} / {rd["total"]}  ({rd["pct"]:.0f}%)'
         parts.append(f'  <text x="{bar_x}" y="{bar_y + bar_h + 16}" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="11" fill="{text_secondary}">{flow_text}</text>')
         x_offset += cols[1][1]
