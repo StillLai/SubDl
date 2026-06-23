@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import re
 import sys
@@ -84,9 +85,9 @@ class FlowInfo:
 def _extract_name_from_url(url: str) -> str:
     try:
         name = urlparse(url).netloc.replace("www.", "").split(":")[0]
-        return name or f"unknown_{int(time.time())}"
+        return name or f"unknown_{hashlib.md5(url.encode('utf-8')).hexdigest()[:8]}"
     except Exception:
-        return f"unknown_{int(time.time())}"
+        return f"unknown_{hashlib.md5(url.encode('utf-8')).hexdigest()[:8]}"
 
 
 @dataclass(frozen=True)

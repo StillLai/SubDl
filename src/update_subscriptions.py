@@ -31,6 +31,11 @@ from utils import (
 from merge_config import merge_config
 
 
+# ========== SVG 常量 ==========
+
+_FONT = '-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif'
+
+
 # ========== 流量解析 ==========
 
 _FLOW_KEY_PATTERN: re.Pattern[str] = re.compile(r'(\w+)=(\d+)')
@@ -128,9 +133,10 @@ def _download_subscription(sub: Subscription, user_agent: str) -> DownloadResult
 
 
 def _download_all(subscriptions: list[Subscription], user_agent: str) -> list[DownloadResult]:
-    """并行下载所有订阅"""
+    """并行下载所有订阅，按原始订阅顺序返回结果"""
     logger.info(f"→ 并行下载 {len(subscriptions)} 个订阅...")
-    results: list[DownloadResult] = []
+    index_map = {sub: i for i, sub in enumerate(subscriptions)}
+    results: list[DownloadResult] = [None] * len(subscriptions)  # type: ignore[list-item]
 
     with ThreadPoolExecutor(max_workers=min(len(subscriptions), 8)) as executor:
         futures = {
@@ -138,8 +144,9 @@ def _download_all(subscriptions: list[Subscription], user_agent: str) -> list[Do
             for sub in subscriptions
         }
         for future in as_completed(futures):
+            sub = futures[future]
             result = future.result()
-            results.append(result)
+            results[index_map[sub]] = result
             if result.is_success:
                 logger.debug(f"  ✓ {result.name}: 下载成功")
             else:
@@ -264,15 +271,28 @@ def _iter_templates() -> list[tuple[str, str]]:
     ]
 
 
-def merge_all_templates(subs_nodes_dict: dict[str, list[dict[str, Any]]]) -> dict[str, str]:
+def _load_templates() -> list[tuple[str, str, dict[str, Any]]]:
+    """加载所有模板并缓存，避免重复磁盘 I/O"""
+    templates: list[tuple[str, str, dict[str, Any]]] = []
+    for path, base_name in _iter_templates():
+        try:
+            templates.append((path, base_name, load_jsonc(path)))
+        except Exception as e:
+            logger.error(f"  模板加载失败 {path}: {e}")
+    return templates
+
+
+def merge_all_templates(
+    subs_nodes_dict: dict[str, list[dict[str, Any]]],
+    templates: list[tuple[str, str, dict[str, Any]]],
+) -> dict[str, str]:
     """遍历所有模板文件并生成合并配置"""
     total_nodes = sum(len(nodes) for nodes in subs_nodes_dict.values())
     results: dict[str, str] = {}
-    for path, base_name in _iter_templates():
+    for path, base_name, template in templates:
         config_filename = base_name.replace('template', 'config') + '.json'
         logger.info(f"  → 处理模板: {os.path.basename(path)}")
         try:
-            template = load_jsonc(path)
             merged = merge_config(template, subs_nodes_dict)
         except Exception as e:
             logger.error(f"  合并异常: {e}")
@@ -283,21 +303,26 @@ def merge_all_templates(subs_nodes_dict: dict[str, list[dict[str, Any]]]) -> dic
     return results
 
 
-def generate_provider_configs(sub_url_map: dict[str, str]) -> dict[str, str]:
+def generate_provider_configs(
+    sub_url_map: dict[str, str],
+    templates: list[tuple[str, str, dict[str, Any]]],
+) -> dict[str, str]:
     """生成 providers 版本的配置文件"""
     results: dict[str, str] = {}
-    for path, base_name in _iter_templates():
-        template = load_jsonc(path)
-        filled = 0
-        for provider in template.get('providers', []):
-            tag = provider.get('tag', '')
-            if tag in sub_url_map:
-                provider['url'] = sub_url_map[tag]
-                filled += 1
-        if filled > 0:
-            config_filename = base_name.replace('template', 'with_providers_config') + '.json'
-            logger.debug(f"  → {os.path.basename(path)} -> {config_filename} ({filled} 个 providers)")
-            results[config_filename] = json.dumps(template, indent=2, ensure_ascii=False)
+    for path, base_name, template in templates:
+        try:
+            filled = 0
+            for provider in template.get('providers', []):
+                tag = provider.get('tag', '')
+                if tag in sub_url_map:
+                    provider['url'] = sub_url_map[tag]
+                    filled += 1
+            if filled > 0:
+                config_filename = base_name.replace('template', 'with_providers_config') + '.json'
+                logger.debug(f"  → {os.path.basename(path)} -> {config_filename} ({filled} 个 providers)")
+                results[config_filename] = json.dumps(template, indent=2, ensure_ascii=False)
+        except Exception as e:
+            logger.error(f"  Provider 配置生成异常 {path}: {e}")
     return results
 
 
@@ -317,7 +342,7 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo]) -> str:
         if not ts:
             return "无"
         try:
-            return datetime.fromtimestamp(ts).strftime("%Y-%m-%d")
+            return datetime.fromtimestamp(ts, tz=timezone(timedelta(hours=8))).strftime("%Y-%m-%d")
         except Exception:
             return "无"
 
@@ -334,11 +359,8 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo]) -> str:
         return "✅ 正常", accent_green
 
     def _esc(s: str) -> str:
-        amp = chr(38)
-        s = s.replace(amp, amp + "amp;")
-        s = s.replace(chr(60), amp + "lt;")
-        s = s.replace(chr(62), amp + "gt;")
-        return s
+        a = '&'
+        return s.replace(a, a + 'amp;').replace('<', a + 'lt;').replace('>', a + 'gt;')
 
     now = datetime.now(timezone(timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S CST')
 
@@ -442,11 +464,11 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo]) -> str:
         f'  <rect x="{pad}" y="{pad}" width="4" height="{title_h}" rx="2" fill="url(#accentGrad)"/>',
         f'  <line x1="{pad}" y1="{pad + title_h - 1}" x2="{pad + content_w}" y2="{pad + title_h - 1}" stroke="{border_color}" stroke-width="1"/>',
         # 标题文字
-        f'  <text x="{pad + 20}" y="{pad + 32}" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="18" font-weight="bold" fill="{text_primary}">SubDl</text>',
-        f'  <text x="{pad + 80}" y="{pad + 32}" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="18" fill="{text_secondary}">订阅状态</text>',
-        f'  <text x="{pad + content_w - 20}" y="{pad + 32}" text-anchor="end" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="11" fill="{text_secondary}">{_esc(now)}</text>',
+        f'  <text x="{pad + 20}" y="{pad + 32}" font-family="{_FONT}" font-size="18" font-weight="bold" fill="{text_primary}">SubDl</text>',
+        f'  <text x="{pad + 80}" y="{pad + 32}" font-family="{_FONT}" font-size="18" fill="{text_secondary}">订阅状态</text>',
+        f'  <text x="{pad + content_w - 20}" y="{pad + 32}" text-anchor="end" font-family="{_FONT}" font-size="11" fill="{text_secondary}">{_esc(now)}</text>',
         # 统计摘要
-        f'  <text x="{pad + 20}" y="{pad + 56}" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="12" fill="{text_secondary}">共 {len(subscription_info)} 个订阅 · {total_nodes} 个节点</text>',
+        f'  <text x="{pad + 20}" y="{pad + 56}" font-family="{_FONT}" font-size="12" fill="{text_secondary}">共 {len(subscription_info)} 个订阅 · {total_nodes} 个节点</text>',
     ]
 
     # 列标题
@@ -464,7 +486,7 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo]) -> str:
             anchor = 'middle'
         parts.append(
             f'  <text x="{tx}" y="{col_y + 22}" text-anchor="{anchor}"'
-            f' font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif"'
+            f' font-family="{_FONT}"'
             f' font-size="11" font-weight="600" fill="{text_secondary}" letter-spacing="0.5">{col_name}</text>'
         )
         x_offset += col_w
@@ -485,7 +507,7 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo]) -> str:
         cy = ry + row_h // 2 + 5
 
         # 订阅名
-        parts.append(f'  <text x="{x_offset + 16}" y="{cy}" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="13" font-weight="600" fill="{text_primary}">{rd["name"]}</text>')
+        parts.append(f'  <text x="{x_offset + 16}" y="{cy}" font-family="{_FONT}" font-size="13" font-weight="600" fill="{text_primary}">{rd["name"]}</text>')
         x_offset += cols[0][1]
 
         # 流量使用 - 文字 + 进度条
@@ -500,26 +522,26 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo]) -> str:
             fill_val = f"url(#{bar_grad})" if bar_grad else rd['bar_color']
             parts.append(f'  <rect x="{bar_x}" y="{bar_y}" width="{fill_w}" height="{bar_h}" rx="4" fill="{fill_val}"/>')
         flow_text = f'{rd["used"]} / {rd["total"]}  ({rd["pct"]:.0f}%)'
-        parts.append(f'  <text x="{bar_x}" y="{bar_y + bar_h + 16}" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="11" fill="{text_secondary}">{flow_text}</text>')
+        parts.append(f'  <text x="{bar_x}" y="{bar_y + bar_h + 16}" font-family="{_FONT}" font-size="11" fill="{text_secondary}">{flow_text}</text>')
         x_offset += cols[1][1]
 
         # 到期时间
-        parts.append(f'  <text x="{x_offset + cols[2][1] // 2}" y="{cy}" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="12" fill="{text_secondary}">{rd["expire"]}</text>')
+        parts.append(f'  <text x="{x_offset + cols[2][1] // 2}" y="{cy}" text-anchor="middle" font-family="{_FONT}" font-size="12" fill="{text_secondary}">{rd["expire"]}</text>')
         x_offset += cols[2][1]
 
         # 状态
-        parts.append(f'  <text x="{x_offset + cols[3][1] // 2}" y="{cy}" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="13" fill="{rd["status_color"]}">{rd["status"]}</text>')
+        parts.append(f'  <text x="{x_offset + cols[3][1] // 2}" y="{cy}" text-anchor="middle" font-family="{_FONT}" font-size="13" fill="{rd["status_color"]}">{rd["status"]}</text>')
         x_offset += cols[3][1]
 
         # 节点数
-        parts.append(f'  <text x="{x_offset + cols[4][1] // 2}" y="{cy}" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="13" font-weight="600" fill="{accent_blue}">{rd["nodes"]}</text>')
+        parts.append(f'  <text x="{x_offset + cols[4][1] // 2}" y="{cy}" text-anchor="middle" font-family="{_FONT}" font-size="13" font-weight="600" fill="{accent_blue}">{rd["nodes"]}</text>')
 
     # 底部合计栏
     footer_y = rows_start_y + rows_total_h + 8
     parts.append(f'  <line x1="{pad}" y1="{footer_y}" x2="{pad + content_w}" y2="{footer_y}" stroke="{border_color}" stroke-width="1"/>')
     parts.append(
         f'  <text x="{pad + content_w // 2}" y="{footer_y + 32}" text-anchor="middle"'
-        f' font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif"'
+        f' font-family="{_FONT}"'
         f' font-size="13" fill="{text_secondary}">合计: <tspan font-weight="700" fill="{accent_blue}">{total_nodes}</tspan> 个节点</text>'
     )
 
@@ -569,14 +591,15 @@ def _generate_and_upload(
     """生成合并配置、providers 配置，并上传到 Gist"""
 
     logger.info("→ 生成合并配置和 providers 配置...")
+    templates = _load_templates()
     sub_url_map = {sub.name: sub.url for sub in subscriptions}
 
-    merged = merge_all_templates(subs_nodes_dict)
+    merged = merge_all_templates(subs_nodes_dict, templates)
     files.update(merged)
     if merged:
         logger.info(f"  ✓ 共生成 {len(merged)} 个配置文件")
 
-    providers = generate_provider_configs(sub_url_map)
+    providers = generate_provider_configs(sub_url_map, templates)
     files.update(providers)
     if providers:
         logger.info(f"  ✓ 共生成 {len(providers)} 个 providers 配置文件")
