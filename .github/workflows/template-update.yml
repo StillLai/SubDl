@@ -33,7 +33,3 @@ jobs:
         git diff --quiet && git diff --staged --quiet || git commit -m "Update template variants [skip ci]"
         git push
 
-    - name: Trigger subscriptions update
-      run: gh workflow run subscriptions-update.yml
-      env:
-        GH_TOKEN: ${{ secrets.GH_TOKEN }}
