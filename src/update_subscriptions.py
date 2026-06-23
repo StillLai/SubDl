@@ -397,49 +397,115 @@ def _format_expire(timestamp: int | None) -> str:
         return "无"
 
 
-def generate_readme(subscription_info: list[SubscriptionInfo]) -> str:
-    """生成 README 内容"""
+def generate_status_svg(subscription_info: list[SubscriptionInfo]) -> str:
+    """生成订阅状态 SVG 图片（用于 GitHub Pages 展示）"""
     now = datetime.now(timezone(timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S CST')
 
-    lines = [
-        "# SubDl", "",
-        f"> 最后更新: {now}", "",
-        "## 订阅状态", "",
-        "| 订阅 | 总流量 | 已用 | 剩余 | 到期时间 | 状态 | 节点数 |",
-        "|------|--------|------|------|----------|------|--------|",
-    ]
+    def _esc(s: str) -> str:
+        """XML 转义"""
+        amp = chr(38)  # &
+        s = s.replace(amp, amp + "amp;")
+        s = s.replace(chr(60), amp + "lt;")
+        s = s.replace(chr(62), amp + "gt;")
+        return s
 
+    col_widths = [140, 100, 100, 100, 100, 100, 80]
+    headers = ['订阅', '总流量', '已用', '剩余', '到期时间', '状态', '节点数']
+    row_h = 40
+    svg_w = sum(col_widths)
+    header_h = 65
+    svg_h = header_h + len(subscription_info) * row_h + row_h
+
+    # 表头背景色
+    header_bg = '#2d333b'
+    # 行背景色交替
+    row_colors = ['#ffffff', '#f6f8fa']
+
+    rows = []
     total_nodes = 0
     for info in subscription_info:
         if info.flow:
             f = info.flow
-            lines.append(
-                f"| {info.name} | {_format_bytes(f.total)} | {_format_bytes(f.used)}"
-                f" | {_format_bytes(f.remaining)} | {_format_expire(f.expire)}"
-                f" | {f.status} | {info.node_count} |"
-            )
+            rows.append([
+                _esc(info.name), _format_bytes(f.total), _format_bytes(f.used),
+                _format_bytes(f.remaining), _format_expire(f.expire),
+                f.status, str(info.node_count),
+            ])
         else:
-            lines.append(f"| {info.name} | 0 B | 0 B | 0 B | 无 | ❓ 无信息 | {info.node_count} |")
+            rows.append([_esc(info.name), '0 B', '0 B', '0 B', '无', '❓ 无信息', str(info.node_count)])
         total_nodes += info.node_count
 
-    lines.append(f"| **合计** | | | | | | **{total_nodes}** |")
+    # 生成行 SVG
+    rows_svg = []
+    for i, row in enumerate(rows):
+        y = header_h + i * row_h
+        bg = row_colors[i % 2]
+        rows_svg.append(f'  <rect x="0" y="{y}" width="{svg_w}" height="{row_h}" fill="{bg}"/>')
+        x = 0
+        for j, cell in enumerate(row):
+            cx = x + col_widths[j] // 2
+            cy = y + row_h // 2 + 5
+            rows_svg.append(
+                f'  <text x="{cx}" y="{cy}" text-anchor="middle"'
+                f' font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif"'
+                f' font-size="13" fill="#24292f">{cell}</text>'
+            )
+            x += col_widths[j]
+    # 分隔线
+    for i in range(len(rows) + 1):
+        y = header_h + i * row_h
+        rows_svg.append(f'  <line x1="0" y1="{y}" x2="{svg_w}" y2="{y}" stroke="#d0d7de" stroke-width="1"/>')
 
-    lines.extend([
-        "", "## 快速配置", "",
-        "1. Fork 本仓库",
-        "2. 在 Settings → Secrets → Actions 中添加:",
-        "   - `GH_TOKEN`: GitHub Token (需要 gist 权限)",
-        "   - `GIST_ID`: Gist ID（可选，首次运行后会自动创建并输出）",
-        "   - `SUB_URL`: 订阅链接 (`名称|URL` 格式)",
-        "   - `SUB_URL_1`, `SUB_URL_2`...: 更多订阅（可选）",
-        "3. 在 Actions → Subscriptions Update 中点击 Run workflow", "",
-        "## 说明", "",
-        "- 每小时自动更新订阅",
-        "- 订阅内容上传到 Gist，不保存在仓库",
-        "- `sing-box-config.json` 是可直接使用的完整 sing-box 配置文件",
-        "- 参考 [sub-store](https://github.com/sub-store-org/Sub-Store) 实现", "",
-    ])
-    return "\n".join(lines)
+    # 表头 SVG
+    header_svg = [f'  <rect x="0" y="0" width="{svg_w}" height="{header_h}" fill="{header_bg}"/>']
+    header_svg.append(
+        f'  <text x="{svg_w // 2}" y="25" text-anchor="middle"'
+        f' font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif"'
+        f' font-size="16" font-weight="bold" fill="#ffffff">SubDl 订阅状态</text>'
+    )
+    header_svg.append(
+        f'  <text x="{svg_w // 2}" y="45" text-anchor="middle"'
+        f' font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif"'
+        f' font-size="11" fill="#8b949e">最后更新: {_esc(now)}</text>'
+    )
+
+    # 列标题
+    col_header_y = header_h - 8
+    x = 0
+    for j, h in enumerate(headers):
+        cx = x + col_widths[j] // 2
+        header_svg.append(
+            f'  <text x="{cx}" y="{col_header_y}" text-anchor="middle"'
+            f' font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif"'
+            f' font-size="12" font-weight="bold" fill="#e6edf3">{h}</text>'
+        )
+        x += col_widths[j]
+
+    # 合计行
+    total_y = header_h + len(rows) * row_h
+    total_svg = [
+        f'  <rect x="0" y="{total_y}" width="{svg_w}" height="{row_h}" fill="#ddf4ff"/>',
+        f'  <text x="{svg_w // 2}" y="{total_y + row_h // 2 + 5}" text-anchor="middle"'
+        f' font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif"'
+        f' font-size="13" font-weight="bold" fill="#24292f">合计: {total_nodes} 个节点</text>',
+    ]
+
+    # 外边框
+    border = [
+        f'<rect x="0" y="0" width="{svg_w}" height="{svg_h}" rx="8" ry="8"'
+        f' fill="none" stroke="#d0d7de" stroke-width="1"/>'
+    ]
+
+    parts = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{svg_w}" height="{svg_h}">'
+        f'<rect x="0" y="0" width="{svg_w}" height="{svg_h}" rx="8" ry="8" fill="#ffffff"/>',
+        *header_svg,
+        *rows_svg,
+        *total_svg,
+        *border,
+        '</svg>',
+    ]
+    return '\n'.join(parts)
 
 
 # ========== Gist 上传 ==========
@@ -496,9 +562,11 @@ def _generate_and_upload(
     if providers:
         logger.info(f"  ✓ 共生成 {len(providers)} 个 providers 配置文件")
 
-    readme_content = generate_readme(subscription_info)
-    (PROJECT_ROOT / "README.md").write_text(readme_content, encoding="utf-8")
-    logger.info("✓ README 已更新")
+    # 生成 SVG 状态图片（供 GitHub Pages 使用）
+    svg_content = generate_status_svg(subscription_info)
+    svg_output = PROJECT_ROOT / "status.svg"
+    svg_output.write_text(svg_content, encoding="utf-8")
+    logger.info("✓ 状态 SVG 已生成")
 
     logger.info(f"上传 {len(files)} 个文件到 Gist...")
     new_gist_id = upload_to_gist(github_token, gist_id, files)

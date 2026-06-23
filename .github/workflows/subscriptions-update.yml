@@ -68,10 +68,18 @@ jobs:
         SUB_URL_9: ${{ secrets.SUB_URL_9 }}
       run: python src/update_subscriptions.py
 
-    - name: Commit changes
+    - name: Deploy SVG to GitHub Pages
       run: |
+        # 在独立目录初始化 git 并推送到 gh-pages 分支（避免污染工作区）
+        REPO_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+        mkdir -p /tmp/gh-pages-deploy
+        cp status.svg /tmp/gh-pages-deploy/
+        cd /tmp/gh-pages-deploy
+        git init
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
-        git add README.md config_template/sing-box_template_noTun.jsonc config_template/sing-box_template_tproxy.jsonc config_template/sing-box_template_tun_for_win.jsonc
-        git diff --quiet && git diff --staged --quiet || git commit -m "Update subscription info [skip ci]"
-        git push
+        git add status.svg
+        git commit -m "Update status SVG [skip ci]"
+        git push --force "$REPO_URL" HEAD:gh-pages
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

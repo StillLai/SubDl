@@ -55,3 +55,11 @@ src/node_modules/
 ruleset/json/
 ruleset/srs/
 data/rules_archive.tar
+
+# 模板变体（从基础模板自动生成，不需要跟踪）
+config_template/sing-box_template_noTun.jsonc
+config_template/sing-box_template_tproxy.jsonc
+config_template/sing-box_template_tun_for_win.jsonc
+
+# 状态 SVG（每次自动生成，推送到 gh-pages 分支）
+status.svg
