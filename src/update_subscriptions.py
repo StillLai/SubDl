@@ -442,7 +442,7 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo]) -> str:
     # 列定义: (名称, 宽度, 对齐)
     cols = [
         ('订阅', 100, 'left'),
-        ('流量使用', 200, 'left'),
+        ('流量使用', 400, 'left'),
         ('到期时间', 90, 'center'),
         ('状态', 70, 'center'),
         ('节点', 60, 'center'),
