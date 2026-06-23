@@ -67,10 +67,33 @@ jobs:
         SUB_URL_9: ${{ secrets.SUB_URL_9 }}
       run: python src/update_subscriptions.py
 
+    - name: Prepare Pages content
+      run: |
+        mkdir -p _pages
+        cp status.svg _pages/status.svg
+        # 用 HTML 包装 SVG，使其作为网页正确显示
+        cat > _pages/index.html <<'EOF'
+        <!DOCTYPE html>
+        <html lang="zh-CN">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>SubDl 订阅状态</title>
+          <style>
+            body { margin: 0; padding: 20px; background: #0d1117; display: flex; justify-content: center; align-items: center; min-height: 100vh; box-sizing: border-box; }
+            img { max-width: 100%; height: auto; }
+          </style>
+        </head>
+        <body>
+          <img src="status.svg" alt="SubDl 订阅状态">
+        </body>
+        </html>
+        EOF
+
     - name: Upload Pages artifact
       uses: actions/upload-pages-artifact@v3
       with:
-        path: status.svg
+        path: _pages
 
   deploy:
     needs: update
