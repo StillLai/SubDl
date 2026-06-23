@@ -34,7 +34,6 @@ jobs:
         git push
 
     - name: Trigger subscriptions update
-      uses: benc-uk/workflow-dispatch@v1
-      with:
-        workflow: subscriptions-update.yml
-        token: ${{ secrets.GH_TOKEN }}
+      run: gh workflow run subscriptions-update.yml
+      env:
+        GH_TOKEN: ${{ secrets.GH_TOKEN }}
