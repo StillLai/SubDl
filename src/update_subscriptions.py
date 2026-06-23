@@ -398,7 +398,7 @@ def _format_expire(timestamp: int | None) -> str:
 
 
 def generate_status_svg(subscription_info: list[SubscriptionInfo]) -> str:
-    """生成订阅状态 SVG 图片（深色科技风格）"""
+    """生成订阅状态 SVG 图片（浅色高级感风格）"""
     now = datetime.now(timezone(timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S CST')
 
     def _esc(s: str) -> str:
@@ -415,18 +415,18 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo]) -> str:
             return 0.0
         return min(used / total * 100, 100.0)
 
-    # 配色
-    bg_color = '#0d1117'
-    card_bg = '#161b22'
-    header_bg = '#1c2333'
-    border_color = '#30363d'
-    text_primary = '#e6edf3'
-    text_secondary = '#8b949e'
-    accent_blue = '#58a6ff'
-    accent_green = '#3fb950'
-    accent_orange = '#d29922'
-    accent_red = '#f85149'
-    bar_bg = '#21262d'
+    # 配色 - 浅色高级感
+    bg_color = '#f0f2f5'
+    card_bg = '#ffffff'
+    header_bg = '#f8fafc'
+    border_color = '#e2e8f0'
+    text_primary = '#1e293b'
+    text_secondary = '#64748b'
+    accent_blue = '#3b82f6'
+    accent_green = '#10b981'
+    accent_orange = '#f59e0b'
+    accent_red = '#ef4444'
+    bar_bg = '#e2e8f0'
 
     # 布局参数
     pad = 20
@@ -494,21 +494,37 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo]) -> str:
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{svg_w}" height="{svg_h}" viewBox="0 0 {svg_w} {svg_h}">',
         # 背景
         f'  <rect width="{svg_w}" height="{svg_h}" rx="{card_radius}" fill="{bg_color}"/>',
-        # 渐变定义
+        # 渐变和滤镜定义
         '  <defs>',
         '    <linearGradient id="headerGrad" x1="0" y1="0" x2="1" y2="0">',
-        '      <stop offset="0%" stop-color="#1a1e2e"/>',
-        '      <stop offset="50%" stop-color="#1c2333"/>',
-        '      <stop offset="100%" stop-color="#1a2538"/>',
+        '      <stop offset="0%" stop-color="#f0f4fa"/>',
+        '      <stop offset="50%" stop-color="#f8fafc"/>',
+        '      <stop offset="100%" stop-color="#eef2f7"/>',
         '    </linearGradient>',
         '    <linearGradient id="accentGrad" x1="0" y1="0" x2="1" y2="0">',
-        '      <stop offset="0%" stop-color="#58a6ff"/>',
-        '      <stop offset="100%" stop-color="#3fb950"/>',
+        '      <stop offset="0%" stop-color="#3b82f6"/>',
+        '      <stop offset="100%" stop-color="#10b981"/>',
         '    </linearGradient>',
+        '    <linearGradient id="barGreenGrad" x1="0" y1="0" x2="1" y2="0">',
+        '      <stop offset="0%" stop-color="#34d399"/>',
+        '      <stop offset="100%" stop-color="#10b981"/>',
+        '    </linearGradient>',
+        '    <linearGradient id="barOrangeGrad" x1="0" y1="0" x2="1" y2="0">',
+        '      <stop offset="0%" stop-color="#fbbf24"/>',
+        '      <stop offset="100%" stop-color="#f59e0b"/>',
+        '    </linearGradient>',
+        '    <linearGradient id="barRedGrad" x1="0" y1="0" x2="1" y2="0">',
+        '      <stop offset="0%" stop-color="#f87171"/>',
+        '      <stop offset="100%" stop-color="#ef4444"/>',
+        '    </linearGradient>',
+        '    <filter id="cardShadow" x="-2%" y="-2%" width="104%" height="104%">',
+        '      <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000000" flood-opacity="0.06"/>',
+        '    </filter>',
         '  </defs>',
         # 标题栏
-        f'  <rect x="{pad}" y="{pad}" width="{content_w}" height="{title_h}" rx="8" fill="url(#headerGrad)"/>',
-        f'  <line x1="{pad}" y1="{pad + title_h - 1}" x2="{pad + content_w}" y2="{pad + title_h - 1}" stroke="{accent_blue}" stroke-width="1.5" opacity="0.5"/>',
+        f'  <rect x="{pad}" y="{pad}" width="{content_w}" height="{title_h}" rx="8" fill="url(#headerGrad)" filter="url(#cardShadow)"/>',
+        f'  <rect x="{pad}" y="{pad}" width="4" height="{title_h}" rx="2" fill="url(#accentGrad)"/>',
+        f'  <line x1="{pad}" y1="{pad + title_h - 1}" x2="{pad + content_w}" y2="{pad + title_h - 1}" stroke="{border_color}" stroke-width="1"/>',
         # 标题文字
         f'  <text x="{pad + 20}" y="{pad + 32}" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="18" font-weight="bold" fill="{text_primary}">SubDl</text>',
         f'  <text x="{pad + 80}" y="{pad + 32}" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="18" fill="{text_secondary}">订阅状态</text>',
@@ -542,9 +558,9 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo]) -> str:
     rows_start_y = col_y + col_header_h
     for i, rd in enumerate(rows_data):
         ry = rows_start_y + i * row_h
-        # 交替行背景（微妙）
+        # 交替行背景（极淡蓝灰色）
         if i % 2 == 1:
-            parts.append(f'  <rect x="{pad}" y="{ry}" width="{content_w}" height="{row_h}" fill="{card_bg}" opacity="0.3"/>')
+            parts.append(f'  <rect x="{pad}" y="{ry}" width="{content_w}" height="{row_h}" fill="#f8fafd"/>')
         # 行底部分隔线
         if i > 0:
             parts.append(f'  <line x1="{pad + 16}" y1="{ry}" x2="{pad + content_w - 16}" y2="{ry}" stroke="{border_color}" stroke-width="0.5"/>')
@@ -564,7 +580,11 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo]) -> str:
         fill_w = max(bar_w * rd['pct'] / 100, 0)
         parts.append(f'  <rect x="{bar_x}" y="{bar_y}" width="{bar_w}" height="{bar_h}" rx="4" fill="{bar_bg}"/>')
         if fill_w > 0:
-            parts.append(f'  <rect x="{bar_x}" y="{bar_y}" width="{fill_w}" height="{bar_h}" rx="4" fill="{rd["bar_color"]}"/>')
+            bar_grad = 'barGreenGrad' if rd['bar_color'] == accent_green else ('barOrangeGrad' if rd['bar_color'] == accent_orange else ('barRedGrad' if rd['bar_color'] == accent_red else None))
+            if bar_grad:
+                parts.append(f'  <rect x="{bar_x}" y="{bar_y}" width="{fill_w}" height="{bar_h}" rx="4" fill="url(#{bar_grad})"/>')
+            else:
+                parts.append(f'  <rect x="{bar_x}" y="{bar_y}" width="{fill_w}" height="{bar_h}" rx="4" fill="{rd["bar_color"]}"/>')
         flow_text = f'{rd["used"]} / {rd["total"]}  ({rd["pct"]:.0f}%)'
         parts.append(f'  <text x="{bar_x}" y="{bar_y + bar_h + 16}" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="11" fill="{text_secondary}">{flow_text}</text>')
         x_offset += cols[1][1]
