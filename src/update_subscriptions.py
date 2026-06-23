@@ -551,31 +551,15 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo]) -> str:
 
 # ========== Gist 上传 ==========
 
-def upload_to_gist(github_token: str, gist_id: str, files: dict[str, str]) -> str:
-    """上传文件到 GitHub Gist"""
+def upload_to_gist(github_token: str, gist_id: str, files: dict[str, str]) -> None:
+    """上传文件到 GitHub Gist（GIST_ID 必须已在 Secrets 中配置）"""
     headers = {"Authorization": f"token {github_token}", "Accept": "application/vnd.github.v3+json"}
     gist_files = {name: {"content": content} for name, content in files.items()}
 
-    try:
-        if not gist_id:
-            logger.info("    创建新的 Gist...")
-            resp = http_request("POST", "https://api.github.com/gists", headers=headers, json_body={
-                "description": "SubDl Subscriptions", "public": False, "files": gist_files
-            })
-            resp.raise_for_status()
-            new_id: str = json.loads(resp.text)["id"]
-            logger.info(f"    ✓ 创建成功，Gist ID: {new_id}")
-            return new_id
-
-        logger.info(f"    更新 Gist: {gist_id}")
-        resp = http_request("PATCH", f"https://api.github.com/gists/{gist_id}", headers=headers, json_body={"files": gist_files})
-        resp.raise_for_status()
-        logger.info("    ✓ 更新成功")
-        return gist_id
-
-    except Exception as e:
-        logger.error(f"    Gist 上传异常: {e}")
-        raise
+    logger.info(f"    更新 Gist: {gist_id}")
+    resp = http_request("PATCH", f"https://api.github.com/gists/{gist_id}", headers=headers, json_body={"files": gist_files})
+    resp.raise_for_status()
+    logger.info("    ✓ 更新成功")
 
 
 # ========== 主流程 ==========
@@ -587,7 +571,7 @@ def _generate_and_upload(
     subscription_info: list[SubscriptionInfo],
     github_token: str,
     gist_id: str,
-) -> str:
+) -> None:
     """生成合并配置、providers 配置，并上传到 Gist"""
 
     logger.info("→ 生成合并配置和 providers 配置...")
@@ -611,13 +595,7 @@ def _generate_and_upload(
     logger.info("✓ 状态 SVG 已生成")
 
     logger.info(f"上传 {len(files)} 个文件到 Gist...")
-    new_gist_id = upload_to_gist(github_token, gist_id, files)
-
-    if new_gist_id != gist_id:
-        logger.info(f"重要提示: 已创建新的 Gist ID: {new_gist_id}")
-        logger.info("请在 Repository secrets 中设置 GIST_ID")
-
-    return new_gist_id
+    upload_to_gist(github_token, gist_id, files)
 
 
 def main() -> None:
@@ -632,6 +610,9 @@ def main() -> None:
         logger.error("环境变量 GH_TOKEN 未设置")
         sys.exit(1)
     gist_id = os.environ.get("GIST_ID", "")
+    if not gist_id:
+        logger.error("环境变量 GIST_ID 未设置，请在 GitHub Secrets 中手动配置")
+        sys.exit(1)
 
     subscriptions = parse_subscriptions()
     if not subscriptions:
