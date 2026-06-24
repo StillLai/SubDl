@@ -48,7 +48,7 @@
     "servers": [
       {
         "tag": "Local-DNS",
-        "type": "dhcp"
+        "type": "local"
       },
       {
         "tag": "DNS-Resolver",
