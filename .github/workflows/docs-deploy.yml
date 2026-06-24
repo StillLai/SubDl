@@ -50,19 +50,8 @@ jobs:
     - name: Install mkdocs-material
       run: pip install mkdocs-material
 
-    - name: Adjust mkdocs.yml paths
-      run: |
-        # 将 docs_dir 改为 sing-box-reF1nd-docs，site_dir 改为 site
-        sed -i 's|^docs_dir:.*|docs_dir: sing-box-reF1nd-docs|' mkdocs.yml
-        # 如果 mkdocs.yml 中有 site_dir 配置则替换，没有则追加
-        if grep -q '^site_dir:' mkdocs.yml; then
-          sed -i 's|^site_dir:.*|site_dir: site|' mkdocs.yml
-        else
-          echo 'site_dir: site' >> mkdocs.yml
-        fi
-
     - name: Build documentation
-      run: mkdocs build --strict
+      run: mkdocs build --docs-dir sing-box-reF1nd-docs --site-dir site --strict
 
     - name: Upload Pages artifact
       uses: actions/upload-pages-artifact@v3
