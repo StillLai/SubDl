@@ -1,0 +1,75 @@
+name: Docs Deploy
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+# 防止多次运行重叠
+concurrency:
+  group: docs-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: write    # 推送同步的文档
+  pages: write       # 部署 Pages
+  id-token: write    # Pages OIDC token
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        fetch-depth: 1
+
+    - name: Sync documentation
+      run: |
+        set -Eeuo pipefail
+        git clone --depth 1 --filter=blob:none --sparse --branch reF1nd-stable https://github.com/reF1nd/sing-box.git /tmp/sing-box-reF1nd
+        cd /tmp/sing-box-reF1nd
+        git sparse-checkout set docs
+        rm -rf "$GITHUB_WORKSPACE/sing-box-reF1nd-docs"
+        cp -r docs "$GITHUB_WORKSPACE/sing-box-reF1nd-docs"
+        # 同步 mkdocs.yml 用于构建
+        git sparse-checkout add mkdocs.yml
+        cp mkdocs.yml "$GITHUB_WORKSPACE/mkdocs.yml"
+
+    - name: Commit changes
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add sing-box-reF1nd-docs/ mkdocs.yml
+        git diff --quiet && git diff --staged --quiet || git commit -m "Sync sing-box docs [skip ci]"
+        git push
+
+    - name: Install mkdocs-material
+      run: pip install mkdocs-material
+
+    - name: Adjust mkdocs.yml paths
+      run: |
+        # 将 docs_dir 改为 sing-box-reF1nd-docs，site_dir 改为 site
+        sed -i 's|^docs_dir:.*|docs_dir: sing-box-reF1nd-docs|' mkdocs.yml
+        # 如果 mkdocs.yml 中有 site_dir 配置则替换，没有则追加
+        if grep -q '^site_dir:' mkdocs.yml; then
+          sed -i 's|^site_dir:.*|site_dir: site|' mkdocs.yml
+        else
+          echo 'site_dir: site' >> mkdocs.yml
+        fi
+
+    - name: Build documentation
+      run: mkdocs build --strict
+
+    - name: Upload Pages artifact
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: site
+
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4
