@@ -84,7 +84,7 @@
     "rules": [
       {
         "clash_mode": "Direct",
-        "server": "Local-DNS"
+        "server": "Tencent-DNS"
       },
       {
         "type": "logical",
@@ -112,7 +112,7 @@
           {"rule_set": ["geosite-icbc", "geosite-ccb", "geosite-abc", "geosite-boc", "BOCOM", "geosite-cmb"]},
           {"package_name": ["com.icbc", "com.chinamworld.main", "com.android.bankabc", "com.chinamworld.bocmbci", "com.bankcomm.Bankcomm", "com.cmbchina.ccd.pluto.cmbActivity", "cmb.pb"]}
         ],
-        "server": "Local-DNS"
+        "server": "Tencent-DNS"
       },
       {
         "rule_set": ["geosite-amazon", "geosite-amazon@ads"],
@@ -286,7 +286,7 @@
         "server": "Tencent-DNS"
       }
     ],
-    "final": "Local-DNS"
+    "final": "Tencent-DNS"
   },
   "providers": [
     {
