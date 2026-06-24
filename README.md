@@ -48,7 +48,7 @@ SUB_URL_2 = https://example3.com/sub   # 省略名称时自动从 URL 提取
 SUB_URL = *山海|https://example.com/api/sub?token=xxx
 ```
 
-生成的 provider URL 格式为：`https://gist.github.com/{用户名}/{Gist ID}/raw/{名称}-singbox.json`
+生成的 provider URL 格式为：`https://gh-proxy.org/https://gist.github.com/{用户名}/{Gist ID}/raw/{名称}-singbox.json`（通过 `gh-proxy.org` 加速访问）
 
 这在 sing-box 客户端无法直接解析 Clash 订阅格式时很有用——provider 会直接拉取已在服务端转换好的 sing-box JSON。
 
