@@ -36,6 +36,10 @@
     "strategy": "prefer_ipv4",
     "servers": [
       {
+        "tag": "Local-DNS",
+        "type": "local"
+      },
+      {
         "tag": "DNS-Resolver",
         "type": "udp",
         "server": "119.29.29.29"
@@ -69,7 +73,7 @@
     "rules": [
       {
         "clash_mode": "Direct",
-        "server": "Tencent-DNS"
+        "server": "Local-DNS"
       },
       {
         "type": "logical",
@@ -136,7 +140,7 @@
             ]
           }
         ],
-        "server": "Tencent-DNS"
+        "server": "Local-DNS"
       },
       {
         "rule_set": [
@@ -452,7 +456,7 @@
         "server": "Tencent-DNS"
       }
     ],
-    "final": "Tencent-DNS"
+    "final": "Local-DNS"
   },
   "providers": [
     {
