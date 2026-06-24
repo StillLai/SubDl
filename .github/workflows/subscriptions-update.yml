@@ -26,6 +26,10 @@ jobs:
         fetch-depth: 1
 
     # --- 模板变体生成（仅在基础模板可能变更时运行） ---
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+        cache: 'pip'
     - name: Install Python dependencies
       run: pip install -r src/requirements.txt
 
@@ -39,6 +43,11 @@ jobs:
         git diff --quiet && git diff --staged --quiet || git commit -m "Update template variants"
         git push
 
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        cache: 'npm'
+        cache-dependency-path: src/package-lock.json
     # dotenv 是 Sub-Store proxy-utils.esm.mjs 库的内部依赖，请勿移除
     - name: Install Node dependencies
       working-directory: src
