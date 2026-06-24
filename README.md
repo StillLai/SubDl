@@ -114,7 +114,7 @@ SubDl/
 - 订阅内容上传到 Gist，不保存在仓库
 - `GH_TOKEN` 建议使用 Fine-grained Token，仅授予 Gist 读写权限
 - `GIST_ID` 为必填项，必须在首次运行前手动创建并配置
-- 参考 [sub-store](https://github.com/sub-store-org/Sub-Store) 的 `proxy-utils.esm.mjs` 实现 Clash → sing-box 转换
+- 参考 [Sub-Store](https://github.com/sub-store-org/Sub-Store) 的 `proxy-utils.esm.mjs` 实现 Clash → sing-box 转换
 
 ## License
 
