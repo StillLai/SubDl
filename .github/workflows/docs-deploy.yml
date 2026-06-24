@@ -36,9 +36,8 @@ jobs:
         git sparse-checkout set docs
         rm -rf "$GITHUB_WORKSPACE/sing-box-reF1nd-docs"
         cp -r docs "$GITHUB_WORKSPACE/sing-box-reF1nd-docs"
-        # 同步 mkdocs.yml 用于构建
-        git sparse-checkout add mkdocs.yml
-        cp mkdocs.yml "$GITHUB_WORKSPACE/mkdocs.yml"
+        # 同步 mkdocs.yml 用于构建（sparse-checkout 不支持单个文件，用 git show 直接提取）
+        git show HEAD:mkdocs.yml > "$GITHUB_WORKSPACE/mkdocs.yml"
 
     - name: Commit changes
       run: |
