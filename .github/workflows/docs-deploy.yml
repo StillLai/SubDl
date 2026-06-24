@@ -56,9 +56,9 @@ jobs:
       run: |
         # 修正 site_url 为实际 GitHub Pages 地址
         sed -i 's|^site_url:.*|site_url: https://stilllai.github.io/SubDl/|' /tmp/mkdocs.yml
-        # 追加路径覆盖（源仓库使用默认值 docs/，本仓库文档在 sing-box-reF1nd-docs/）
-        echo 'docs_dir: sing-box-reF1nd-docs' >> /tmp/mkdocs.yml
-        echo 'site_dir: site' >> /tmp/mkdocs.yml
+        # 追加路径覆盖（使用绝对路径，因为 mkdocs 会相对于配置文件目录解析相对路径）
+        echo "docs_dir: $GITHUB_WORKSPACE/sing-box-reF1nd-docs" >> /tmp/mkdocs.yml
+        echo "site_dir: $GITHUB_WORKSPACE/site" >> /tmp/mkdocs.yml
 
     - name: Build documentation
       run: mkdocs build -f /tmp/mkdocs.yml --strict
