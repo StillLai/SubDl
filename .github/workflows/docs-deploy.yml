@@ -36,28 +36,32 @@ jobs:
         git sparse-checkout set docs
         rm -rf "$GITHUB_WORKSPACE/sing-box-reF1nd-docs"
         cp -r docs "$GITHUB_WORKSPACE/sing-box-reF1nd-docs"
-        # 同步 mkdocs.yml 用于构建（sparse-checkout 不支持单个文件，用 git show 直接提取）
-        git show HEAD:mkdocs.yml > "$GITHUB_WORKSPACE/mkdocs.yml"
+        # 移除非本仓库的 CNAME 文件
+        rm -f "$GITHUB_WORKSPACE/sing-box-reF1nd-docs/CNAME"
+        # 从源仓库提取 mkdocs.yml 到临时目录（不提交到仓库）
+        git show HEAD:mkdocs.yml > /tmp/mkdocs.yml
 
     - name: Commit changes
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
-        git add sing-box-reF1nd-docs/ mkdocs.yml
+        git add sing-box-reF1nd-docs/
         git diff --quiet && git diff --staged --quiet || git commit -m "Sync sing-box docs [skip ci]"
         git push
 
     - name: Install mkdocs-material
       run: pip install mkdocs-material mkdocs-static-i18n
 
-    - name: Adjust mkdocs.yml paths
+    - name: Adjust mkdocs.yml for this repo
       run: |
-        # 源仓库 mkdocs.yml 没有 docs_dir/site_dir（使用默认值），追加覆盖
-        echo 'docs_dir: sing-box-reF1nd-docs' >> mkdocs.yml
-        echo 'site_dir: site' >> mkdocs.yml
+        # 修正 site_url 为实际 GitHub Pages 地址
+        sed -i 's|^site_url:.*|site_url: https://stilllai.github.io/SubDl/|' /tmp/mkdocs.yml
+        # 追加路径覆盖（源仓库使用默认值 docs/，本仓库文档在 sing-box-reF1nd-docs/）
+        echo 'docs_dir: sing-box-reF1nd-docs' >> /tmp/mkdocs.yml
+        echo 'site_dir: site' >> /tmp/mkdocs.yml
 
     - name: Build documentation
-      run: mkdocs build --strict
+      run: mkdocs build -f /tmp/mkdocs.yml --strict
 
     - name: Upload Pages artifact
       uses: actions/upload-pages-artifact@v3
