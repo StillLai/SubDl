@@ -37,7 +37,7 @@
     "servers": [
       {
         "tag": "Local-DNS",
-        "type": "dhcp"
+        "type": "local"
       },
       {
         "tag": "DNS-Resolver",
@@ -73,7 +73,7 @@
     "rules": [
       {
         "clash_mode": "Direct",
-        "server": "Local-DNS"
+        "server": "Tencent-DNS"
       },
       {
         "type": "logical",
@@ -140,7 +140,7 @@
             ]
           }
         ],
-        "server": "Local-DNS"
+        "server": "Tencent-DNS"
       },
       {
         "rule_set": [
@@ -456,7 +456,7 @@
         "server": "Tencent-DNS"
       }
     ],
-    "final": "Local-DNS"
+    "final": "Tencent-DNS"
   },
   "providers": [
     {
