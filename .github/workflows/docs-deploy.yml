@@ -48,10 +48,16 @@ jobs:
         git push
 
     - name: Install mkdocs-material
-      run: pip install mkdocs-material
+      run: pip install mkdocs-material mkdocs-static-i18n
+
+    - name: Adjust mkdocs.yml paths
+      run: |
+        # 源仓库 mkdocs.yml 没有 docs_dir/site_dir（使用默认值），追加覆盖
+        echo 'docs_dir: sing-box-reF1nd-docs' >> mkdocs.yml
+        echo 'site_dir: site' >> mkdocs.yml
 
     - name: Build documentation
-      run: mkdocs build --docs-dir sing-box-reF1nd-docs --site-dir site --strict
+      run: mkdocs build --strict
 
     - name: Upload Pages artifact
       uses: actions/upload-pages-artifact@v3
