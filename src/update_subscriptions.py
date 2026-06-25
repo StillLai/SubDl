@@ -348,9 +348,36 @@ def generate_provider_configs(
     return results
 
 
+# ========== 版本获取 ==========
+
+def fetch_latest_versions() -> dict[str, str]:
+    """通过 GitHub API 获取 sing-box 官方版和 reF1nd 分支的最新 release 版本"""
+    repos = {
+        'official': 'SagerNet/sing-box',
+        'reF1nd': 'reF1nd/sing-box-releases',
+    }
+    versions: dict[str, str] = {}
+    headers: dict[str, str] = {"Accept": "application/vnd.github.v3+json"}
+    gh_token = os.environ.get("GH_TOKEN")
+    if gh_token:
+        headers["Authorization"] = f"token {gh_token}"
+    for key, repo in repos.items():
+        try:
+            resp = http_get_with_retry(
+                f"https://api.github.com/repos/{repo}/releases/latest",
+                headers=headers,
+            )
+            data = json.loads(resp.text)
+            versions[key] = data.get('tag_name', '未知')
+        except Exception as e:
+            logger.warn(f"获取 {repo} 版本失败: {e}")
+            versions[key] = '获取失败'
+    return versions
+
+
 # ========== SVG 状态图生成 ==========
 
-def generate_status_svg(subscription_info: list[SubscriptionInfo]) -> str:
+def generate_status_svg(subscription_info: list[SubscriptionInfo], versions: dict[str, str] | None = None) -> str:
     """生成订阅状态 SVG 图片（浅色高级感风格）"""
 
     def _fmt_bytes(n: int) -> str:
@@ -401,7 +428,7 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo]) -> str:
     pad = 20
     card_radius = 12
     row_h = 56
-    title_h = 70
+    title_h = 90
     col_header_h = 36
 
     # 列定义: (名称, 宽度, 对齐)
@@ -492,6 +519,17 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo]) -> str:
         # 统计摘要
         f'  <text x="{pad + 20}" y="{pad + 56}" font-family="{_FONT}" font-size="12" fill="{text_secondary}">共 {len(subscription_info)} 个订阅 · {total_nodes} 个节点</text>',
     ]
+
+    # 版本信息
+    if versions:
+        official_ver = _esc(versions.get('official', '—'))
+        ref1nd_ver = _esc(versions.get('reF1nd', '—'))
+        parts.append(
+            f'  <text x="{pad + 20}" y="{pad + 76}" font-family="{_FONT}" font-size="11" fill="{text_secondary}">'
+            f'sing-box 官方版: <tspan font-weight="600" fill="{text_primary}">{official_ver}</tspan>'
+            f'　|　reF1nd 分支: <tspan font-weight="600" fill="{text_primary}">{ref1nd_ver}</tspan>'
+            f'</text>'
+        )
 
     # 列标题
     col_y = pad + title_h + 8
@@ -636,8 +674,12 @@ def _generate_and_upload(
     if providers:
         logger.info(f"  ✓ 共生成 {len(providers)} 个 providers 配置文件")
 
+    # 获取 sing-box 最新版本信息
+    versions = fetch_latest_versions()
+    logger.info(f"  → sing-box 版本: 官方 {versions.get('official', '?')} | reF1nd {versions.get('reF1nd', '?')}")
+
     # 生成 SVG 状态图片（供 GitHub Pages 使用）
-    svg_content = generate_status_svg(subscription_info)
+    svg_content = generate_status_svg(subscription_info, versions)
     svg_output = PROJECT_ROOT / "status.svg"
     svg_output.write_text(svg_content, encoding="utf-8")
     logger.info("✓ 状态 SVG 已生成")
