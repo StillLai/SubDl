@@ -39,7 +39,7 @@ TEMPLATE_BASE = TEMPLATE_DIR / 'sing-box_template.jsonc'
 
 HTTP_RETRY = 3
 HTTP_TIMEOUT = 30
-USER_AGENT = "ClashMetaForAndroid/2.11.30.Meta"
+USER_AGENT = "ClashMetaForAndroid/2.11.30"
 _RETRYABLE_CODES: frozenset[int] = frozenset({429, 500, 502, 503, 504})
 
 
