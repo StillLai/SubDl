@@ -68,7 +68,7 @@ SUB_URL = *山海|https://example.com/api/sub?token=xxx
 | `sing-box_noTun_config.json` | 无 tun 模式的配置 |
 | `sing-box_tproxy_config.json` | tproxy 模式的配置 |
 | `sing-box_tun_for_win_config.json` | Windows 专用 tun 配置 |
-| `sing-box_*_with_providers_config.json` | 使用 providers 引用的配置 |
+| `sing-box_with_providers_config*.json` | 使用 providers 引用的配置 |
 
 ## 配置模板
 
