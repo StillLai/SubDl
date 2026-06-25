@@ -550,10 +550,12 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo], versions: dic
             if info.from_backup:
                 status_text = '📦 备份'
                 status_color = accent_orange
+            remaining = f.total - used if f.total > 0 else 0
             rows_data.append({
                 'name': name_display,
                 'used': _fmt_bytes(used),
                 'total': _fmt_bytes(f.total),
+                'remaining': _fmt_bytes(remaining),
                 'pct': pct,
                 'bar_color': bar_color,
                 'expire': _fmt_expire(f.expire),
@@ -565,7 +567,7 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo], versions: dic
             status_text = '📦 备份' if info.from_backup else '❓ 无信息'
             status_color = accent_orange if info.from_backup else text_secondary
             rows_data.append({
-                'name': name_display, 'used': '—', 'total': '—',
+                'name': name_display, 'used': '—', 'total': '—', 'remaining': '—',
                 'pct': 0, 'bar_color': text_secondary, 'expire': '—',
                 'status': status_text, 'status_color': status_color, 'nodes': str(info.node_count),
             })
@@ -666,7 +668,8 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo], versions: dic
             fill_val = f"url(#{bar_grad})" if bar_grad else rd['bar_color']
             parts.append(f'  <rect x="{bar_x}" y="{bar_y}" width="{fill_w}" height="{bar_h}" rx="4" fill="{fill_val}"/>')
         flow_text = f'{rd["used"]} / {rd["total"]}  ({rd["pct"]:.0f}%)'
-        parts.append(f'  <text x="{bar_x}" y="{bar_y + bar_h + 16}" font-family="{_FONT}" font-size="11" fill="{text_secondary}">{flow_text}</text>')
+        remaining_text = f'剩余: {rd["remaining"]}'
+        parts.append(f'  <text x="{bar_x}" y="{bar_y + bar_h + 16}" font-family="{_FONT}" font-size="11" fill="{text_secondary}">{flow_text}  {remaining_text}</text>')
         x_offset += cols[1][1]
 
         # 到期时间
