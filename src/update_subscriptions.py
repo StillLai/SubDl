@@ -428,7 +428,7 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo], versions: dic
     pad = 20
     card_radius = 12
     row_h = 56
-    title_h = 90
+    title_h = 70
     col_header_h = 36
 
     # 列定义: (名称, 宽度, 对齐)
@@ -444,7 +444,8 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo], versions: dic
 
     rows_total_h = len(subscription_info) * row_h
     footer_h = 56
-    svg_h = title_h + col_header_h + rows_total_h + footer_h + pad * 2
+    version_h = 52 if versions else 0
+    svg_h = title_h + col_header_h + rows_total_h + footer_h + version_h + pad * 2
 
     # 收集数据行
     _BAR_GRAD_MAP = {accent_green: 'barGreenGrad', accent_orange: 'barOrangeGrad', accent_red: 'barRedGrad'}
@@ -520,17 +521,6 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo], versions: dic
         f'  <text x="{pad + 20}" y="{pad + 56}" font-family="{_FONT}" font-size="12" fill="{text_secondary}">共 {len(subscription_info)} 个订阅 · {total_nodes} 个节点</text>',
     ]
 
-    # 版本信息
-    if versions:
-        official_ver = _esc(versions.get('official', '—'))
-        ref1nd_ver = _esc(versions.get('reF1nd', '—'))
-        parts.append(
-            f'  <text x="{pad + 20}" y="{pad + 76}" font-family="{_FONT}" font-size="11" fill="{text_secondary}">'
-            f'sing-box 官方版: <tspan font-weight="600" fill="{text_primary}">{official_ver}</tspan>'
-            f'　|　reF1nd 分支: <tspan font-weight="600" fill="{text_primary}">{ref1nd_ver}</tspan>'
-            f'</text>'
-        )
-
     # 列标题
     col_y = pad + title_h + 8
     x_offset = pad
@@ -604,6 +594,22 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo], versions: dic
         f' font-family="{_FONT}"'
         f' font-size="13" fill="{text_secondary}">合计: <tspan font-weight="700" fill="{accent_blue}">{total_nodes}</tspan> 个节点</text>'
     )
+
+    # 版本信息区域
+    if versions:
+        ver_y = footer_y + footer_h
+        parts.append(f'  <line x1="{pad}" y1="{ver_y}" x2="{pad + content_w}" y2="{ver_y}" stroke="{border_color}" stroke-width="1"/>')
+        official_ver = _esc(versions.get('official', '—'))
+        ref1nd_ver = _esc(versions.get('reF1nd', '—'))
+        parts.append(
+            f'  <text x="{pad + 20}" y="{ver_y + 22}" font-family="{_FONT}" font-size="12" font-weight="600" fill="{text_secondary}">sing-box 版本</text>'
+        )
+        parts.append(
+            f'  <text x="{pad + 20}" y="{ver_y + 40}" font-family="{_FONT}" font-size="11" fill="{text_secondary}">'
+            f'官方版: <tspan font-weight="600" fill="{text_primary}">{official_ver}</tspan>'
+            f'　|　reF1nd 分支: <tspan font-weight="600" fill="{text_primary}">{ref1nd_ver}</tspan>'
+            f'</text>'
+        )
 
     parts.append('</svg>')
     return '\n'.join(parts)
