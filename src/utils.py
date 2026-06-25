@@ -114,6 +114,7 @@ class DownloadResult:
     reason: str = "未知"
     filename: str = ""
     raw_content: str | None = None
+    is_converted: bool = False  # True 表示内容已是从 Gist 备份获取的 sing-box 格式
 
     @property
     def is_success(self) -> bool:

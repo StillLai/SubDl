@@ -162,6 +162,54 @@ def _download_all(subscriptions: list[Subscription], user_agent: str) -> list[Do
     return results
 
 
+def _fetch_from_gist_fallback(sub_name: str, gist_id: str, gist_owner: str) -> DownloadResult | None:
+    """当原始订阅下载失败时，尝试从 Gist 备份获取已转换的 sing-box 配置
+    
+    地址格式: https://gist.github.com/{gist_owner}/{gist_id}/raw/{sub_name}-singbox.json
+    """
+    url = f"https://gist.github.com/{gist_owner}/{gist_id}/raw/{sub_name}-singbox.json"
+    try:
+        logger.info(f"  → 尝试从 Gist 备份获取: {sub_name}")
+        response = http_get_with_retry(url)
+        content = response.text
+        # 验证内容是否为有效的 sing-box JSON
+        parsed = json.loads(content)
+        if not isinstance(parsed, dict) or ('outbounds' not in parsed and 'endpoints' not in parsed):
+            logger.warn(f"  Gist fallback 内容格式不正确 ({sub_name})")
+            return None
+        logger.info(f"  ✓ {sub_name}: 从 Gist 备份获取成功")
+        return DownloadResult(
+            name=sub_name, status="ok", filename=f"{sub_name}-singbox.json",
+            raw_content=content, is_converted=True,
+        )
+    except Exception as e:
+        logger.warn(f"  Gist fallback 失败 ({sub_name}): {e}")
+        return None
+
+
+def _try_gist_fallback(
+    download_results: list[DownloadResult],
+    gist_id: str,
+    gist_owner: str,
+) -> list[DownloadResult]:
+    """对下载失败的订阅尝试从 Gist 备份获取，成功则替换原结果"""
+    failed_indices = [
+        i for i, r in enumerate(download_results)
+        if not r.is_success
+    ]
+    if not failed_indices:
+        return download_results
+
+    logger.info(f"→ {len(failed_indices)} 个订阅下载失败，尝试 Gist fallback...")
+    for i in failed_indices:
+        result = download_results[i]
+        fallback = _fetch_from_gist_fallback(result.name, gist_id, gist_owner)
+        if fallback is not None:
+            download_results[i] = fallback
+
+    return download_results
+
+
 # ========== 批量转换 ==========
 
 def _convert_batch(contents_dict: dict[str, str]) -> dict[str, dict[str, Any] | None]:
@@ -211,11 +259,15 @@ def _convert_batch(contents_dict: dict[str, str]) -> dict[str, dict[str, Any] | 
 def _aggregate_results(
     download_results: list[DownloadResult],
 ) -> tuple[dict[str, str], list[SubscriptionInfo], dict[str, list[dict[str, Any]]]]:
-    """聚合下载结果：批量转换 → 收集文件、订阅信息和节点字典"""
+    """聚合下载结果：批量转换 → 收集文件、订阅信息和节点字典
+    
+    对于 is_converted=True 的结果（来自 Gist 备份），跳过转换直接使用。
+    """
+    # 只对非已转换的结果进行批量转换
     contents_to_convert = {
         r.name: r.raw_content
         for r in download_results
-        if r.is_success and r.raw_content
+        if r.is_success and r.raw_content and not r.is_converted
     }
     converted = _convert_batch(contents_to_convert) if contents_to_convert else {}
 
@@ -235,6 +287,34 @@ def _aggregate_results(
         if result.raw_content is None:
             skipped.append(f"{result.name} (原始内容为空)")
             continue
+
+        if result.is_converted:
+            # 从 Gist 备份获取的已经是 sing-box JSON，直接使用
+            files[result.filename] = result.raw_content
+            try:
+                singbox_config = json.loads(result.raw_content)
+            except json.JSONDecodeError:
+                skipped.append(f"{result.name} (Gist 备份 JSON 解析失败)")
+                subscription_info.append(SubscriptionInfo(
+                    name=result.name, flow=result.flow, node_count=0
+                ))
+                continue
+
+            singbox_nodes = singbox_config.get('outbounds', []) + singbox_config.get('endpoints', [])
+            node_count = len(singbox_nodes)
+
+            if node_count > 0:
+                subs_nodes_dict[result.name] = singbox_nodes
+                logger.info(f"  ✓ {result.name}: 使用 Gist 备份 ({len(result.raw_content)} 字节, {node_count} 个节点)")
+            else:
+                skipped.append(f"{result.name} (Gist 备份空节点)")
+
+            subscription_info.append(SubscriptionInfo(
+                name=result.name, flow=result.flow, node_count=node_count
+            ))
+            continue
+
+        # 常规流程：需要转换
         files[result.filename] = result.raw_content
 
         singbox_config = converted.get(result.name)
@@ -719,6 +799,15 @@ def main() -> None:
     logger.info("::group::Download & Convert subscriptions")
     download_results = _download_all(subscriptions, USER_AGENT)
     logger.info("::endgroup::")
+
+    # 对下载失败的订阅尝试从 Gist 备份获取
+    gist_owner = os.environ.get("GIST_OWNER") or ''
+    if not gist_owner:
+        gist_owner = _get_gist_owner(github_token) or ''
+    if gist_owner:
+        download_results = _try_gist_fallback(download_results, gist_id, gist_owner)
+    else:
+        logger.warn("⚠ 无法获取 Gist 所有者，跳过 fallback")
 
     valid_results = [r for r in download_results if r.is_success]
     if not valid_results:
