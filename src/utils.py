@@ -127,6 +127,7 @@ class SubscriptionInfo:
     name: str
     flow: FlowInfo | None
     node_count: int
+    from_backup: bool = False  # True 表示数据来自 Gist 备份
 
 
 # ========== 基础工具函数 ==========

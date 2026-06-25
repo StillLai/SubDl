@@ -192,7 +192,7 @@ def _try_gist_fallback(
     gist_id: str,
     gist_owner: str,
 ) -> list[DownloadResult]:
-    """对下载失败的订阅尝试从 Gist 备份获取，成功则替换原结果"""
+    """对下载失败的订阅尝试从 Gist 备份获取（并行），成功则替换原结果"""
     failed_indices = [
         i for i, r in enumerate(download_results)
         if not r.is_success
@@ -200,12 +200,18 @@ def _try_gist_fallback(
     if not failed_indices:
         return download_results
 
-    logger.info(f"→ {len(failed_indices)} 个订阅下载失败，尝试 Gist fallback...")
-    for i in failed_indices:
-        result = download_results[i]
-        fallback = _fetch_from_gist_fallback(result.name, gist_id, gist_owner)
-        if fallback is not None:
-            download_results[i] = fallback
+    logger.info(f"→ {len(failed_indices)} 个订阅下载失败，尝试 Gist fallback（并行）...")
+
+    with ThreadPoolExecutor(max_workers=min(len(failed_indices), 4)) as executor:
+        futures = {
+            executor.submit(_fetch_from_gist_fallback, download_results[i].name, gist_id, gist_owner): i
+            for i in failed_indices
+        }
+        for future in as_completed(futures):
+            i = futures[future]
+            fallback = future.result()
+            if fallback is not None:
+                download_results[i] = fallback
 
     return download_results
 
@@ -310,7 +316,7 @@ def _aggregate_results(
                 skipped.append(f"{result.name} (Gist 备份空节点)")
 
             subscription_info.append(SubscriptionInfo(
-                name=result.name, flow=result.flow, node_count=node_count
+                name=result.name, flow=result.flow, node_count=node_count, from_backup=True,
             ))
             continue
 
@@ -532,14 +538,20 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo], versions: dic
     rows_data = []
     total_nodes = 0
     for info in subscription_info:
+        name_display = _esc(info.name)
+        if info.from_backup:
+            name_display += ' 📦'
         if info.flow:
             f = info.flow
             used = f.upload + f.download
             pct = min(used / f.total * 100, 100.0) if f.total > 0 else 0.0
             bar_color = accent_red if pct >= 90 else (accent_orange if pct >= 70 else accent_green)
             status_text, status_color = _flow_status(f)
+            if info.from_backup:
+                status_text = '📦 备份'
+                status_color = accent_orange
             rows_data.append({
-                'name': _esc(info.name),
+                'name': name_display,
                 'used': _fmt_bytes(used),
                 'total': _fmt_bytes(f.total),
                 'pct': pct,
@@ -550,10 +562,12 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo], versions: dic
                 'nodes': str(info.node_count),
             })
         else:
+            status_text = '📦 备份' if info.from_backup else '❓ 无信息'
+            status_color = accent_orange if info.from_backup else text_secondary
             rows_data.append({
-                'name': _esc(info.name), 'used': '—', 'total': '—',
+                'name': name_display, 'used': '—', 'total': '—',
                 'pct': 0, 'bar_color': text_secondary, 'expire': '—',
-                'status': '❓ 无信息', 'status_color': text_secondary, 'nodes': str(info.node_count),
+                'status': status_text, 'status_color': status_color, 'nodes': str(info.node_count),
             })
         total_nodes += info.node_count
 
@@ -729,6 +743,7 @@ def _generate_and_upload(
     subscription_info: list[SubscriptionInfo],
     github_token: str,
     gist_id: str,
+    gist_owner: str = '',
 ) -> None:
     """生成合并配置、providers 配置，并上传到 Gist"""
 
@@ -738,13 +753,7 @@ def _generate_and_upload(
 
     # 收集标记为使用 Gist 的订阅名称
     gist_subs = {sub.name for sub in subscriptions if sub.use_gist}
-    gist_owner = ''
     if gist_subs:
-        gist_owner = os.environ.get("GIST_OWNER") or ''
-        if not gist_owner:
-            owner = _get_gist_owner(github_token)
-            if owner:
-                gist_owner = owner
         if gist_owner:
             logger.info(f"  → {len(gist_subs)} 个订阅的 provider 将指向 Gist: {gist_owner}/{gist_id}")
         else:
@@ -825,7 +834,7 @@ def main() -> None:
 
     # 生成配置并上传
     logger.info("::group::Generate configs & Upload to Gist")
-    _generate_and_upload(files, subs_nodes_dict, subscriptions, subscription_info, github_token, gist_id)
+    _generate_and_upload(files, subs_nodes_dict, subscriptions, subscription_info, github_token, gist_id, gist_owner)
     logger.info("::endgroup::")
 
     logger.info(f"完成! 成功处理 {len(valid_results)} 个订阅，共 {len(files)} 个文件")
