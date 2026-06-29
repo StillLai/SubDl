@@ -1,0 +1,48 @@
+name: Docs Sync
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+# 防止多次运行重叠
+concurrency:
+  group: docs-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: write    # 推送同步的文档
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        fetch-depth: 1
+
+    - name: Sync documentation
+      run: |
+        set -Eeuo pipefail
+        git clone --depth 1 --filter=blob:none --sparse --branch reF1nd-stable https://github.com/reF1nd/sing-box.git /tmp/sing-box-reF1nd
+        cd /tmp/sing-box-reF1nd
+        git sparse-checkout set docs
+        rm -rf "$GITHUB_WORKSPACE/sing-box-reF1nd-docs"
+        cp -r docs "$GITHUB_WORKSPACE/sing-box-reF1nd-docs"
+        # 移除非本仓库的 CNAME 文件
+        rm -f "$GITHUB_WORKSPACE/sing-box-reF1nd-docs/CNAME"
+        # 从源仓库提取 mkdocs.yml 供部署工作流使用
+        git show HEAD:mkdocs.yml > "$GITHUB_WORKSPACE/sing-box-reF1nd-docs/mkdocs.yml"
+
+    - name: Commit changes
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add sing-box-reF1nd-docs/
+        if git diff --cached --quiet; then
+          echo "No documentation changes detected, skipping commit."
+        else
+          git commit -m "Sync sing-box docs"
+          git push
+        fi

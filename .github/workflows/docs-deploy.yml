@@ -1,8 +1,10 @@
 name: Docs Deploy
 
 on:
-  schedule:
-    - cron: '0 */6 * * *'
+  push:
+    branches: [main]
+    paths:
+      - 'sing-box-reF1nd-docs/**'
   workflow_dispatch:
 
 # 防止多次运行重叠
@@ -11,7 +13,6 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write    # 推送同步的文档
   pages: write       # 部署 Pages
   id-token: write    # Pages OIDC token
 
@@ -28,43 +29,22 @@ jobs:
       with:
         fetch-depth: 1
 
-    - name: Sync documentation
-      run: |
-        set -Eeuo pipefail
-        git clone --depth 1 --filter=blob:none --sparse --branch reF1nd-stable https://github.com/reF1nd/sing-box.git /tmp/sing-box-reF1nd
-        cd /tmp/sing-box-reF1nd
-        git sparse-checkout set docs
-        rm -rf "$GITHUB_WORKSPACE/sing-box-reF1nd-docs"
-        cp -r docs "$GITHUB_WORKSPACE/sing-box-reF1nd-docs"
-        # 移除非本仓库的 CNAME 文件
-        rm -f "$GITHUB_WORKSPACE/sing-box-reF1nd-docs/CNAME"
-        # 从源仓库提取 mkdocs.yml 到临时目录（不提交到仓库）
-        git show HEAD:mkdocs.yml > /tmp/mkdocs.yml
-
-    - name: Commit changes
-      run: |
-        git config user.name "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
-        git add sing-box-reF1nd-docs/
-        git diff --quiet && git diff --staged --quiet || git commit -m "Sync sing-box docs [skip ci]"
-        git push
-
     - name: Install mkdocs-material
       run: pip install mkdocs-material mkdocs-static-i18n
 
     - name: Adjust mkdocs.yml for this repo
       run: |
         # 修正 site_url 为实际 GitHub Pages 地址
-        sed -i 's|^site_url:.*|site_url: https://stilllai.github.io/SubDl/|' /tmp/mkdocs.yml
+        sed -i 's|^site_url:.*|site_url: https://stilllai.github.io/SubDl/|' sing-box-reF1nd-docs/mkdocs.yml
         # 修正 repo 指向 reF1nd 发布仓库（右上角版本号/星标实时从此仓库获取）
-        sed -i 's|^repo_url:.*|repo_url: https://github.com/reF1nd/sing-box-releases|' /tmp/mkdocs.yml
-        sed -i 's|^repo_name:.*|repo_name: reF1nd/sing-box-releases|' /tmp/mkdocs.yml
-        # 追加路径覆盖（使用绝对路径，因为 mkdocs 会相对于配置文件目录解析相对路径）
-        echo "docs_dir: $GITHUB_WORKSPACE/sing-box-reF1nd-docs" >> /tmp/mkdocs.yml
-        echo "site_dir: $GITHUB_WORKSPACE/site" >> /tmp/mkdocs.yml
+        sed -i 's|^repo_url:.*|repo_url: https://github.com/reF1nd/sing-box-releases|' sing-box-reF1nd-docs/mkdocs.yml
+        sed -i 's|^repo_name:.*|repo_name: reF1nd/sing-box-releases|' sing-box-reF1nd-docs/mkdocs.yml
+        # 追加路径覆盖
+        echo "docs_dir: $GITHUB_WORKSPACE/sing-box-reF1nd-docs" >> sing-box-reF1nd-docs/mkdocs.yml
+        echo "site_dir: $GITHUB_WORKSPACE/site" >> sing-box-reF1nd-docs/mkdocs.yml
 
     - name: Build documentation
-      run: mkdocs build -f /tmp/mkdocs.yml --strict
+      run: mkdocs build -f sing-box-reF1nd-docs/mkdocs.yml --strict
 
     - name: Upload Pages artifact
       uses: actions/upload-pages-artifact@v5
