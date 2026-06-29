@@ -480,8 +480,7 @@
         "url": "https://cp.cloudflare.com"
       },
       "url": "",
-      "user_agent": "ClashMetaForAndroid/2.11.23.Meta",
-      "download_detour": "🎯 全球直连",
+      "user_agent": "ClashMetaForAndroid/2.11.30",
       "update_interval": "3h"
     },
     {
@@ -492,7 +491,7 @@
         "url": "https://cp.cloudflare.com"
       },
       "url": "",
-      "user_agent": "ClashMetaForAndroid/2.11.23.Meta",
+      "user_agent": "ClashMetaForAndroid/2.11.30",
       "download_detour": "🗂️ 备用自动",
       "update_interval": "3h"
     }
