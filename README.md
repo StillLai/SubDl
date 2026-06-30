@@ -9,7 +9,7 @@
 - 🔄 每小时自动更新订阅（GitHub Actions cron）
 - ⚡ 并行下载 + 自动重试（指数退避）
 - 🔀 Clash → sing-box 自动转换（基于 [Sub-Store](https://github.com/sub-store-org/Sub-Store)）
-- 📦 多模板配置生成（tun / noTun / tproxy / tun_for_win）
+- 📦 多模板配置生成（tun / mixed / tproxy / tun-win）
 - 📊 流量状态 SVG 图片展示（上传到 `assets` 分支）
 - 📋 自定义规则集支持（Clash/Surge → sing-box JSON + SRS）
 
@@ -42,7 +42,7 @@ SUB_URL_2 = https://example3.com/sub   # 省略名称时自动从 URL 提取
 
 **Provider 指向 Gist：**
 
-在订阅名称前加 `*`，可让该订阅在 `with_providers_config` 配置中的 provider `url` 指向 Gist 上已转换的 sing-box 文件（`{名称}-singbox.json`），而非原始订阅地址。Gist 所有者用户名会自动通过 API 获取，也可通过可选的 `GIST_OWNER` 环境变量手动指定。
+在订阅名称前加 `*`，可让该订阅在 providers 配置中的 provider `url` 指向 Gist 上已转换的 sing-box 文件（`{名称}-singbox.json`），而非原始订阅地址。Gist 所有者用户名会自动通过 API 获取，也可通过可选的 `GIST_OWNER` 环境变量手动指定。
 
 ```
 SUB_URL = *山海|https://example.com/api/sub?token=xxx
@@ -64,11 +64,11 @@ SUB_URL = *山海|https://example.com/api/sub?token=xxx
 |--------|------|
 | `{订阅名}.yaml` | 原始订阅内容 |
 | `{订阅名}-singbox.json` | 转换后的 sing-box 节点 |
-| `sing-box_config.json` | 合并默认模板的完整配置 |
-| `sing-box_noTun_config.json` | 无 tun 模式的配置 |
-| `sing-box_tproxy_config.json` | tproxy 模式的配置 |
-| `sing-box_tun_for_win_config.json` | Windows 专用 tun 配置 |
-| `sing-box_with_providers_config*.json` | 使用 providers 引用的配置 |
+| `sing-box.json` | 合并默认模板的完整配置 |
+| `sing-box-mixed.json` | 无 tun 模式的配置 |
+| `sing-box-tproxy.json` | tproxy 模式的配置 |
+| `sing-box-tun-win.json` | Windows 专用 tun 配置 |
+| `sing-box-*-providers.json` | 使用 providers 引用的配置 |
 
 ## 配置模板
 
@@ -76,12 +76,12 @@ SUB_URL = *山海|https://example.com/api/sub?token=xxx
 
 | 模板文件 | 适用场景 |
 |----------|----------|
-| `sing-box_template.jsonc` | 默认配置（带 tun 入站） |
-| `sing-box_template_noTun.jsonc` | 不需要 tun 的场景（如纯代理转发） |
-| `sing-box_template_tproxy_config.jsonc` | Linux tproxy 透明代理 |
-| `sing-box_template_tun_for_win.jsonc` | Windows（移除了 `auto_redirect`） |
+| `sing-box.jsonc` | 默认配置（带 tun 入站） |
+| `sing-box-mixed.jsonc` | 不需要 tun 的场景（如纯代理转发） |
+| `sing-box-tproxy.jsonc` | Linux tproxy 透明代理 |
+| `sing-box-tun-win.jsonc` | Windows（移除了 `auto_redirect`） |
 
-你可以编辑基础模板 `sing-box_template.jsonc`，其他变体会在 CI 中自动生成。
+你可以编辑基础模板 `sing-box.jsonc`，其他变体会在 CI 中自动生成。
 
 ## 自定义规则集
 
