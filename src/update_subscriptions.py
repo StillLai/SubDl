@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import re
@@ -22,18 +23,33 @@ from datetime import datetime, timezone, timedelta
 from typing import Any
 
 from utils import (
-    logger, load_jsonc,
-    http_get_with_retry, http_request, try_decode_base64,
+    log_debug, log_info, log_warn, log_error,
+    load_jsonc, http_get_with_retry, http_request,
     FlowInfo, Subscription, DownloadResult, SubscriptionInfo,
-    PROJECT_ROOT, TEMPLATE_DIR,
-    CONVERT_SCRIPT, USER_AGENT,
+    PROJECT_ROOT, TEMPLATE_DIR, CONVERT_SCRIPT, USER_AGENT,
 )
 from merge_config import merge_config
 
 
-# ========== SVG 常量 ==========
+# ========== 常量 ==========
 
 _FONT = '-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif'
+_B64_PATTERN: re.Pattern[str] = re.compile(r'^[A-Za-z0-9+/=\s]+$')
+_WORKERS = int(os.environ.get('WORKERS', '8'))
+
+
+# ========== Base64 解码 ==========
+
+def _try_decode_base64(content: str) -> str:
+    """尝试将内容作为 Base64 解码，失败则原样返回"""
+    try:
+        cleaned = ''.join(content.split())
+        if cleaned and _B64_PATTERN.match(cleaned):
+            cleaned += "=" * (-len(cleaned) % 4)
+            return base64.b64decode(cleaned).decode("utf-8")
+    except Exception:
+        pass
+    return content
 
 
 # ========== 流量解析 ==========
@@ -89,7 +105,7 @@ _SUB_URL_KEY_RE: re.Pattern[str] = re.compile(r'^SUB_URL(_\d+)?$')
 
 def parse_subscriptions() -> list[Subscription]:
     """解析订阅配置 — 从 SUB_URL / SUB_URL_N 环境变量获取
-    
+
     名称前加 * 表示该订阅的 provider 应指向 Gist 上已转换的文件，
     例如: SUB_URL = *山海|https://example.com/sub
     """
@@ -123,9 +139,9 @@ def _download_subscription(sub: Subscription, user_agent: str) -> DownloadResult
         response = http_get_with_retry(sub.url, headers={"User-Agent": user_agent})
         content = response.text
 
-        decoded = try_decode_base64(content)
+        decoded = _try_decode_base64(content)
         if decoded is not content:
-            logger.debug(f"    {sub.name}: 内容已从 Base64 解码")
+            log_debug(f"    {sub.name}: 内容已从 Base64 解码")
             content = decoded
 
         flow = parse_flow_info(response.headers)
@@ -141,11 +157,11 @@ def _download_subscription(sub: Subscription, user_agent: str) -> DownloadResult
 
 def _download_all(subscriptions: list[Subscription], user_agent: str) -> list[DownloadResult]:
     """并行下载所有订阅，按原始订阅顺序返回结果"""
-    logger.info(f"→ 并行下载 {len(subscriptions)} 个订阅...")
+    log_info(f"→ 并行下载 {len(subscriptions)} 个订阅...")
     index_map = {sub: i for i, sub in enumerate(subscriptions)}
     results: list[DownloadResult] = [None] * len(subscriptions)  # type: ignore[list-item]
 
-    with ThreadPoolExecutor(max_workers=min(len(subscriptions), 8)) as executor:
+    with ThreadPoolExecutor(max_workers=min(len(subscriptions), _WORKERS)) as executor:
         futures = {
             executor.submit(_download_subscription, sub, user_agent): sub
             for sub in subscriptions
@@ -155,35 +171,34 @@ def _download_all(subscriptions: list[Subscription], user_agent: str) -> list[Do
             result = future.result()
             results[index_map[sub]] = result
             if result.is_success:
-                logger.debug(f"  ✓ {result.name}: 下载成功")
+                log_debug(f"  ✓ {result.name}: 下载成功")
             else:
-                logger.warn(f"  ✗ {result.name}: {result.reason}")
+                log_warn(f"  ✗ {result.name}: {result.reason}")
 
     return results
 
 
 def _fetch_from_gist_fallback(sub_name: str, gist_id: str, gist_owner: str) -> DownloadResult | None:
     """当原始订阅下载失败时，尝试从 Gist 备份获取已转换的 sing-box 配置
-    
+
     地址格式: https://gist.github.com/{gist_owner}/{gist_id}/raw/{sub_name}-singbox.json
     """
     url = f"https://gist.github.com/{gist_owner}/{gist_id}/raw/{sub_name}-singbox.json"
     try:
-        logger.info(f"  → 尝试从 Gist 备份获取: {sub_name}")
+        log_info(f"  → 尝试从 Gist 备份获取: {sub_name}")
         response = http_get_with_retry(url)
         content = response.text
-        # 验证内容是否为有效的 sing-box JSON
         parsed = json.loads(content)
         if not isinstance(parsed, dict) or ('outbounds' not in parsed and 'endpoints' not in parsed):
-            logger.warn(f"  Gist fallback 内容格式不正确 ({sub_name})")
+            log_warn(f"  Gist fallback 内容格式不正确 ({sub_name})")
             return None
-        logger.info(f"  ✓ {sub_name}: 从 Gist 备份获取成功")
+        log_info(f"  ✓ {sub_name}: 从 Gist 备份获取成功")
         return DownloadResult(
             name=sub_name, status="ok", filename=f"{sub_name}-singbox.json",
             raw_content=content, is_converted=True,
         )
     except Exception as e:
-        logger.warn(f"  Gist fallback 失败 ({sub_name}): {e}")
+        log_warn(f"  Gist fallback 失败 ({sub_name}): {e}")
         return None
 
 
@@ -200,9 +215,9 @@ def _try_gist_fallback(
     if not failed_indices:
         return download_results
 
-    logger.info(f"→ {len(failed_indices)} 个订阅下载失败，尝试 Gist fallback（并行）...")
+    log_info(f"→ {len(failed_indices)} 个订阅下载失败，尝试 Gist fallback（并行）...")
 
-    with ThreadPoolExecutor(max_workers=min(len(failed_indices), 4)) as executor:
+    with ThreadPoolExecutor(max_workers=min(len(failed_indices), _WORKERS)) as executor:
         futures = {
             executor.submit(_fetch_from_gist_fallback, download_results[i].name, gist_id, gist_owner): i
             for i in failed_indices
@@ -231,19 +246,19 @@ def _convert_batch(contents_dict: dict[str, str]) -> dict[str, dict[str, Any] | 
             json.dump(contents_dict, f, ensure_ascii=False)
             batch_input_file = f.name
 
-        logger.info(f"  → 批量转换 {len(contents_dict)} 个订阅（单进程）...")
+        log_info(f"  → 批量转换 {len(contents_dict)} 个订阅（单进程）...")
         result = subprocess.run(
             ['node', str(CONVERT_SCRIPT), 'batch-convert', batch_input_file],
             capture_output=True, text=True, encoding='utf-8'
         )
 
         if result.returncode != 0:
-            logger.error(f"  批量转换失败 (exit {result.returncode}): {result.stderr}")
+            log_error(f"  批量转换失败 (exit {result.returncode}): {result.stderr}")
             return {name: None for name in contents_dict}
 
         stdout = result.stdout.strip()
         if not stdout:
-            logger.error(f"  批量转换输出为空 (stderr: {result.stderr.strip() or '(无)'})")
+            log_error(f"  批量转换输出为空 (stderr: {result.stderr.strip() or '(无)'})")
             return {name: None for name in contents_dict}
 
         raw_result = json.loads(stdout)
@@ -253,7 +268,7 @@ def _convert_batch(contents_dict: dict[str, str]) -> dict[str, dict[str, Any] | 
         }
 
     except Exception as e:
-        logger.error(f"  批量转换异常: {e}")
+        log_error(f"  批量转换异常: {e}")
         return {name: None for name in contents_dict}
     finally:
         if batch_input_file:
@@ -266,10 +281,9 @@ def _aggregate_results(
     download_results: list[DownloadResult],
 ) -> tuple[dict[str, str], list[SubscriptionInfo], dict[str, list[dict[str, Any]]]]:
     """聚合下载结果：批量转换 → 收集文件、订阅信息和节点字典
-    
+
     对于 is_converted=True 的结果（来自 Gist 备份），跳过转换直接使用。
     """
-    # 只对非已转换的结果进行批量转换
     contents_to_convert = {
         r.name: r.raw_content
         for r in download_results
@@ -295,7 +309,6 @@ def _aggregate_results(
             continue
 
         if result.is_converted:
-            # 从 Gist 备份获取的已经是 sing-box JSON，直接使用
             files[result.filename] = result.raw_content
             try:
                 singbox_config = json.loads(result.raw_content)
@@ -311,7 +324,7 @@ def _aggregate_results(
 
             if node_count > 0:
                 subs_nodes_dict[result.name] = singbox_nodes
-                logger.info(f"  ✓ {result.name}: 使用 Gist 备份 ({len(result.raw_content)} 字节, {node_count} 个节点)")
+                log_info(f"  ✓ {result.name}: 使用 Gist 备份 ({len(result.raw_content)} 字节, {node_count} 个节点)")
             else:
                 skipped.append(f"{result.name} (Gist 备份空节点)")
 
@@ -320,7 +333,6 @@ def _aggregate_results(
             ))
             continue
 
-        # 常规流程：需要转换
         files[result.filename] = result.raw_content
 
         singbox_config = converted.get(result.name)
@@ -338,7 +350,7 @@ def _aggregate_results(
 
         if node_count > 0:
             subs_nodes_dict[result.name] = singbox_nodes
-            logger.info(f"  ✓ {result.name}: 转换成功 ({len(singbox_content)} 字节, {node_count} 个节点)")
+            log_info(f"  ✓ {result.name}: 转换成功 ({len(singbox_content)} 字节, {node_count} 个节点)")
         else:
             skipped.append(f"{result.name} (空节点)")
 
@@ -347,31 +359,25 @@ def _aggregate_results(
         ))
 
     if skipped:
-        logger.warn(f"⚠️ {len(skipped)} 个订阅跳过: {', '.join(skipped)}")
+        log_warn(f"⚠️ {len(skipped)} 个订阅跳过: {', '.join(skipped)}")
 
     return files, subscription_info, subs_nodes_dict
 
 
 # ========== 模板处理 ==========
 
-def _iter_templates() -> list[tuple[str, str]]:
-    """扫描 config_template 目录，收集所有模板文件"""
-    if not TEMPLATE_DIR.is_dir():
-        return []
-    return [
-        (str(f), f.stem) for f in sorted(TEMPLATE_DIR.iterdir())
-        if f.is_file()
-    ]
-
-
 def _load_templates() -> list[tuple[str, str, dict[str, Any]]]:
     """加载所有模板并缓存，避免重复磁盘 I/O"""
+    if not TEMPLATE_DIR.is_dir():
+        return []
     templates: list[tuple[str, str, dict[str, Any]]] = []
-    for path, base_name in _iter_templates():
+    for f in sorted(TEMPLATE_DIR.iterdir()):
+        if not f.is_file():
+            continue
         try:
-            templates.append((path, base_name, load_jsonc(path)))
+            templates.append((str(f), f.stem, load_jsonc(f)))
         except Exception as e:
-            logger.error(f"  模板加载失败 {path}: {e}")
+            log_error(f"  模板加载失败 {f}: {e}")
     return templates
 
 
@@ -384,14 +390,14 @@ def merge_all_templates(
     results: dict[str, str] = {}
     for path, base_name, template in templates:
         config_filename = base_name + '.json'
-        logger.info(f"  → 处理模板: {os.path.basename(path)}")
+        log_info(f"  → 处理模板: {os.path.basename(path)}")
         try:
             merged = merge_config(template, subs_nodes_dict)
         except Exception as e:
-            logger.error(f"  合并异常: {e}")
+            log_error(f"  合并异常: {e}")
             continue
         content = json.dumps(merged, indent=2, ensure_ascii=False)
-        logger.info(f"    ✓ 生成 {config_filename} ({len(content)} 字节, {total_nodes} 个节点)")
+        log_info(f"    ✓ 生成 {config_filename} ({len(content)} 字节, {total_nodes} 个节点)")
         results[config_filename] = content
     return results
 
@@ -404,7 +410,7 @@ def generate_provider_configs(
     gist_id: str = '',
 ) -> dict[str, str]:
     """生成 providers 版本的配置文件
-    
+
     Args:
         sub_url_map: 订阅名称 -> 原始 URL 的映射
         templates: 模板列表
@@ -427,10 +433,10 @@ def generate_provider_configs(
                     filled += 1
             if filled > 0:
                 config_filename = base_name + '-providers.json'
-                logger.debug(f"  → {os.path.basename(path)} -> {config_filename} ({filled} 个 providers)")
+                log_debug(f"  → {os.path.basename(path)} -> {config_filename} ({filled} 个 providers)")
                 results[config_filename] = json.dumps(template, indent=2, ensure_ascii=False)
         except Exception as e:
-            logger.error(f"  Provider 配置生成异常 {path}: {e}")
+            log_error(f"  Provider 配置生成异常 {path}: {e}")
     return results
 
 
@@ -456,7 +462,7 @@ def fetch_latest_versions() -> dict[str, str]:
             data = json.loads(resp.text)
             versions[key] = data.get('tag_name', '未知')
         except Exception as e:
-            logger.warn(f"获取 {repo} 版本失败: {e}")
+            log_warn(f"获取 {repo} 版本失败: {e}")
             versions[key] = '获取失败'
     return versions
 
@@ -621,10 +627,7 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo], versions: dic
     col_y = pad + title_h + 8
     x_offset = pad
     for col_name, col_w, _ in cols:
-        if col_name == '订阅':
-            tx = x_offset + 16
-            anchor = 'start'
-        elif col_name == '流量使用':
+        if col_name in ('订阅', '流量使用'):
             tx = x_offset + 16
             anchor = 'start'
         else:
@@ -642,10 +645,8 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo], versions: dic
     rows_start_y = col_y + col_header_h
     for i, rd in enumerate(rows_data):
         ry = rows_start_y + i * row_h
-        # 交替行背景（极淡蓝灰色）
         if i % 2 == 1:
             parts.append(f'  <rect x="{pad}" y="{ry}" width="{content_w}" height="{row_h}" fill="#f8fafd"/>')
-        # 行底部分隔线
         if i > 0:
             parts.append(f'  <line x1="{pad + 16}" y1="{ry}" x2="{pad + content_w - 16}" y2="{ry}" stroke="{border_color}" stroke-width="0.5"/>')
 
@@ -719,10 +720,11 @@ def upload_to_gist(github_token: str, gist_id: str, files: dict[str, str]) -> No
     headers = {"Authorization": f"token {github_token}", "Accept": "application/vnd.github.v3+json"}
     gist_files = {name: {"content": content} for name, content in files.items()}
 
-    logger.info(f"    更新 Gist: {gist_id}")
+    log_info(f"    更新 Gist: {gist_id}")
     resp = http_request("PATCH", f"https://api.github.com/gists/{gist_id}", headers=headers, json_body={"files": gist_files})
-    resp.raise_for_status()
-    logger.info("    ✓ 更新成功")
+    if resp.status_code >= 400:
+        raise Exception(f"HTTP {resp.status_code}: {resp.text[:200]}")
+    log_info("    ✓ 更新成功")
 
 
 # ========== 主流程 ==========
@@ -732,10 +734,12 @@ def _get_gist_owner(github_token: str) -> str | None:
     try:
         headers = {"Authorization": f"token {github_token}", "Accept": "application/vnd.github.v3+json"}
         resp = http_request("GET", "https://api.github.com/user", headers=headers)
-        resp.raise_for_status()
+        if resp.status_code >= 400:
+            log_warn(f"获取 Gist 所有者用户名失败: HTTP {resp.status_code}")
+            return None
         return json.loads(resp.text).get("login")
     except Exception as e:
-        logger.warn(f"获取 Gist 所有者用户名失败: {e}")
+        log_warn(f"获取 Gist 所有者用户名失败: {e}")
         return None
 
 
@@ -750,97 +754,91 @@ def _generate_and_upload(
 ) -> None:
     """生成合并配置、providers 配置，并上传到 Gist"""
 
-    logger.info("→ 生成合并配置和 providers 配置...")
+    log_info("→ 生成合并配置和 providers 配置...")
     templates = _load_templates()
     sub_url_map = {sub.name: sub.url for sub in subscriptions}
 
-    # 收集标记为使用 Gist 的订阅名称
     gist_subs = {sub.name for sub in subscriptions if sub.use_gist}
     if gist_subs:
         if gist_owner:
-            logger.info(f"  → {len(gist_subs)} 个订阅的 provider 将指向 Gist: {gist_owner}/{gist_id}")
+            log_info(f"  → {len(gist_subs)} 个订阅的 provider 将指向 Gist: {gist_owner}/{gist_id}")
         else:
-            logger.warn(f"  ⚠ 无法获取 Gist 所有者，provider 将使用原始订阅 URL")
+            log_warn(f"  ⚠ 无法获取 Gist 所有者，provider 将使用原始订阅 URL")
 
     merged = merge_all_templates(subs_nodes_dict, templates)
     files.update(merged)
     if merged:
-        logger.info(f"  ✓ 共生成 {len(merged)} 个配置文件")
+        log_info(f"  ✓ 共生成 {len(merged)} 个配置文件")
 
     providers = generate_provider_configs(sub_url_map, templates, gist_subs, gist_owner, gist_id)
     files.update(providers)
     if providers:
-        logger.info(f"  ✓ 共生成 {len(providers)} 个 providers 配置文件")
+        log_info(f"  ✓ 共生成 {len(providers)} 个 providers 配置文件")
 
-    # 获取 sing-box 最新版本信息
     versions = fetch_latest_versions()
-    logger.info(f"  → sing-box 版本: 官方 {versions.get('official', '?')} | reF1nd {versions.get('reF1nd', '?')}")
+    log_info(f"  → sing-box 版本: 官方 {versions.get('official', '?')} | reF1nd {versions.get('reF1nd', '?')}")
 
-    # 生成 SVG 状态图片（供 GitHub Pages 使用）
     svg_content = generate_status_svg(subscription_info, versions)
     svg_output = PROJECT_ROOT / "status.svg"
     svg_output.write_text(svg_content, encoding="utf-8")
-    logger.info("✓ 状态 SVG 已生成")
+    log_info("✓ 状态 SVG 已生成")
 
-    logger.info(f"上传 {len(files)} 个文件到 Gist...")
+    log_info(f"上传 {len(files)} 个文件到 Gist...")
     upload_to_gist(github_token, gist_id, files)
 
 
 def main() -> None:
     """主入口"""
-    logger.info("=" * 60)
-    logger.info("SubDl - Subscription Downloader")
-    logger.info(f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    logger.info("=" * 60)
+    log_info("=" * 60)
+    log_info("SubDl - Subscription Downloader")
+    log_info(f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    log_info("=" * 60)
 
     github_token = os.environ.get("GH_TOKEN")
     if not github_token:
-        logger.error("环境变量 GH_TOKEN 未设置")
+        log_error("环境变量 GH_TOKEN 未设置")
         sys.exit(1)
     gist_id = os.environ.get("GIST_ID", "")
     if not gist_id:
-        logger.error("环境变量 GIST_ID 未设置，请在 GitHub Secrets 中手动配置")
+        log_error("环境变量 GIST_ID 未设置，请在 GitHub Secrets 中手动配置")
         sys.exit(1)
 
     subscriptions = parse_subscriptions()
     if not subscriptions:
-        logger.error("未找到订阅配置")
+        log_error("未找到订阅配置")
         sys.exit(1)
-    logger.info(f"找到 {len(subscriptions)} 个订阅")
+    log_info(f"找到 {len(subscriptions)} 个订阅")
 
-    logger.info("::group::Download & Convert subscriptions")
+    log_info("::group::Download & Convert subscriptions")
     download_results = _download_all(subscriptions, USER_AGENT)
-    logger.info("::endgroup::")
+    log_info("::endgroup::")
 
-    # 对下载失败的订阅尝试从 Gist 备份获取
     gist_owner = os.environ.get("GIST_OWNER") or ''
     if not gist_owner:
         gist_owner = _get_gist_owner(github_token) or ''
     if gist_owner:
         download_results = _try_gist_fallback(download_results, gist_id, gist_owner)
     else:
-        logger.warn("⚠ 无法获取 Gist 所有者，跳过 fallback")
+        log_warn("⚠ 无法获取 Gist 所有者，跳过 fallback")
 
     valid_results = [r for r in download_results if r.is_success]
     if not valid_results:
-        logger.error("所有订阅下载失败或内容无效")
+        log_error("所有订阅下载失败或内容无效")
         sys.exit(1)
-    logger.info(f"✓ 有效订阅: {len(valid_results)}/{len(subscriptions)}")
+    log_info(f"✓ 有效订阅: {len(valid_results)}/{len(subscriptions)}")
 
-    # 聚合结果
     files, subscription_info, subs_nodes_dict = _aggregate_results(download_results)
 
     if not subs_nodes_dict:
-        logger.error("没有有效的订阅节点，将不上传配置文件")
+        log_error("没有有效的订阅节点，将不上传配置文件")
         sys.exit(1)
-    logger.info(f"✓ 合并节点: {len(subs_nodes_dict)}/{len(subscriptions)}")
+    log_info(f"✓ 合并节点: {len(subs_nodes_dict)}/{len(subscriptions)}")
 
-    # 生成配置并上传
-    logger.info("::group::Generate configs & Upload to Gist")
+    log_info("::group::Generate configs & Upload to Gist")
     _generate_and_upload(files, subs_nodes_dict, subscriptions, subscription_info, github_token, gist_id, gist_owner)
-    logger.info("::endgroup::")
+    log_info("::endgroup::")
 
-    logger.info(f"完成! 成功处理 {len(valid_results)} 个订阅，共 {len(files)} 个文件")
+    log_info(f"完成! 成功处理 {len(valid_results)} 个订阅，共 {len(files)} 个文件")
 
 
 if __name__ == "__main__":

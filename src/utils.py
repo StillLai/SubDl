@@ -5,10 +5,8 @@
 
 from __future__ import annotations
 
-import base64
 import hashlib
 import json
-import re
 import sys
 import time
 from dataclasses import dataclass
@@ -51,24 +49,29 @@ def _log(level: str, msg: str) -> None:
     print(f"{prefix}{msg}", file=sys.stderr)
 
 
+def log_debug(msg: str) -> None:
+    _log("DEBUG", msg)
+
+
+def log_info(msg: str) -> None:
+    _log("INFO", msg)
+
+
+def log_warn(msg: str) -> None:
+    _log("WARN", msg)
+
+
+def log_error(msg: str) -> None:
+    _log("ERROR", msg)
+
+
+# 兼容旧导入: from utils import logger
 class logger:
-    """极简日志命名空间，与原 API 兼容"""
-
-    @staticmethod
-    def debug(msg: str) -> None:
-        _log("DEBUG", msg)
-
-    @staticmethod
-    def info(msg: str) -> None:
-        _log("INFO", msg)
-
-    @staticmethod
-    def warn(msg: str) -> None:
-        _log("WARN", msg)
-
-    @staticmethod
-    def error(msg: str) -> None:
-        _log("ERROR", msg)
+    """兼容层 —— 新代码请直接使用 log_debug / log_info / log_warn / log_error"""
+    debug = staticmethod(log_debug)
+    info = staticmethod(log_info)
+    warn = staticmethod(log_warn)
+    error = staticmethod(log_error)
 
 
 # ========== 数据模型 ==========
@@ -85,9 +88,9 @@ class FlowInfo:
 def _extract_name_from_url(url: str) -> str:
     try:
         name = urlparse(url).netloc.replace("www.", "").split(":")[0]
-        return name or f"unknown_{hashlib.md5(url.encode('utf-8')).hexdigest()[:8]}"
+        return name or f"unknown_{hashlib.md5(url.encode()).hexdigest()[:8]}"
     except Exception:
-        return f"unknown_{hashlib.md5(url.encode('utf-8')).hexdigest()[:8]}"
+        return f"unknown_{hashlib.md5(url.encode()).hexdigest()[:8]}"
 
 
 @dataclass(frozen=True)
@@ -138,21 +141,6 @@ def load_jsonc(filepath: str | Path) -> Any:
         return json5.load(f)
 
 
-_B64_PATTERN: re.Pattern[str] = re.compile(r'^[A-Za-z0-9+/=\s]+$')
-
-
-def try_decode_base64(content: str) -> str:
-    """尝试将内容作为 Base64 解码，失败则原样返回"""
-    try:
-        cleaned = ''.join(content.split())
-        if cleaned and _B64_PATTERN.match(cleaned):
-            cleaned += "=" * (-len(cleaned) % 4)
-            return base64.b64decode(cleaned).decode("utf-8")
-    except Exception:
-        pass
-    return content
-
-
 # ========== 网络请求（基于 urllib，无第三方依赖） ==========
 
 @dataclass
@@ -161,10 +149,6 @@ class HttpResponse:
     status_code: int
     text: str
     headers: dict[str, str]
-
-    def raise_for_status(self) -> None:
-        if self.status_code >= 400:
-            raise HTTPError(url='', code=self.status_code, msg=f"HTTP {self.status_code}", hdrs=None, fp=None)
 
 
 def http_request(
@@ -202,7 +186,7 @@ def http_get_with_retry(
         try:
             if attempt > 1:
                 sleep_time = backoff_factor ** (attempt - 1)
-                logger.debug(f"  重试 {attempt}/{max_retries}，等待 {sleep_time}s...")
+                log_debug(f"  重试 {attempt}/{max_retries}，等待 {sleep_time}s...")
                 time.sleep(sleep_time)
 
             resp = http_request('GET', url, headers=headers, timeout=timeout)
@@ -210,12 +194,12 @@ def http_get_with_retry(
             if resp.status_code >= 400:
                 if resp.status_code in _RETRYABLE_CODES:
                     raise HTTPError(url='', code=resp.status_code, msg=f"HTTP {resp.status_code}", hdrs=None, fp=None)
-                resp.raise_for_status()
+                raise HTTPError(url='', code=resp.status_code, msg=f"HTTP {resp.status_code}", hdrs=None, fp=None)
             return resp
 
         except (HTTPError, URLError, OSError) as e:
             last_error = e
-            logger.debug(f"  请求失败: {e}")
+            log_debug(f"  请求失败: {e}")
 
     assert last_error is not None
     raise last_error

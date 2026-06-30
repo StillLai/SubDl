@@ -16,7 +16,7 @@ import copy
 import re
 from typing import Any
 
-from utils import logger
+from utils import log_info, log_debug
 
 
 def filter_nodes_by_regex(
@@ -112,11 +112,11 @@ def _fix_empty_outbounds(outbounds: list[Any]) -> None:
             outbounds_list = outbound.get('outbounds', [])
             if not isinstance(outbounds_list, list) or not outbounds_list:
                 outbound['outbounds'] = ['Compatible']
-                logger.debug(f"  {outbound.get('tag')} -> 空 outbound，添加 Compatible")
+                log_debug(f"  {outbound.get('tag')} -> 空 outbound，添加 Compatible")
 
     if not has_compatible:
         outbounds.append({"tag": "Compatible", "type": "direct"})
-        logger.info("[Merge] 已添加 Compatible outbound 定义")
+        log_info("[Merge] 已添加 Compatible outbound 定义")
 
 
 def merge_config(
@@ -136,20 +136,20 @@ def merge_config(
             node_copy = copy.deepcopy(node)
             node_copy['tag'] = f"{sub_name}/{node_copy['tag']}" if 'tag' in node_copy else ''
             all_nodes.append(node_copy)
-    logger.info(f"[Merge] 已收集 {len(all_nodes)} 个节点并添加订阅前缀")
+    log_info(f"[Merge] 已收集 {len(all_nodes)} 个节点并添加订阅前缀")
 
     # 步骤 2: 处理 providers 配置
     if 'providers' in config:
         process_providers(config, subscriptions_nodes)
         del config['providers']
-        logger.info("[Merge] 已处理 providers 配置")
+        log_info("[Merge] 已处理 providers 配置")
 
     # 步骤 3: 移除 outbounds 中的 include/exclude 字段
     _strip_filter_fields(outbounds)
 
     # 步骤 4: 将代理节点添加到 outbounds 末尾
     outbounds.extend(all_nodes)
-    logger.info(f"[Merge] 已添加 {len(all_nodes)} 个代理节点到配置")
+    log_info(f"[Merge] 已添加 {len(all_nodes)} 个代理节点到配置")
 
     # 步骤 5: 修复空 outbound 兼容性 + 确保 Compatible 定义存在
     _fix_empty_outbounds(outbounds)

@@ -14,7 +14,7 @@ import copy
 import json
 from typing import Any
 
-from utils import logger, load_jsonc, TEMPLATE_DIR, TEMPLATE_BASE
+from utils import log_info, log_error, load_jsonc, TEMPLATE_DIR, TEMPLATE_BASE
 
 
 # ========== 模板变体生成 ==========
@@ -59,16 +59,12 @@ def generate_all_template_variants() -> None:
             output_path = TEMPLATE_DIR / f'sing-box-{suffix}.jsonc'
             with open(output_path, 'w', encoding='utf-8') as f:
                 json.dump(template, f, indent=2, ensure_ascii=False)
-            logger.debug(f"  ✓ 已生成 {label} 模板")
+            log_info(f"  ✓ 已生成 {label} 模板")
         except Exception as e:
-            logger.error(f"  ✗ 生成 {label} 模板异常: {e}")
-
-
-def main() -> None:
-    logger.info("开始生成模板变体...")
-    generate_all_template_variants()
-    logger.info("模板变体生成完成。")
+            log_error(f"  ✗ 生成 {label} 模板异常: {e}")
 
 
 if __name__ == "__main__":
-    main()
+    log_info("开始生成模板变体...")
+    generate_all_template_variants()
+    log_info("模板变体生成完成。")

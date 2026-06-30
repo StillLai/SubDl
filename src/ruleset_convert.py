@@ -14,7 +14,8 @@ from typing import Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from utils import (
-    logger, http_get_with_retry,
+    log_info, log_warn, log_error,
+    http_get_with_retry,
     RULESET_SOURCE, RULESET_JSON_DIR, RULESET_SRS_DIR,
 )
 
@@ -55,10 +56,15 @@ _ANDROID_COMMON_PREFIXES: frozenset[str] = frozenset(
 
 # ========== 网络下载与解析 ==========
 
-def _fetch_parsed(url: str, parser: str) -> Any:
+def _fetch_and_parse(url: str, parser: str) -> Any:
     """下载 URL 内容并按指定格式解析（'json' / 'yaml' / 'csv'）"""
     response = http_get_with_retry(url)
-    return _PARSERS[parser](response.text)
+    if parser == 'json':
+        return json.loads(response.text)
+    elif parser == 'yaml':
+        return yaml.safe_load(response.text)
+    else:
+        return _parse_csv_rows(response.text)
 
 
 def is_ipv4_or_ipv6(address: str) -> str | None:
@@ -136,22 +142,15 @@ def _parse_csv_rows(data: str) -> list[dict[str, str | None]]:
     return rows
 
 
-_PARSERS: dict[str, Any] = {
-    'json': json.loads,
-    'yaml': yaml.safe_load,
-    'csv': _parse_csv_rows,
-}
-
-
 def parse_and_convert_to_rows(link: str) -> list[dict[str, str | None]]:
     """下载并解析规则链接，返回 list[dict] (pattern, address, other)"""
     if link.endswith('.yaml') or link.endswith('.txt'):
         try:
-            return _parse_yaml_rows(_fetch_parsed(link, 'yaml'))
+            return _parse_yaml_rows(_fetch_and_parse(link, 'yaml'))
         except Exception as e:
-            logger.warn(f"  YAML 解析失败 {link}: {e}，回退到 CSV 格式解析")
-            return _fetch_parsed(link, 'csv')
-    return _fetch_parsed(link, 'csv')
+            log_warn(f"  YAML 解析失败 {link}: {e}，回退到 CSV 格式解析")
+            return _fetch_and_parse(link, 'csv')
+    return _fetch_and_parse(link, 'csv')
 
 
 # ========== SRS 编译 ==========
@@ -159,17 +158,15 @@ def parse_and_convert_to_rows(link: str) -> list[dict[str, str | None]]:
 def _compile_srs(file_name: str) -> None:
     """使用 subprocess 安全调用 sing-box 编译 SRS，输出到 file_name 同级的 srs/ 目录"""
     src = Path(file_name)
-    srs_dir = RULESET_SRS_DIR
-    srs_filename = src.stem + '.srs'
-    srs_path = srs_dir / srs_filename
-    srs_dir.mkdir(parents=True, exist_ok=True)
+    srs_path = RULESET_SRS_DIR / (src.stem + '.srs')
+    RULESET_SRS_DIR.mkdir(parents=True, exist_ok=True)
     try:
         subprocess.run(
             ["sing-box", "rule-set", "compile", "--output", str(srs_path), file_name],
             check=True, capture_output=True, text=True
         )
     except Exception as e:
-        logger.error(f"  SRS 编译失败: {srs_filename} - {e}")
+        log_error(f"  SRS 编译失败: {srs_path.name} - {e}")
 
 
 def prioritize_version_key(obj: Any) -> Any:
@@ -222,15 +219,15 @@ def _group_by_mapped(
 def _handle_json_ruleset(link: str, file_name: str) -> str | None:
     """处理已是 sing-box 格式的 JSON 规则集"""
     try:
-        json_data = _fetch_parsed(link, 'json')
+        json_data = _fetch_and_parse(link, 'json')
         if isinstance(json_data, dict) and 'version' in json_data and 'rules' in json_data:
             with open(file_name, 'w', encoding='utf-8') as output_file:
                 json.dump(prioritize_version_key(json_data), output_file, ensure_ascii=False, indent=2)
             _compile_srs(file_name)
             return file_name
-        logger.warn(f"  {link} 不是 sing-box 规则集格式，跳过")
+        log_warn(f"  {link} 不是 sing-box 规则集格式，跳过")
     except Exception as e:
-        logger.error(f"  处理 JSON 文件失败 {link}: {e}")
+        log_error(f"  处理 JSON 文件失败 {link}: {e}")
     return None
 
 
@@ -285,7 +282,7 @@ def main() -> None:
     RULESET_SRS_DIR.mkdir(parents=True, exist_ok=True)
 
     result_file_names: list[str] = []
-    logger.info(f"→ 并行处理 {len(links)} 个规则源...")
+    log_info(f"→ 并行处理 {len(links)} 个规则源...")
 
     with ThreadPoolExecutor(max_workers=min(len(links), 8)) as executor:
         futures = {
@@ -299,11 +296,11 @@ def main() -> None:
                 if result:
                     result_file_names.append(result)
             except Exception as e:
-                logger.error(f"  跳过 {link}: {e}")
+                log_error(f"  跳过 {link}: {e}")
 
-    logger.info(f"✓ 共生成 {len(result_file_names)}/{len(links)} 个规则集（JSON + SRS）")
+    log_info(f"✓ 共生成 {len(result_file_names)}/{len(links)} 个规则集（JSON + SRS）")
     for file_name in result_file_names:
-        logger.info(f"  ✓ {Path(file_name).stem}")
+        log_info(f"  ✓ {Path(file_name).stem}")
 
 
 if __name__ == "__main__":
