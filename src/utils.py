@@ -32,7 +32,7 @@ RULESET_SOURCE = RULESET_DIR / 'ruleset_source.txt'
 RULESET_JSON_DIR = RULESET_DIR / 'json'
 RULESET_SRS_DIR = RULESET_DIR / 'srs'
 CONVERT_SCRIPT = SCRIPT_DIR / 'convert.mjs'
-TEMPLATE_BASE = TEMPLATE_DIR / 'sing-box_template.jsonc'
+TEMPLATE_BASE = TEMPLATE_DIR / 'sing-box.jsonc'
 
 
 # ========== 网络配置 ==========

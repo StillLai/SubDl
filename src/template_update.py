@@ -1,9 +1,9 @@
 """Template Update 独立脚本
 
-负责从 config_template/sing-box_template.jsonc 生成模板变体文件：
-- noTun
+负责从 config_template/sing-box.jsonc 生成模板变体文件：
+- mixed
 - tproxy
-- tun_for_win
+- tun-win
 
 与 Subscriptions Update 完全解耦，可单独运行。
 """
@@ -20,9 +20,9 @@ from utils import logger, load_jsonc, TEMPLATE_DIR, TEMPLATE_BASE
 # ========== 模板变体生成 ==========
 
 _TEMPLATE_VARIANTS: list[tuple[str, str, str]] = [
-    ('noTun', 'noTun', 'remove_tun'),
+    ('mixed', 'mixed', 'remove_tun'),
     ('tproxy', 'tproxy', 'replace_tun_with_tproxy'),
-    ('tun_for_win', 'tun_for_win', 'remove_auto_redirect'),
+    ('tun-win', 'tun-win', 'remove_auto_redirect'),
 ]
 
 
@@ -50,13 +50,13 @@ def _transform_template(template: dict[str, Any], action: str) -> None:
 
 
 def generate_all_template_variants() -> None:
-    """生成所有模板变体（noTun / tproxy / tun_for_win）"""
+    """生成所有模板变体（mixed / tproxy / tun-win）"""
     base_template = load_jsonc(TEMPLATE_BASE)
     for suffix, label, action in _TEMPLATE_VARIANTS:
         try:
             template = copy.deepcopy(base_template)
             _transform_template(template, action)
-            output_path = TEMPLATE_DIR / f'sing-box_template_{suffix}.jsonc'
+            output_path = TEMPLATE_DIR / f'sing-box-{suffix}.jsonc'
             with open(output_path, 'w', encoding='utf-8') as f:
                 json.dump(template, f, indent=2, ensure_ascii=False)
             logger.debug(f"  ✓ 已生成 {label} 模板")

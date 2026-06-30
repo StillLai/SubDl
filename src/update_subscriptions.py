@@ -355,12 +355,12 @@ def _aggregate_results(
 # ========== 模板处理 ==========
 
 def _iter_templates() -> list[tuple[str, str]]:
-    """扫描 config_template 目录，收集所有 sing-box_template*.jsonc 模板文件"""
+    """扫描 config_template 目录，收集所有 sing-box-*.jsonc 模板文件"""
     if not TEMPLATE_DIR.is_dir():
         return []
     return [
         (str(f), f.stem) for f in sorted(TEMPLATE_DIR.iterdir())
-        if f.is_file() and f.suffix == '.jsonc' and f.stem.startswith('sing-box_template')
+        if f.is_file() and f.suffix == '.jsonc' and f.stem.startswith('sing-box-')
     ]
 
 
@@ -383,7 +383,7 @@ def merge_all_templates(
     total_nodes = sum(len(nodes) for nodes in subs_nodes_dict.values())
     results: dict[str, str] = {}
     for path, base_name, template in templates:
-        config_filename = base_name.replace('template', 'config') + '.json'
+        config_filename = base_name + '.json'
         logger.info(f"  → 处理模板: {os.path.basename(path)}")
         try:
             merged = merge_config(template, subs_nodes_dict)
@@ -426,7 +426,7 @@ def generate_provider_configs(
                         provider['url'] = sub_url_map[tag]
                     filled += 1
             if filled > 0:
-                config_filename = base_name.replace('template', 'with_providers_config') + '.json'
+                config_filename = base_name + '-providers.json'
                 logger.debug(f"  → {os.path.basename(path)} -> {config_filename} ({filled} 个 providers)")
                 results[config_filename] = json.dumps(template, indent=2, ensure_ascii=False)
         except Exception as e:
