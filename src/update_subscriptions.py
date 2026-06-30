@@ -355,12 +355,12 @@ def _aggregate_results(
 # ========== 模板处理 ==========
 
 def _iter_templates() -> list[tuple[str, str]]:
-    """扫描 config_template 目录，收集所有 sing-box-*.jsonc 模板文件"""
+    """扫描 config_template 目录，收集所有模板文件"""
     if not TEMPLATE_DIR.is_dir():
         return []
     return [
         (str(f), f.stem) for f in sorted(TEMPLATE_DIR.iterdir())
-        if f.is_file() and f.suffix == '.jsonc' and f.stem.startswith('sing-box-')
+        if f.is_file()
     ]
 
 
