@@ -658,8 +658,8 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo], versions: dic
 
         # 环境变量名 + 订阅名
         if rd.get("env_name"):
-            parts.append(f'  <text x="{x_offset + 16}" y="{cy - 2}" font-family="{_FONT}" font-size="10" fill="{text_secondary}">{rd["env_name"]}</text>')
-            parts.append(f'  <text x="{x_offset + 16}" y="{cy + 13}" font-family="{_FONT}" font-size="13" font-weight="600" fill="{text_primary}">{rd["name"]}</text>')
+            parts.append(f'  <text x="{x_offset + 16}" y="{ry + 18}" font-family="{_FONT}" font-size="10" fill="{text_secondary}">{rd["env_name"]}</text>')
+            parts.append(f'  <text x="{x_offset + 16}" y="{ry + 38}" font-family="{_FONT}" font-size="13" font-weight="600" fill="{text_primary}">{rd["name"]}</text>')
         else:
             parts.append(f'  <text x="{x_offset + 16}" y="{cy}" font-family="{_FONT}" font-size="13" font-weight="600" fill="{text_primary}">{rd["name"]}</text>')
         x_offset += cols[0][1]
