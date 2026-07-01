@@ -525,7 +525,7 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo], versions: dic
 
     # 列定义: (名称, 宽度, 对齐)
     cols = [
-        ('订阅', 180, 'left'),
+        ('订阅', 100, 'left'),
         ('流量使用', 280, 'left'),
         ('到期时间', 90, 'center'),
         ('状态', 70, 'center'),
