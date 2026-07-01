@@ -100,12 +100,13 @@ class Subscription:
     url: str
     filename: str
     use_gist: bool = False
+    env_name: str = ""
 
     @classmethod
-    def from_url(cls, url: str, name: str | None = None, use_gist: bool = False) -> Subscription:
+    def from_url(cls, url: str, name: str | None = None, use_gist: bool = False, env_name: str = "") -> Subscription:
         if name is None:
             name = _extract_name_from_url(url)
-        return cls(name=name, url=url, filename=f"{name}.yaml", use_gist=use_gist)
+        return cls(name=name, url=url, filename=f"{name}.yaml", use_gist=use_gist, env_name=env_name)
 
 
 @dataclass
@@ -118,6 +119,7 @@ class DownloadResult:
     filename: str = ""
     raw_content: str | None = None
     is_converted: bool = False  # True 表示内容已是从 Gist 备份获取的 sing-box 格式
+    env_name: str = ""
 
     @property
     def is_success(self) -> bool:
@@ -131,6 +133,7 @@ class SubscriptionInfo:
     flow: FlowInfo | None
     node_count: int
     from_backup: bool = False  # True 表示数据来自 Gist 备份
+    env_name: str = ""
 
 
 # ========== 基础工具函数 ==========

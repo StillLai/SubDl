@@ -123,9 +123,9 @@ def parse_subscriptions() -> list[Subscription]:
             use_gist = name.startswith("*")
             if use_gist:
                 name = name[1:]
-            sub = Subscription.from_url(url.strip(), name.strip(), use_gist=use_gist)
+            sub = Subscription.from_url(url.strip(), name.strip(), use_gist=use_gist, env_name=env_name)
         else:
-            sub = Subscription.from_url(value.strip())
+            sub = Subscription.from_url(value.strip(), env_name=env_name)
         if sub:
             subscriptions.append(sub)
     return subscriptions
@@ -147,12 +147,12 @@ def _download_subscription(sub: Subscription, user_agent: str) -> DownloadResult
         flow = parse_flow_info(response.headers)
         reason = _validate_subscription(content)
         if reason:
-            return DownloadResult(name=sub.name, status="invalid", flow=flow, reason=reason, filename=sub.filename)
+            return DownloadResult(name=sub.name, status="invalid", flow=flow, reason=reason, filename=sub.filename, env_name=sub.env_name)
 
-        return DownloadResult(name=sub.name, status="ok", flow=flow, filename=sub.filename, raw_content=content)
+        return DownloadResult(name=sub.name, status="ok", flow=flow, filename=sub.filename, raw_content=content, env_name=sub.env_name)
 
     except Exception as e:
-        return DownloadResult(name=sub.name, status="error", reason=str(e), filename=sub.filename)
+        return DownloadResult(name=sub.name, status="error", reason=str(e), filename=sub.filename, env_name=sub.env_name)
 
 
 def _download_all(subscriptions: list[Subscription], user_agent: str) -> list[DownloadResult]:
@@ -178,7 +178,7 @@ def _download_all(subscriptions: list[Subscription], user_agent: str) -> list[Do
     return results
 
 
-def _fetch_from_gist_fallback(sub_name: str, gist_id: str, gist_owner: str) -> DownloadResult | None:
+def _fetch_from_gist_fallback(sub_name: str, gist_id: str, gist_owner: str, env_name: str = "") -> DownloadResult | None:
     """当原始订阅下载失败时，尝试从 Gist 备份获取已转换的 sing-box 配置
 
     地址格式: https://gist.github.com/{gist_owner}/{gist_id}/raw/{sub_name}-singbox.json
@@ -195,7 +195,7 @@ def _fetch_from_gist_fallback(sub_name: str, gist_id: str, gist_owner: str) -> D
         log_info(f"  ✓ {sub_name}: 从 Gist 备份获取成功")
         return DownloadResult(
             name=sub_name, status="ok", filename=f"{sub_name}-singbox.json",
-            raw_content=content, is_converted=True,
+            raw_content=content, is_converted=True, env_name=env_name,
         )
     except Exception as e:
         log_warn(f"  Gist fallback 失败 ({sub_name}): {e}")
@@ -219,7 +219,7 @@ def _try_gist_fallback(
 
     with ThreadPoolExecutor(max_workers=min(len(failed_indices), _WORKERS)) as executor:
         futures = {
-            executor.submit(_fetch_from_gist_fallback, download_results[i].name, gist_id, gist_owner): i
+            executor.submit(_fetch_from_gist_fallback, download_results[i].name, gist_id, gist_owner, download_results[i].env_name): i
             for i in failed_indices
         }
         for future in as_completed(futures):
@@ -300,7 +300,7 @@ def _aggregate_results(
         if not result.is_success:
             skipped.append(f"{result.name} ({result.reason})")
             subscription_info.append(SubscriptionInfo(
-                name=result.name, flow=result.flow, node_count=0
+                name=result.name, flow=result.flow, node_count=0, env_name=result.env_name,
             ))
             continue
 
@@ -315,7 +315,7 @@ def _aggregate_results(
             except json.JSONDecodeError:
                 skipped.append(f"{result.name} (Gist 备份 JSON 解析失败)")
                 subscription_info.append(SubscriptionInfo(
-                    name=result.name, flow=result.flow, node_count=0
+                    name=result.name, flow=result.flow, node_count=0, env_name=result.env_name,
                 ))
                 continue
 
@@ -329,7 +329,7 @@ def _aggregate_results(
                 skipped.append(f"{result.name} (Gist 备份空节点)")
 
             subscription_info.append(SubscriptionInfo(
-                name=result.name, flow=result.flow, node_count=node_count, from_backup=True,
+                name=result.name, flow=result.flow, node_count=node_count, from_backup=True, env_name=result.env_name,
             ))
             continue
 
@@ -339,7 +339,7 @@ def _aggregate_results(
         if singbox_config is None:
             skipped.append(f"{result.name} (转换失败)")
             subscription_info.append(SubscriptionInfo(
-                name=result.name, flow=result.flow, node_count=0
+                name=result.name, flow=result.flow, node_count=0, env_name=result.env_name,
             ))
             continue
 
@@ -355,7 +355,7 @@ def _aggregate_results(
             skipped.append(f"{result.name} (空节点)")
 
         subscription_info.append(SubscriptionInfo(
-            name=result.name, flow=result.flow, node_count=node_count
+            name=result.name, flow=result.flow, node_count=node_count, env_name=result.env_name,
         ))
 
     if skipped:
@@ -525,7 +525,7 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo], versions: dic
 
     # 列定义: (名称, 宽度, 对齐)
     cols = [
-        ('订阅', 100, 'left'),
+        ('订阅', 180, 'left'),
         ('流量使用', 280, 'left'),
         ('到期时间', 90, 'center'),
         ('状态', 70, 'center'),
@@ -545,6 +545,7 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo], versions: dic
     total_nodes = 0
     for info in subscription_info:
         name_display = _esc(info.name)
+        env_name_display = _esc(info.env_name) if info.env_name else ''
         if info.from_backup:
             name_display += ' 📦'
         if info.flow:
@@ -558,6 +559,7 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo], versions: dic
                 status_color = accent_orange
             remaining = f.total - used if f.total > 0 else 0
             rows_data.append({
+                'env_name': env_name_display,
                 'name': name_display,
                 'used': _fmt_bytes(used),
                 'total': _fmt_bytes(f.total),
@@ -573,6 +575,7 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo], versions: dic
             status_text = '📦 备份' if info.from_backup else '❓ 无信息'
             status_color = accent_orange if info.from_backup else text_secondary
             rows_data.append({
+                'env_name': env_name_display,
                 'name': name_display, 'used': '—', 'total': '—', 'remaining': '—',
                 'pct': 0, 'bar_color': text_secondary, 'expire': '—',
                 'status': status_text, 'status_color': status_color, 'nodes': str(info.node_count),
@@ -653,8 +656,12 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo], versions: dic
         x_offset = pad
         cy = ry + row_h // 2 + 5
 
-        # 订阅名
-        parts.append(f'  <text x="{x_offset + 16}" y="{cy}" font-family="{_FONT}" font-size="13" font-weight="600" fill="{text_primary}">{rd["name"]}</text>')
+        # 环境变量名 + 订阅名
+        if rd.get("env_name"):
+            parts.append(f'  <text x="{x_offset + 16}" y="{cy - 2}" font-family="{_FONT}" font-size="10" fill="{text_secondary}">{rd["env_name"]}</text>')
+            parts.append(f'  <text x="{x_offset + 16}" y="{cy + 13}" font-family="{_FONT}" font-size="13" font-weight="600" fill="{text_primary}">{rd["name"]}</text>')
+        else:
+            parts.append(f'  <text x="{x_offset + 16}" y="{cy}" font-family="{_FONT}" font-size="13" font-weight="600" fill="{text_primary}">{rd["name"]}</text>')
         x_offset += cols[0][1]
 
         # 流量使用 - 文字 + 进度条
