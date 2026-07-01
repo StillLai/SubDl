@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - 'config_template/sing-box_template.jsonc'
+      - 'config_template/**'
 
 # 防止多次运行重叠（保证 Gist 状态一致）
 concurrency:
