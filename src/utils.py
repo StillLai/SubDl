@@ -3,8 +3,6 @@
 集中管理常量、日志、文件IO、网络请求等基础功能。
 """
 
-from __future__ import annotations
-
 import hashlib
 import json
 import sys
@@ -63,15 +61,6 @@ def log_warn(msg: str) -> None:
 
 def log_error(msg: str) -> None:
     _log("ERROR", msg)
-
-
-# 兼容旧导入: from utils import logger
-class logger:
-    """兼容层 —— 新代码请直接使用 log_debug / log_info / log_warn / log_error"""
-    debug = staticmethod(log_debug)
-    info = staticmethod(log_info)
-    warn = staticmethod(log_warn)
-    error = staticmethod(log_error)
 
 
 # ========== 数据模型 ==========
@@ -182,7 +171,10 @@ def http_get_with_retry(
     max_retries: int = HTTP_RETRY,
     backoff_factor: int = 2,
 ) -> HttpResponse:
-    """HTTP GET with exponential backoff retry"""
+    """HTTP GET with exponential backoff retry
+
+    仅对可重试状态码（429/5xx）进行重试，其他 4xx 错误立即失败。
+    """
     last_error: Exception | None = None
 
     for attempt in range(1, max_retries + 1):
@@ -195,12 +187,12 @@ def http_get_with_retry(
             resp = http_request('GET', url, headers=headers, timeout=timeout)
 
             if resp.status_code >= 400:
-                if resp.status_code in _RETRYABLE_CODES:
-                    raise HTTPError(url='', code=resp.status_code, msg=f"HTTP {resp.status_code}", hdrs=None, fp=None)
                 raise HTTPError(url='', code=resp.status_code, msg=f"HTTP {resp.status_code}", hdrs=None, fp=None)
             return resp
 
         except (HTTPError, URLError, OSError) as e:
+            if isinstance(e, HTTPError) and e.code not in _RETRYABLE_CODES:
+                raise
             last_error = e
             log_debug(f"  请求失败: {e}")
 

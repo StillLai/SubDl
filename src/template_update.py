@@ -8,8 +8,6 @@
 与 Subscriptions Update 完全解耦，可单独运行。
 """
 
-from __future__ import annotations
-
 import copy
 import json
 from typing import Any

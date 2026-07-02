@@ -10,8 +10,6 @@ Sing-box 配置合并模块
 4. 处理空 outbound 的兼容性问题
 """
 
-from __future__ import annotations
-
 import copy
 import re
 from typing import Any

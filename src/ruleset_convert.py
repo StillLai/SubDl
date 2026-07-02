@@ -1,7 +1,5 @@
 """规则集转换脚本 — 将 Clash/Surge 等规则源转换为 sing-box 格式"""
 
-from __future__ import annotations
-
 import json
 import csv
 import subprocess

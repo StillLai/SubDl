@@ -8,8 +8,6 @@
   4. 合并配置、生成 README、上传 Gist
 """
 
-from __future__ import annotations
-
 import base64
 import json
 import os
@@ -366,16 +364,16 @@ def _aggregate_results(
 
 # ========== 模板处理 ==========
 
-def _load_templates() -> list[tuple[str, str, dict[str, Any]]]:
+def _load_templates() -> list[tuple[str, dict[str, Any]]]:
     """加载所有模板并缓存，避免重复磁盘 I/O"""
     if not TEMPLATE_DIR.is_dir():
         return []
-    templates: list[tuple[str, str, dict[str, Any]]] = []
+    templates: list[tuple[str, dict[str, Any]]] = []
     for f in sorted(TEMPLATE_DIR.iterdir()):
         if not f.is_file():
             continue
         try:
-            templates.append((str(f), f.stem, load_jsonc(f)))
+            templates.append((f.stem, load_jsonc(f)))
         except Exception as e:
             log_error(f"  模板加载失败 {f}: {e}")
     return templates
@@ -383,14 +381,14 @@ def _load_templates() -> list[tuple[str, str, dict[str, Any]]]:
 
 def merge_all_templates(
     subs_nodes_dict: dict[str, list[dict[str, Any]]],
-    templates: list[tuple[str, str, dict[str, Any]]],
+    templates: list[tuple[str, dict[str, Any]]],
 ) -> dict[str, str]:
     """遍历所有模板文件并生成合并配置"""
     total_nodes = sum(len(nodes) for nodes in subs_nodes_dict.values())
     results: dict[str, str] = {}
-    for path, base_name, template in templates:
+    for base_name, template in templates:
         config_filename = base_name + '.json'
-        log_info(f"  → 处理模板: {os.path.basename(path)}")
+        log_info(f"  → 处理模板: {base_name}.jsonc")
         try:
             merged = merge_config(template, subs_nodes_dict)
         except Exception as e:
@@ -404,7 +402,7 @@ def merge_all_templates(
 
 def generate_provider_configs(
     sub_url_map: dict[str, str],
-    templates: list[tuple[str, str, dict[str, Any]]],
+    templates: list[tuple[str, dict[str, Any]]],
     gist_subs: set[str] | None = None,
     gist_owner: str = '',
     gist_id: str = '',
@@ -420,7 +418,7 @@ def generate_provider_configs(
     """
     gist_subs = gist_subs or set()
     results: dict[str, str] = {}
-    for path, base_name, template in templates:
+    for base_name, template in templates:
         try:
             filled = 0
             for provider in template.get('providers', []):
@@ -433,37 +431,44 @@ def generate_provider_configs(
                     filled += 1
             if filled > 0:
                 config_filename = base_name + '-providers.json'
-                log_debug(f"  → {os.path.basename(path)} -> {config_filename} ({filled} 个 providers)")
+                log_debug(f"  → {base_name}.jsonc -> {config_filename} ({filled} 个 providers)")
                 results[config_filename] = json.dumps(template, indent=2, ensure_ascii=False)
         except Exception as e:
-            log_error(f"  Provider 配置生成异常 {path}: {e}")
+            log_error(f"  Provider 配置生成异常 {base_name}: {e}")
     return results
 
 
 # ========== 版本获取 ==========
 
+def _fetch_version(repo: str, headers: dict[str, str]) -> str:
+    """获取单个仓库的最新 release 版本"""
+    try:
+        resp = http_get_with_retry(
+            f"https://api.github.com/repos/{repo}/releases/latest",
+            headers=headers,
+        )
+        return json.loads(resp.text).get('tag_name', '未知')
+    except Exception as e:
+        log_warn(f"获取 {repo} 版本失败: {e}")
+        return '获取失败'
+
+
 def fetch_latest_versions() -> dict[str, str]:
-    """通过 GitHub API 获取 sing-box 官方版和 reF1nd 分支的最新 release 版本"""
+    """通过 GitHub API 并行获取 sing-box 官方版和 reF1nd 分支的最新 release 版本"""
     repos = {
         'official': 'SagerNet/sing-box',
         'reF1nd': 'reF1nd/sing-box-releases',
     }
-    versions: dict[str, str] = {}
     headers: dict[str, str] = {"Accept": "application/vnd.github.v3+json"}
     gh_token = os.environ.get("GH_TOKEN")
     if gh_token:
         headers["Authorization"] = f"token {gh_token}"
-    for key, repo in repos.items():
-        try:
-            resp = http_get_with_retry(
-                f"https://api.github.com/repos/{repo}/releases/latest",
-                headers=headers,
-            )
-            data = json.loads(resp.text)
-            versions[key] = data.get('tag_name', '未知')
-        except Exception as e:
-            log_warn(f"获取 {repo} 版本失败: {e}")
-            versions[key] = '获取失败'
+
+    versions: dict[str, str] = {}
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = {executor.submit(_fetch_version, repo, headers): key for key, repo in repos.items()}
+        for future in as_completed(futures):
+            versions[futures[future]] = future.result()
     return versions
 
 
@@ -500,8 +505,7 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo], versions: dic
         return "✅ 正常", accent_green
 
     def _esc(s: str) -> str:
-        a = '&'
-        return s.replace(a, a + 'amp;').replace('<', a + 'lt;').replace('>', a + 'gt;')
+        return s.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
 
     now = datetime.now(timezone(timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S CST')
 
@@ -736,18 +740,13 @@ def upload_to_gist(github_token: str, gist_id: str, files: dict[str, str]) -> No
 
 # ========== 主流程 ==========
 
-def _get_gist_owner(github_token: str) -> str | None:
+def _get_gist_owner(github_token: str) -> str:
     """通过 GitHub API 获取当前认证用户的用户名"""
-    try:
-        headers = {"Authorization": f"token {github_token}", "Accept": "application/vnd.github.v3+json"}
-        resp = http_request("GET", "https://api.github.com/user", headers=headers)
-        if resp.status_code >= 400:
-            log_warn(f"获取 Gist 所有者用户名失败: HTTP {resp.status_code}")
-            return None
-        return json.loads(resp.text).get("login")
-    except Exception as e:
-        log_warn(f"获取 Gist 所有者用户名失败: {e}")
-        return None
+    headers = {"Authorization": f"token {github_token}", "Accept": "application/vnd.github.v3+json"}
+    resp = http_request("GET", "https://api.github.com/user", headers=headers)
+    if resp.status_code >= 400:
+        raise Exception(f"获取 Gist 所有者失败: HTTP {resp.status_code}")
+    return json.loads(resp.text)["login"]
 
 
 def _generate_and_upload(
@@ -757,7 +756,7 @@ def _generate_and_upload(
     subscription_info: list[SubscriptionInfo],
     github_token: str,
     gist_id: str,
-    gist_owner: str = '',
+    gist_owner: str,
 ) -> None:
     """生成合并配置、providers 配置，并上传到 Gist"""
 
@@ -767,10 +766,7 @@ def _generate_and_upload(
 
     gist_subs = {sub.name for sub in subscriptions if sub.use_gist}
     if gist_subs:
-        if gist_owner:
-            log_info(f"  → {len(gist_subs)} 个订阅的 provider 将指向 Gist: {gist_owner}/{gist_id}")
-        else:
-            log_warn(f"  ⚠ 无法获取 Gist 所有者，provider 将使用原始订阅 URL")
+        log_info(f"  → {len(gist_subs)} 个订阅的 provider 将指向 Gist: {gist_owner}/{gist_id}")
 
     merged = merge_all_templates(subs_nodes_dict, templates)
     files.update(merged)
@@ -809,6 +805,8 @@ def main() -> None:
     if not gist_id:
         log_error("环境变量 GIST_ID 未设置，请在 GitHub Secrets 中手动配置")
         sys.exit(1)
+    gist_owner = _get_gist_owner(github_token)
+    log_info(f"Gist 所有者: {gist_owner}")
 
     subscriptions = parse_subscriptions()
     if not subscriptions:
@@ -820,13 +818,7 @@ def main() -> None:
     download_results = _download_all(subscriptions, USER_AGENT)
     log_info("::endgroup::")
 
-    gist_owner = os.environ.get("GIST_OWNER") or ''
-    if not gist_owner:
-        gist_owner = _get_gist_owner(github_token) or ''
-    if gist_owner:
-        download_results = _try_gist_fallback(download_results, gist_id, gist_owner)
-    else:
-        log_warn("⚠ 无法获取 Gist 所有者，跳过 fallback")
+    download_results = _try_gist_fallback(download_results, gist_id, gist_owner)
 
     valid_results = [r for r in download_results if r.is_success]
     if not valid_results:
