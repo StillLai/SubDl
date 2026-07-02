@@ -3,6 +3,8 @@
 集中管理常量、日志、文件IO、网络请求等基础功能。
 """
 
+from __future__ import annotations
+
 import hashlib
 import json
 import sys
