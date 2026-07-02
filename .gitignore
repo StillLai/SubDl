@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDE & AI tools
+.vscode/
+.idea/
+.kilo/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Local config
+.env
+.env.local
+config.local.*
+
+# Sub-Store dependency (auto-downloaded)
+src/deps/
+
+# Node.js
+src/node_modules/
+
+# 自动生成的规则集文件（由 GitHub Action 生成，不需要本地跟踪）
+ruleset/json/
+ruleset/srs/
+data/rules_archive.tar
+
+# 状态 SVG（每次自动生成，推送到 gh-pages 分支，不需要本地跟踪）
+status.svg
