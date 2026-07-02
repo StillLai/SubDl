@@ -21,7 +21,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Any
 
 from utils import (
-    log_debug, log_info, log_warn, log_error,
+    log_info, log_warn, log_error,
     load_jsonc, http_get_with_retry, http_request,
     FlowInfo, Subscription, DownloadResult, SubscriptionInfo,
     PROJECT_ROOT, TEMPLATE_DIR, CONVERT_SCRIPT, USER_AGENT,
@@ -139,7 +139,7 @@ def _download_subscription(sub: Subscription, user_agent: str) -> DownloadResult
 
         decoded = _try_decode_base64(content)
         if decoded is not content:
-            log_debug(f"    {sub.name}: 内容已从 Base64 解码")
+            log_info(f"    {sub.name}: 内容已从 Base64 解码")
             content = decoded
 
         flow = parse_flow_info(response.headers)
@@ -169,7 +169,7 @@ def _download_all(subscriptions: list[Subscription], user_agent: str) -> list[Do
             result = future.result()
             results[index_map[sub]] = result
             if result.is_success:
-                log_debug(f"  ✓ {result.name}: 下载成功")
+                log_info(f"  ✓ {result.name}: 下载成功")
             else:
                 log_warn(f"  ✗ {result.name}: {result.reason}")
 
@@ -275,6 +275,12 @@ def _convert_batch(contents_dict: dict[str, str]) -> dict[str, dict[str, Any] | 
 
 # ========== 结果聚合 ==========
 
+
+def _get_singbox_nodes(config: dict[str, Any]) -> list[dict[str, Any]]:
+    """从 sing-box 配置中提取所有节点（outbounds + endpoints）"""
+    return config.get('outbounds', []) + config.get('endpoints', [])
+
+
 def _aggregate_results(
     download_results: list[DownloadResult],
 ) -> tuple[dict[str, str], list[SubscriptionInfo], dict[str, list[dict[str, Any]]]]:
@@ -317,7 +323,7 @@ def _aggregate_results(
                 ))
                 continue
 
-            singbox_nodes = singbox_config.get('outbounds', []) + singbox_config.get('endpoints', [])
+            singbox_nodes = _get_singbox_nodes(singbox_config)
             node_count = len(singbox_nodes)
 
             if node_count > 0:
@@ -341,7 +347,7 @@ def _aggregate_results(
             ))
             continue
 
-        singbox_nodes = singbox_config.get('outbounds', []) + singbox_config.get('endpoints', [])
+        singbox_nodes = _get_singbox_nodes(singbox_config)
         node_count = len(singbox_nodes)
         singbox_content = json.dumps(singbox_config, indent=2, ensure_ascii=False)
         files[f"{result.name}-singbox.json"] = singbox_content
@@ -365,13 +371,14 @@ def _aggregate_results(
 # ========== 模板处理 ==========
 
 def _load_templates() -> list[tuple[str, dict[str, Any]]]:
-    """加载所有模板并缓存，避免重复磁盘 I/O"""
+    """加载所有 .json/.jsonc 模板并缓存，避免重复磁盘 I/O"""
     if not TEMPLATE_DIR.is_dir():
         return []
     templates: list[tuple[str, dict[str, Any]]] = []
-    for f in sorted(TEMPLATE_DIR.iterdir()):
-        if not f.is_file():
-            continue
+    for f in sorted(
+        p for p in TEMPLATE_DIR.iterdir()
+        if p.suffix in ('.json', '.jsonc')
+    ):
         try:
             templates.append((f.stem, load_jsonc(f)))
         except Exception as e:
@@ -431,7 +438,7 @@ def generate_provider_configs(
                     filled += 1
             if filled > 0:
                 config_filename = base_name + '-providers.json'
-                log_debug(f"  → {base_name}.jsonc -> {config_filename} ({filled} 个 providers)")
+                log_info(f"  → {base_name}.jsonc -> {config_filename} ({filled} 个 providers)")
                 results[config_filename] = json.dumps(template, indent=2, ensure_ascii=False)
         except Exception as e:
             log_error(f"  Provider 配置生成异常 {base_name}: {e}")
@@ -472,126 +479,125 @@ def fetch_latest_versions() -> dict[str, str]:
     return versions
 
 
-# ========== SVG 状态图生成 ==========
+# ========== SVG 工具函数 ==========
 
-def generate_status_svg(subscription_info: list[SubscriptionInfo], versions: dict[str, str] | None = None) -> str:
-    """生成订阅状态 SVG 图片（浅色高级感风格）"""
+def _fmt_bytes(n: int) -> str:
+    """格式化字节数为人类可读形式"""
+    if n == 0:
+        return "0 B"
+    units = ('B', 'KB', 'MB', 'GB', 'TB')
+    i = min(int(n.bit_length() - 1) // 10, len(units) - 1)
+    return f"{n / (1024 ** i):.2f} {units[i]}"
 
-    def _fmt_bytes(n: int) -> str:
-        if n == 0:
-            return "0 B"
-        units = ('B', 'KB', 'MB', 'GB', 'TB')
-        i = min(int(n.bit_length() - 1) // 10, len(units) - 1)
-        return f"{n / (1024 ** i):.2f} {units[i]}"
 
-    def _fmt_expire(ts: int | None) -> str:
-        if not ts:
-            return "无"
-        try:
-            return datetime.fromtimestamp(ts, tz=timezone(timedelta(hours=8))).strftime("%Y-%m-%d")
-        except Exception:
-            return "无"
+def _fmt_expire(ts: int | None) -> str:
+    """格式化过期时间戳"""
+    if not ts:
+        return "无"
+    try:
+        return datetime.fromtimestamp(ts, tz=timezone(timedelta(hours=8))).strftime("%Y-%m-%d")
+    except Exception:
+        return "无"
 
-    def _flow_status(f: FlowInfo) -> tuple[str, str]:
-        """返回 (status_text, color)"""
-        now = time.time()
-        if f.expire and f.expire < now:
-            return "❌ 已过期", accent_red
-        used = f.upload + f.download
-        if f.total > 0 and used >= f.total:
-            return "❌ 流量用完", accent_red
-        if f.expire and f.expire - now < 7 * 24 * 3600:
-            return "⚠️ 即将到期", accent_orange
-        return "✅ 正常", accent_green
 
-    def _esc(s: str) -> str:
-        return s.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+def _svg_esc(s: str) -> str:
+    """SVG 特殊字符转义"""
+    return s.replace('&', '&').replace('<', '<').replace('>', '>')
 
-    now = datetime.now(timezone(timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S CST')
 
-    # 配色
-    bg_color = '#f0f2f5'
-    border_color = '#e2e8f0'
-    text_primary = '#1e293b'
-    text_secondary = '#64748b'
-    accent_blue = '#3b82f6'
-    accent_green = '#10b981'
-    accent_orange = '#f59e0b'
-    accent_red = '#ef4444'
-    bar_bg = '#e2e8f0'
+# ---------- SVG 常量 ----------
 
-    # 布局参数
-    pad = 20
-    card_radius = 12
-    row_h = 56
-    title_h = 70
-    col_header_h = 36
+_SVG_PAD = 20
+_SVG_ROW_H = 56
+_SVG_TITLE_H = 70
+_SVG_COL_HEADER_H = 36
+_SVG_COLS: list[tuple[str, int]] = [
+    ('订阅', 100), ('流量使用', 280), ('到期时间', 90), ('状态', 70), ('节点', 60),
+]
+_SVG_BAR_GRAD_MAP: dict[str, str] = {
+    '#10b981': 'barGreenGrad', '#f59e0b': 'barOrangeGrad', '#ef4444': 'barRedGrad',
+}
 
-    # 列定义: (名称, 宽度, 对齐)
-    cols = [
-        ('订阅', 100, 'left'),
-        ('流量使用', 280, 'left'),
-        ('到期时间', 90, 'center'),
-        ('状态', 70, 'center'),
-        ('节点', 60, 'center'),
-    ]
-    svg_w = sum(c[1] for c in cols) + pad * 2
-    content_w = svg_w - pad * 2
+_C_BG = '#f0f2f5'
+_C_BORDER = '#e2e8f0'
+_C_TEXT_PRI = '#1e293b'
+_C_TEXT_SEC = '#64748b'
+_C_BLUE = '#3b82f6'
+_C_GREEN = '#10b981'
+_C_ORANGE = '#f59e0b'
+_C_RED = '#ef4444'
+_C_BAR_BG = '#e2e8f0'
 
-    rows_total_h = len(subscription_info) * row_h
-    footer_h = 56
-    version_h = 52 if versions else 0
-    svg_h = title_h + col_header_h + rows_total_h + footer_h + version_h + pad * 2
 
-    # 收集数据行
-    _BAR_GRAD_MAP = {accent_green: 'barGreenGrad', accent_orange: 'barOrangeGrad', accent_red: 'barRedGrad'}
-    rows_data = []
+def _flow_status_text(flow: FlowInfo) -> tuple[str, str]:
+    """返回 (状态文本, 颜色)"""
+    now = time.time()
+    if flow.expire and flow.expire < now:
+        return "❌ 已过期", _C_RED
+    used = flow.upload + flow.download
+    if flow.total > 0 and used >= flow.total:
+        return "❌ 流量用完", _C_RED
+    if flow.expire and flow.expire - now < 7 * 24 * 3600:
+        return "⚠️ 即将到期", _C_ORANGE
+    return "✅ 正常", _C_GREEN
+
+
+# ---------- SVG 子构建函数 ----------
+
+def _build_svg_rows_data(
+    subscription_info: list[SubscriptionInfo],
+) -> tuple[list[dict[str, Any]], int]:
+    """收集 SVG 数据行，返回 (rows_data, total_nodes)"""
+    rows_data: list[dict[str, Any]] = []
     total_nodes = 0
+
     for info in subscription_info:
-        name_display = _esc(info.name)
-        env_name_display = _esc(info.env_name) if info.env_name else ''
+        name_display = _svg_esc(info.name)
+        env_name_display = _svg_esc(info.env_name) if info.env_name else ''
         if info.from_backup:
             name_display += ' 📦'
+
         if info.flow:
             f = info.flow
             used = f.upload + f.download
             pct = min(used / f.total * 100, 100.0) if f.total > 0 else 0.0
-            bar_color = accent_red if pct >= 90 else (accent_orange if pct >= 70 else accent_green)
-            status_text, status_color = _flow_status(f)
+            bar_color = _C_RED if pct >= 90 else (_C_ORANGE if pct >= 70 else _C_GREEN)
+            status_text, status_color = _flow_status_text(f)
             if info.from_backup:
-                status_text = '📦 备份'
-                status_color = accent_orange
+                status_text, status_color = '📦 备份', _C_ORANGE
             remaining = f.total - used if f.total > 0 else 0
             rows_data.append({
-                'env_name': env_name_display,
-                'name': name_display,
-                'used': _fmt_bytes(used),
-                'total': _fmt_bytes(f.total),
-                'remaining': _fmt_bytes(remaining),
-                'pct': pct,
-                'bar_color': bar_color,
-                'expire': _fmt_expire(f.expire),
-                'status': status_text,
-                'status_color': status_color,
+                'env_name': env_name_display, 'name': name_display,
+                'used': _fmt_bytes(used), 'total': _fmt_bytes(f.total),
+                'remaining': _fmt_bytes(remaining), 'pct': pct,
+                'bar_color': bar_color, 'expire': _fmt_expire(f.expire),
+                'status': status_text, 'status_color': status_color,
                 'nodes': str(info.node_count),
             })
         else:
             status_text = '📦 备份' if info.from_backup else '❓ 无信息'
-            status_color = accent_orange if info.from_backup else text_secondary
+            status_color = _C_ORANGE if info.from_backup else _C_TEXT_SEC
             rows_data.append({
-                'env_name': env_name_display,
-                'name': name_display, 'used': '—', 'total': '—', 'remaining': '—',
-                'pct': 0, 'bar_color': text_secondary, 'expire': '—',
-                'status': status_text, 'status_color': status_color, 'nodes': str(info.node_count),
+                'env_name': env_name_display, 'name': name_display,
+                'used': '—', 'total': '—', 'remaining': '—',
+                'pct': 0, 'bar_color': _C_TEXT_SEC, 'expire': '—',
+                'status': status_text, 'status_color': status_color,
+                'nodes': str(info.node_count),
             })
         total_nodes += info.node_count
 
-    # 构建 SVG
-    parts = [
+    return rows_data, total_nodes
+
+
+def _build_svg_header(
+    svg_w: int, svg_h: int, content_w: int,
+    sub_count: int, total_nodes: int, now: str,
+) -> list[str]:
+    """构建 SVG 头部：根元素 + 背景 + 渐变/滤镜 + 标题栏"""
+    p = _SVG_PAD
+    return [
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{svg_w}" height="{svg_h}" viewBox="0 0 {svg_w} {svg_h}">',
-        # 背景
-        f'  <rect width="{svg_w}" height="{svg_h}" rx="{card_radius}" fill="{bg_color}"/>',
-        # 渐变和滤镜定义
+        f'  <rect width="{svg_w}" height="{svg_h}" rx="12" fill="{_C_BG}"/>',
         '  <defs>',
         '    <linearGradient id="headerGrad" x1="0" y1="0" x2="1" y2="0">',
         '      <stop offset="0%" stop-color="#f0f4fa"/>',
@@ -618,111 +624,139 @@ def generate_status_svg(subscription_info: list[SubscriptionInfo], versions: dic
         '      <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000000" flood-opacity="0.06"/>',
         '    </filter>',
         '  </defs>',
-        # 标题栏
-        f'  <rect x="{pad}" y="{pad}" width="{content_w}" height="{title_h}" rx="8" fill="url(#headerGrad)" filter="url(#cardShadow)"/>',
-        f'  <rect x="{pad}" y="{pad}" width="4" height="{title_h}" rx="2" fill="url(#accentGrad)"/>',
-        f'  <line x1="{pad}" y1="{pad + title_h - 1}" x2="{pad + content_w}" y2="{pad + title_h - 1}" stroke="{border_color}" stroke-width="1"/>',
-        # 标题文字
-        f'  <text x="{pad + 20}" y="{pad + 32}" font-family="{_FONT}" font-size="18" font-weight="bold" fill="{text_primary}">SubDl</text>',
-        f'  <text x="{pad + 80}" y="{pad + 32}" font-family="{_FONT}" font-size="18" fill="{text_secondary}">订阅状态</text>',
-        f'  <text x="{pad + content_w - 20}" y="{pad + 32}" text-anchor="end" font-family="{_FONT}" font-size="11" fill="{text_secondary}">{_esc(now)}</text>',
-        # 统计摘要
-        f'  <text x="{pad + 20}" y="{pad + 56}" font-family="{_FONT}" font-size="12" fill="{text_secondary}">共 {len(subscription_info)} 个订阅 · {total_nodes} 个节点</text>',
+        f'  <rect x="{p}" y="{p}" width="{content_w}" height="{_SVG_TITLE_H}" rx="8" fill="url(#headerGrad)" filter="url(#cardShadow)"/>',
+        f'  <rect x="{p}" y="{p}" width="4" height="{_SVG_TITLE_H}" rx="2" fill="url(#accentGrad)"/>',
+        f'  <line x1="{p}" y1="{p + _SVG_TITLE_H - 1}" x2="{p + content_w}" y2="{p + _SVG_TITLE_H - 1}" stroke="{_C_BORDER}" stroke-width="1"/>',
+        f'  <text x="{p + 20}" y="{p + 32}" font-family="{_FONT}" font-size="18" font-weight="bold" fill="{_C_TEXT_PRI}">SubDl</text>',
+        f'  <text x="{p + 80}" y="{p + 32}" font-family="{_FONT}" font-size="18" fill="{_C_TEXT_SEC}">订阅状态</text>',
+        f'  <text x="{p + content_w - 20}" y="{p + 32}" text-anchor="end" font-family="{_FONT}" font-size="11" fill="{_C_TEXT_SEC}">{_svg_esc(now)}</text>',
+        f'  <text x="{p + 20}" y="{p + 56}" font-family="{_FONT}" font-size="12" fill="{_C_TEXT_SEC}">共 {sub_count} 个订阅 · {total_nodes} 个节点</text>',
     ]
 
+
+def _build_svg_table(
+    rows_data: list[dict[str, Any]], content_w: int, table_y: int,
+) -> list[str]:
+    """构建 SVG 表格：列标题 + 数据行"""
+    p = _SVG_PAD
+    parts: list[str] = []
+
     # 列标题
-    col_y = pad + title_h + 8
-    x_offset = pad
-    for col_name, col_w, _ in cols:
-        if col_name in ('订阅', '流量使用'):
-            tx = x_offset + 16
-            anchor = 'start'
-        else:
-            tx = x_offset + col_w // 2
-            anchor = 'middle'
+    x_offset = p
+    for col_name, col_w in _SVG_COLS:
+        tx = x_offset + 16 if col_name in ('订阅', '流量使用') else x_offset + col_w // 2
+        anchor = 'start' if col_name in ('订阅', '流量使用') else 'middle'
         parts.append(
-            f'  <text x="{tx}" y="{col_y + 22}" text-anchor="{anchor}"'
+            f'  <text x="{tx}" y="{table_y + 22}" text-anchor="{anchor}"'
             f' font-family="{_FONT}"'
-            f' font-size="11" font-weight="600" fill="{text_secondary}" letter-spacing="0.5">{col_name}</text>'
+            f' font-size="11" font-weight="600" fill="{_C_TEXT_SEC}" letter-spacing="0.5">{col_name}</text>'
         )
         x_offset += col_w
-    parts.append(f'  <line x1="{pad}" y1="{col_y + col_header_h}" x2="{pad + content_w}" y2="{col_y + col_header_h}" stroke="{border_color}" stroke-width="1"/>')
+    parts.append(f'  <line x1="{p}" y1="{table_y + _SVG_COL_HEADER_H}" x2="{p + content_w}" y2="{table_y + _SVG_COL_HEADER_H}" stroke="{_C_BORDER}" stroke-width="1"/>')
 
     # 数据行
-    rows_start_y = col_y + col_header_h
+    rows_start_y = table_y + _SVG_COL_HEADER_H
     for i, rd in enumerate(rows_data):
-        ry = rows_start_y + i * row_h
+        ry = rows_start_y + i * _SVG_ROW_H
         if i % 2 == 1:
-            parts.append(f'  <rect x="{pad}" y="{ry}" width="{content_w}" height="{row_h}" fill="#f8fafd"/>')
+            parts.append(f'  <rect x="{p}" y="{ry}" width="{content_w}" height="{_SVG_ROW_H}" fill="#f8fafd"/>')
         if i > 0:
-            parts.append(f'  <line x1="{pad + 16}" y1="{ry}" x2="{pad + content_w - 16}" y2="{ry}" stroke="{border_color}" stroke-width="0.5"/>')
+            parts.append(f'  <line x1="{p + 16}" y1="{ry}" x2="{p + content_w - 16}" y2="{ry}" stroke="{_C_BORDER}" stroke-width="0.5"/>')
 
-        x_offset = pad
-        cy = ry + row_h // 2 + 5
+        x_offset = p
+        cy = ry + _SVG_ROW_H // 2 + 5
 
         # 环境变量名 + 订阅名
         if rd.get("env_name"):
-            parts.append(f'  <text x="{x_offset + 16}" y="{ry + 18}" font-family="{_FONT}" font-size="10" fill="{text_secondary}">{rd["env_name"]}</text>')
-            parts.append(f'  <text x="{x_offset + 16}" y="{ry + 38}" font-family="{_FONT}" font-size="13" font-weight="600" fill="{text_primary}">{rd["name"]}</text>')
+            parts.append(f'  <text x="{x_offset + 16}" y="{ry + 18}" font-family="{_FONT}" font-size="10" fill="{_C_TEXT_SEC}">{rd["env_name"]}</text>')
+            parts.append(f'  <text x="{x_offset + 16}" y="{ry + 38}" font-family="{_FONT}" font-size="13" font-weight="600" fill="{_C_TEXT_PRI}">{rd["name"]}</text>')
         else:
-            parts.append(f'  <text x="{x_offset + 16}" y="{cy}" font-family="{_FONT}" font-size="13" font-weight="600" fill="{text_primary}">{rd["name"]}</text>')
-        x_offset += cols[0][1]
+            parts.append(f'  <text x="{x_offset + 16}" y="{cy}" font-family="{_FONT}" font-size="13" font-weight="600" fill="{_C_TEXT_PRI}">{rd["name"]}</text>')
+        x_offset += _SVG_COLS[0][1]
 
-        # 流量使用 - 文字 + 进度条
+        # 流量使用 - 进度条 + 文字
         bar_x = x_offset + 16
         bar_y = ry + 12
-        bar_w = cols[1][1] - 32
-        bar_h = 8
+        bar_w = _SVG_COLS[1][1] - 32
         fill_w = max(bar_w * rd['pct'] / 100, 0)
-        parts.append(f'  <rect x="{bar_x}" y="{bar_y}" width="{bar_w}" height="{bar_h}" rx="4" fill="{bar_bg}"/>')
+        parts.append(f'  <rect x="{bar_x}" y="{bar_y}" width="{bar_w}" height="8" rx="4" fill="{_C_BAR_BG}"/>')
         if fill_w > 0:
-            bar_grad = _BAR_GRAD_MAP.get(rd['bar_color'])
+            bar_grad = _SVG_BAR_GRAD_MAP.get(rd['bar_color'])
             fill_val = f"url(#{bar_grad})" if bar_grad else rd['bar_color']
-            parts.append(f'  <rect x="{bar_x}" y="{bar_y}" width="{fill_w}" height="{bar_h}" rx="4" fill="{fill_val}"/>')
-        flow_text = f'{rd["used"]} / {rd["total"]}  ({rd["pct"]:.0f}%)'
-        remaining_text = f'剩余: {rd["remaining"]}'
-        parts.append(f'  <text x="{bar_x}" y="{bar_y + bar_h + 16}" font-family="{_FONT}" font-size="11" fill="{text_secondary}">{flow_text}  {remaining_text}</text>')
-        x_offset += cols[1][1]
+            parts.append(f'  <rect x="{bar_x}" y="{bar_y}" width="{fill_w}" height="8" rx="4" fill="{fill_val}"/>')
+        parts.append(f'  <text x="{bar_x}" y="{bar_y + 24}" font-family="{_FONT}" font-size="11" fill="{_C_TEXT_SEC}">{rd["used"]} / {rd["total"]}  ({rd["pct"]:.0f}%)  剩余: {rd["remaining"]}</text>')
+        x_offset += _SVG_COLS[1][1]
 
         # 到期时间
-        parts.append(f'  <text x="{x_offset + cols[2][1] // 2}" y="{cy}" text-anchor="middle" font-family="{_FONT}" font-size="12" fill="{text_secondary}">{rd["expire"]}</text>')
-        x_offset += cols[2][1]
+        parts.append(f'  <text x="{x_offset + _SVG_COLS[2][1] // 2}" y="{cy}" text-anchor="middle" font-family="{_FONT}" font-size="12" fill="{_C_TEXT_SEC}">{rd["expire"]}</text>')
+        x_offset += _SVG_COLS[2][1]
 
         # 状态
-        parts.append(f'  <text x="{x_offset + cols[3][1] // 2}" y="{cy}" text-anchor="middle" font-family="{_FONT}" font-size="13" fill="{rd["status_color"]}">{rd["status"]}</text>')
-        x_offset += cols[3][1]
+        parts.append(f'  <text x="{x_offset + _SVG_COLS[3][1] // 2}" y="{cy}" text-anchor="middle" font-family="{_FONT}" font-size="13" fill="{rd["status_color"]}">{rd["status"]}</text>')
+        x_offset += _SVG_COLS[3][1]
 
         # 节点数
-        parts.append(f'  <text x="{x_offset + cols[4][1] // 2}" y="{cy}" text-anchor="middle" font-family="{_FONT}" font-size="13" font-weight="600" fill="{accent_blue}">{rd["nodes"]}</text>')
+        parts.append(f'  <text x="{x_offset + _SVG_COLS[4][1] // 2}" y="{cy}" text-anchor="middle" font-family="{_FONT}" font-size="13" font-weight="600" fill="{_C_BLUE}">{rd["nodes"]}</text>')
 
-    # 底部合计栏
-    footer_y = rows_start_y + rows_total_h + 8
-    parts.append(f'  <line x1="{pad}" y1="{footer_y}" x2="{pad + content_w}" y2="{footer_y}" stroke="{border_color}" stroke-width="1"/>')
-    parts.append(
-        f'  <text x="{pad + content_w // 2}" y="{footer_y + 32}" text-anchor="middle"'
+    return parts
+
+
+def _build_svg_footer(
+    total_nodes: int, versions: dict[str, str] | None,
+    content_w: int, footer_y: int,
+) -> list[str]:
+    """构建 SVG 底部：合计栏 + 版本信息 + 关闭标签"""
+    p = _SVG_PAD
+    parts: list[str] = [
+        f'  <line x1="{p}" y1="{footer_y}" x2="{p + content_w}" y2="{footer_y}" stroke="{_C_BORDER}" stroke-width="1"/>',
+        f'  <text x="{p + content_w // 2}" y="{footer_y + 32}" text-anchor="middle"'
         f' font-family="{_FONT}"'
-        f' font-size="13" fill="{text_secondary}">合计: <tspan font-weight="700" fill="{accent_blue}">{total_nodes}</tspan> 个节点</text>'
-    )
+        f' font-size="13" fill="{_C_TEXT_SEC}">合计: <tspan font-weight="700" fill="{_C_BLUE}">{total_nodes}</tspan> 个节点</text>',
+    ]
 
-    # 版本信息区域
     if versions:
-        ver_y = footer_y + footer_h
-        parts.append(f'  <line x1="{pad}" y1="{ver_y}" x2="{pad + content_w}" y2="{ver_y}" stroke="{border_color}" stroke-width="1"/>')
-        official_ver = _esc(versions.get('official', '—'))
-        ref1nd_ver = _esc(versions.get('reF1nd', '—'))
+        ver_y = footer_y + 56
+        parts.append(f'  <line x1="{p}" y1="{ver_y}" x2="{p + content_w}" y2="{ver_y}" stroke="{_C_BORDER}" stroke-width="1"/>')
+        official_ver = _svg_esc(versions.get('official', '—'))
+        ref1nd_ver = _svg_esc(versions.get('reF1nd', '—'))
         parts.append(
-            f'  <text x="{pad + 20}" y="{ver_y + 22}" font-family="{_FONT}" font-size="12" font-weight="600" fill="{text_secondary}">sing-box 版本</text>'
+            f'  <text x="{p + 20}" y="{ver_y + 22}" font-family="{_FONT}" font-size="12" font-weight="600" fill="{_C_TEXT_SEC}">sing-box 版本</text>'
         )
         parts.append(
-            f'  <text x="{pad + 20}" y="{ver_y + 40}" font-family="{_FONT}" font-size="11" fill="{text_secondary}">'
-            f'官方版: <tspan font-weight="600" fill="{text_primary}">{official_ver}</tspan>'
-            f'　|　reF1nd 分支: <tspan font-weight="600" fill="{text_primary}">{ref1nd_ver}</tspan>'
+            f'  <text x="{p + 20}" y="{ver_y + 40}" font-family="{_FONT}" font-size="11" fill="{_C_TEXT_SEC}">'
+            f'官方版: <tspan font-weight="600" fill="{_C_TEXT_PRI}">{official_ver}</tspan>'
+            f'　|　reF1nd 分支: <tspan font-weight="600" fill="{_C_TEXT_PRI}">{ref1nd_ver}</tspan>'
             f'</text>'
         )
 
     parts.append('</svg>')
-    return '\n'.join(parts)
+    return parts
 
+
+# ---------- SVG 主函数 ----------
+
+def generate_status_svg(
+    subscription_info: list[SubscriptionInfo], versions: dict[str, str] | None = None,
+) -> str:
+    """生成订阅状态 SVG 图片（浅色高级感风格）"""
+    now = datetime.now(timezone(timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S CST')
+
+    svg_w = sum(c[1] for c in _SVG_COLS) + _SVG_PAD * 2
+    content_w = svg_w - _SVG_PAD * 2
+    rows_data, total_nodes = _build_svg_rows_data(subscription_info)
+    rows_total_h = len(subscription_info) * _SVG_ROW_H
+    version_h = 52 if versions else 0
+    svg_h = _SVG_TITLE_H + _SVG_COL_HEADER_H + rows_total_h + 56 + version_h + _SVG_PAD * 2
+
+    table_y = _SVG_PAD + _SVG_TITLE_H + 8
+    footer_y = table_y + _SVG_COL_HEADER_H + rows_total_h + 8
+
+    parts = (
+        _build_svg_header(svg_w, svg_h, content_w, len(subscription_info), total_nodes, now)
+        + _build_svg_table(rows_data, content_w, table_y)
+        + _build_svg_footer(total_nodes, versions, content_w, footer_y)
+    )
+    return '\n'.join(parts)
 
 # ========== Gist 上传 ==========
 

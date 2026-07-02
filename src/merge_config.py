@@ -14,7 +14,7 @@ import copy
 import re
 from typing import Any
 
-from utils import log_info, log_debug
+from utils import log_info
 
 
 def filter_nodes_by_regex(
@@ -110,7 +110,7 @@ def _fix_empty_outbounds(outbounds: list[Any]) -> None:
             outbounds_list = outbound.get('outbounds', [])
             if not isinstance(outbounds_list, list) or not outbounds_list:
                 outbound['outbounds'] = ['Compatible']
-                log_debug(f"  {outbound.get('tag')} -> 空 outbound，添加 Compatible")
+                log_info(f"  {outbound.get('tag')} -> 空 outbound，添加 Compatible")
 
     if not has_compatible:
         outbounds.append({"tag": "Compatible", "type": "direct"})

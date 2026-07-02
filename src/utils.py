@@ -49,10 +49,6 @@ def _log(level: str, msg: str) -> None:
     print(f"{prefix}{msg}", file=sys.stderr)
 
 
-def log_debug(msg: str) -> None:
-    _log("DEBUG", msg)
-
-
 def log_info(msg: str) -> None:
     _log("INFO", msg)
 
@@ -183,7 +179,7 @@ def http_get_with_retry(
         try:
             if attempt > 1:
                 sleep_time = backoff_factor ** (attempt - 1)
-                log_debug(f"  重试 {attempt}/{max_retries}，等待 {sleep_time}s...")
+                log_info(f"  重试 {attempt}/{max_retries}，等待 {sleep_time}s...")
                 time.sleep(sleep_time)
 
             resp = http_request('GET', url, headers=headers, timeout=timeout)
@@ -196,7 +192,7 @@ def http_get_with_retry(
             if isinstance(e, HTTPError) and e.code not in _RETRYABLE_CODES:
                 raise
             last_error = e
-            log_debug(f"  请求失败: {e}")
+            log_info(f"  请求失败: {e}")
 
     assert last_error is not None
     raise last_error
