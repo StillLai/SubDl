@@ -71,16 +71,25 @@ SUB_URL = *山海|https://example.com/api/sub?token=xxx
 
 ## 配置模板
 
-`config_template/` 目录下有 4 个模板变体：
+`config_template/` 目录采用模块化结构，公共部分只需编辑一次：
 
-| 模板文件 | 适用场景 |
-|----------|----------|
-| `sing-box.jsonc` | 默认配置（含 tun 入站） |
-| `sing-box-mixed.jsonc` | 仅 mixed 入站（HTTP/SOCKS5 代理，无 tun） |
-| `sing-box-tproxy.jsonc` | 含 tproxy 入站的配置（实现透明代理还需配合 iptables/nftables 规则） |
-| `sing-box-tun-win.jsonc` | Windows 专用 tun 配置（移除了 `auto_redirect`） |
+| 零件文件 | 说明 |
+|----------|------|
+| `base.jsonc` | 基础配置（log / experimental / clash_api / cache_file） |
+| `dns.jsonc` | DNS 服务器和路由规则 |
+| `providers.jsonc` | 节点 providers 数组 |
+| `outbounds.jsonc` | 出站规则（分组选择器、urltest 等） |
+| `route.jsonc` | 路由规则（rule_set + rules） |
+| `inbounds/` | 入站变体，每个文件对应一种配置 |
 
-你可以编辑基础模板 `sing-box.jsonc`，其他变体会在 CI 中自动生成。
+入站变体：
+
+| 文件 | 适用场景 |
+|------|----------|
+| `inbounds/tun.jsonc` | 默认配置（含 tun 入站，生成 `sing-box.json`） |
+| `inbounds/mixed.jsonc` | 仅 mixed 入站（生成 `sing-box-mixed.json`） |
+| `inbounds/tproxy.jsonc` | 含 tproxy 入站（生成 `sing-box-tproxy.json`） |
+| `inbounds/tun-win.jsonc` | Windows 专用 tun 配置，无 `auto_redirect`（生成 `sing-box-tun-win.json`） |
 
 ## 自定义规则集
 
@@ -100,9 +109,14 @@ SubDl/
 │   ├── convert.mjs               # Clash → sing-box 转换（Node.js）
 │   ├── merge_config.py           # 将节点合并到模板配置
 │   ├── ruleset_convert.py        # 规则集转换脚本
-│   ├── template_update.py        # 模板变体生成
 │   └── utils.py                  # 公共工具（网络、日志、数据模型）
-├── config_template/              # sing-box 配置模板
+├── config_template/              # sing-box 配置模板（模块化零件）
+│   ├── base.jsonc                # 基础配置（log/experimental/clash_api/cache_file）
+│   ├── dns.jsonc                 # DNS 配置
+│   ├── providers.jsonc           # providers 数组
+│   ├── outbounds.jsonc           # outbounds 数组
+│   ├── route.jsonc               # 路由配置（rule_set + rules）
+│   └── inbounds/                 # 入站变体（tun/mixed/tproxy/tun-win）
 ├── ruleset/                      # 规则集源和自定义规则
 ├── sing-box-reF1nd-docs/         # sing-box 文档副本
 └── .github/workflows/            # CI 自动化

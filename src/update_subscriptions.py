@@ -370,19 +370,60 @@ def _aggregate_results(
 
 # ========== 模板处理 ==========
 
+# inbounds 变体文件名 → 输出配置文件名的映射
+_INVARIANT_MAP: dict[str, str] = {
+    'tun': 'sing-box',
+    'mixed': 'sing-box-mixed',
+    'tproxy': 'sing-box-tproxy',
+    'tun-win': 'sing-box-tun-win',
+}
+
+
 def _load_templates() -> list[tuple[str, dict[str, Any]]]:
-    """加载所有 .json/.jsonc 模板并缓存，避免重复磁盘 I/O"""
-    if not TEMPLATE_DIR.is_dir():
+    """从模块化零件文件组装配置模板
+
+    读取 config_template/ 下的公共零件（base/dns/providers/outbounds/route）
+    和 inbounds/ 下的变体文件，组装成完整的配置模板。
+    """
+    inbounds_dir = TEMPLATE_DIR / 'inbounds'
+    if not inbounds_dir.is_dir():
+        log_error(f"  inbounds 目录不存在: {inbounds_dir}")
         return []
+
+    # 加载公共零件（只读一次）
+    try:
+        base = load_jsonc(TEMPLATE_DIR / 'base.jsonc')
+        dns = load_jsonc(TEMPLATE_DIR / 'dns.jsonc')
+        providers = load_jsonc(TEMPLATE_DIR / 'providers.jsonc')
+        outbounds = load_jsonc(TEMPLATE_DIR / 'outbounds.jsonc')
+        route = load_jsonc(TEMPLATE_DIR / 'route.jsonc')
+    except Exception as e:
+        log_error(f"  公共零件加载失败: {e}")
+        return []
+
     templates: list[tuple[str, dict[str, Any]]] = []
-    for f in sorted(
-        p for p in TEMPLATE_DIR.iterdir()
-        if p.suffix in ('.json', '.jsonc')
-    ):
+    for f in sorted(inbounds_dir.iterdir()):
+        if f.suffix not in ('.json', '.jsonc'):
+            continue
+        variant = f.stem
+        output_name = _INVARIANT_MAP.get(variant)
+        if not output_name:
+            log_warn(f"  未知 inbounds 变体: {variant}，跳过")
+            continue
         try:
-            templates.append((f.stem, load_jsonc(f)))
+            inbounds = load_jsonc(f)
+            config: dict[str, Any] = {
+                **base,
+                "inbounds": inbounds,
+                "dns": dns,
+                "providers": providers,
+                "outbounds": outbounds,
+                "route": route,
+            }
+            templates.append((output_name, config))
         except Exception as e:
-            log_error(f"  模板加载失败 {f}: {e}")
+            log_error(f"  模板组装失败 {f}: {e}")
+
     return templates
 
 
