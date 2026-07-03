@@ -63,11 +63,11 @@ SUB_URL = *山海|https://example.com/api/sub?token=xxx
 |--------|------|
 | `{订阅名}.yaml` | 原始订阅内容 |
 | `{订阅名}-singbox.json` | 转换后的 sing-box 节点 |
-| `sing-box.json` | 合并默认模板的完整配置 |
-| `sing-box-mixed.json` | 无 tun 模式的配置 |
-| `sing-box-tproxy.json` | tproxy 模式的配置 |
+| `sing-box.json` | 合并默认 tun 模板的完整配置 |
+| `sing-box-mixed.json` | 仅含 mixed 入站的配置 |
+| `sing-box-tproxy.json` | 含 tproxy 入站的配置 |
 | `sing-box-tun-win.json` | Windows 专用 tun 配置 |
-| `sing-box-*-providers.json` | 使用 providers 引用的配置 |
+| `sing-box-*-providers.json` | 使用 providers 引用节点的配置 |
 
 ## 配置模板
 
@@ -75,10 +75,10 @@ SUB_URL = *山海|https://example.com/api/sub?token=xxx
 
 | 模板文件 | 适用场景 |
 |----------|----------|
-| `sing-box.jsonc` | 默认配置（带 tun 入站） |
-| `sing-box-mixed.jsonc` | 不需要 tun 的场景（如纯代理转发） |
-| `sing-box-tproxy.jsonc` | Linux tproxy 透明代理 |
-| `sing-box-tun-win.jsonc` | Windows（移除了 `auto_redirect`） |
+| `sing-box.jsonc` | 默认配置（含 tun 入站） |
+| `sing-box-mixed.jsonc` | 仅 mixed 入站（HTTP/SOCKS5 代理，无 tun） |
+| `sing-box-tproxy.jsonc` | 含 tproxy 入站的配置（实现透明代理还需配合 iptables/nftables 规则） |
+| `sing-box-tun-win.jsonc` | Windows 专用 tun 配置（移除了 `auto_redirect`） |
 
 你可以编辑基础模板 `sing-box.jsonc`，其他变体会在 CI 中自动生成。
 
