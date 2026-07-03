@@ -69,57 +69,45 @@ jobs:
         mkdir -p .cache
 
         download_singbox() {
-          local repo="$1" ver="$2" dest="$3"
-          echo "→ 从 $repo 下载 $ver..."
+          local repo="$1" ver="$2" dest="$3" pattern="$4"
+          echo "→ 从 $repo 下载 $ver (pattern: $pattern)..."
           local tmpdir
           tmpdir=$(mktemp -d)
-          # gh release download 自动处理认证和 CDN 重定向
-          gh release download "$ver" --repo "$repo" --pattern "*.deb" --dir "$tmpdir" --clobber 2>/dev/null \
-            || gh release download "$ver" --repo "$repo" --pattern "*.tar.gz" --dir "$tmpdir" --clobber
-          # 尝试解压 .deb
+          gh release download "$ver" --repo "$repo" --pattern "$pattern" --dir "$tmpdir" --clobber
+          # 根据下载文件类型选择解压方式
+          local bin=""
           for f in "$tmpdir"/*.deb; do
             [ -f "$f" ] || continue
             dpkg-deb -x "$f" "$tmpdir/extract"
-            local bin
             bin=$(find "$tmpdir/extract" -name sing-box -type f | head -1)
-            if [ -n "$bin" ]; then
-              cp "$bin" "$dest"
-              rm -rf "$tmpdir"
-              chmod +x "$dest"
-              if "$dest" version >/dev/null 2>&1; then
-                echo "✓ $dest 就绪: $("$dest" version)"
-              else
-                echo "::error::$dest 下载成功但无法执行，请检查架构兼容性"
-                exit 1
-              fi
-              return 0
-            fi
+            [ -n "$bin" ] && break
           done
-          # 尝试解压 .tar.gz
-          for f in "$tmpdir"/*.tar.gz; do
-            [ -f "$f" ] || continue
-            tar xzf "$f" -C "$tmpdir"
-            local bin
-            bin=$(find "$tmpdir" -name sing-box -type f -not -path "*.json" | head -1)
-            if [ -n "$bin" ]; then
-              cp "$bin" "$dest"
-              rm -rf "$tmpdir"
-              chmod +x "$dest"
-              if "$dest" version >/dev/null 2>&1; then
-                echo "✓ $dest 就绪: $("$dest" version)"
-              else
-                echo "::error::$dest 下载成功但无法执行，请检查架构兼容性"
-                exit 1
-              fi
-              return 0
-            fi
-          done
+          if [ -z "$bin" ]; then
+            for f in "$tmpdir"/*.tar.gz; do
+              [ -f "$f" ] || continue
+              tar xzf "$f" -C "$tmpdir"
+              bin=$(find "$tmpdir" -name sing-box -type f -not -path "*.json" | head -1)
+              [ -n "$bin" ] && break
+            done
+          fi
+          if [ -z "$bin" ]; then
+            echo "::error::找不到 $repo $ver 的二进制"
+            rm -rf "$tmpdir"
+            exit 1
+          fi
+          cp "$bin" "$dest"
           rm -rf "$tmpdir"
-          echo "::error::找不到 $repo $ver 的二进制"
-          exit 1
+          chmod +x "$dest"
+          if "$dest" version >/dev/null 2>&1; then
+            echo "✓ $dest 就绪: $("$dest" version)"
+          else
+            echo "::error::$dest 下载成功但无法执行，请检查架构兼容性"
+            exit 1
+          fi
         }
 
-        # 官方版
+        # 官方版 — 只下载 .deb 包
+        arch="$(dpkg --print-architecture 2>/dev/null || echo amd64)"
         if [ "${{ steps.cache-official.outputs.cache-hit }}" == "true" ] && [ -f .cache/sing-box-official ]; then
           chmod +x .cache/sing-box-official
           if .cache/sing-box-official version >/dev/null 2>&1; then
@@ -127,14 +115,14 @@ jobs:
           else
             echo "⚠ 缓存的 sing-box 官方版无法执行（可能 runner 环境已变更），重新下载..."
             rm -f .cache/sing-box-official
-            download_singbox "SagerNet/sing-box" "${{ steps.singbox-ver.outputs.official }}" ".cache/sing-box-official"
+            download_singbox "SagerNet/sing-box" "${{ steps.singbox-ver.outputs.official }}" ".cache/sing-box-official" "*${arch}.deb"
           fi
         else
           rm -f .cache/sing-box-official
-          download_singbox "SagerNet/sing-box" "${{ steps.singbox-ver.outputs.official }}" ".cache/sing-box-official"
+          download_singbox "SagerNet/sing-box" "${{ steps.singbox-ver.outputs.official }}" ".cache/sing-box-official" "*${arch}.deb"
         fi
 
-        # reF1nd 版
+        # reF1nd 版 — 只下载 amd64v3-glibc tar.gz
         if [ "${{ steps.cache-ref1nd.outputs.cache-hit }}" == "true" ] && [ -f .cache/sing-box-ref1nd ]; then
           chmod +x .cache/sing-box-ref1nd
           if .cache/sing-box-ref1nd version >/dev/null 2>&1; then
@@ -142,11 +130,11 @@ jobs:
           else
             echo "⚠ 缓存的 sing-box reF1nd 无法执行（可能 runner 环境已变更），重新下载..."
             rm -f .cache/sing-box-ref1nd
-            download_singbox "reF1nd/sing-box-releases" "${{ steps.singbox-ver.outputs.ref1nd }}" ".cache/sing-box-ref1nd"
+            download_singbox "reF1nd/sing-box-releases" "${{ steps.singbox-ver.outputs.ref1nd }}" ".cache/sing-box-ref1nd" "*linux-amd64v3-glibc.tar.gz"
           fi
         else
           rm -f .cache/sing-box-ref1nd
-          download_singbox "reF1nd/sing-box-releases" "${{ steps.singbox-ver.outputs.ref1nd }}" ".cache/sing-box-ref1nd"
+          download_singbox "reF1nd/sing-box-releases" "${{ steps.singbox-ver.outputs.ref1nd }}" ".cache/sing-box-ref1nd" "*linux-amd64v3-glibc.tar.gz"
         fi
 
         # 最终验证二进制可执行
