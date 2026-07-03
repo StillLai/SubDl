@@ -86,7 +86,12 @@ jobs:
               cp "$bin" "$dest"
               rm -rf "$tmpdir"
               chmod +x "$dest"
-              echo "✓ $dest 就绪: $("$dest" version || echo '未知版本')"
+              if "$dest" version >/dev/null 2>&1; then
+                echo "✓ $dest 就绪: $("$dest" version)"
+              else
+                echo "::error::$dest 下载成功但无法执行，请检查架构兼容性"
+                exit 1
+              fi
               return 0
             fi
           done
@@ -100,7 +105,12 @@ jobs:
               cp "$bin" "$dest"
               rm -rf "$tmpdir"
               chmod +x "$dest"
-              echo "✓ $dest 就绪: $("$dest" version || echo '未知版本')"
+              if "$dest" version >/dev/null 2>&1; then
+                echo "✓ $dest 就绪: $("$dest" version)"
+              else
+                echo "::error::$dest 下载成功但无法执行，请检查架构兼容性"
+                exit 1
+              fi
               return 0
             fi
           done
@@ -111,8 +121,14 @@ jobs:
 
         # 官方版
         if [ "${{ steps.cache-official.outputs.cache-hit }}" == "true" ] && [ -f .cache/sing-box-official ]; then
-          echo "✓ 命中缓存: sing-box 官方版"
           chmod +x .cache/sing-box-official
+          if .cache/sing-box-official version >/dev/null 2>&1; then
+            echo "✓ 命中缓存: sing-box 官方版"
+          else
+            echo "⚠ 缓存的 sing-box 官方版无法执行（可能 runner 环境已变更），重新下载..."
+            rm -f .cache/sing-box-official
+            download_singbox "SagerNet/sing-box" "${{ steps.singbox-ver.outputs.official }}" ".cache/sing-box-official"
+          fi
         else
           rm -f .cache/sing-box-official
           download_singbox "SagerNet/sing-box" "${{ steps.singbox-ver.outputs.official }}" ".cache/sing-box-official"
@@ -120,14 +136,28 @@ jobs:
 
         # reF1nd 版
         if [ "${{ steps.cache-ref1nd.outputs.cache-hit }}" == "true" ] && [ -f .cache/sing-box-ref1nd ]; then
-          echo "✓ 命中缓存: sing-box reF1nd"
           chmod +x .cache/sing-box-ref1nd
+          if .cache/sing-box-ref1nd version >/dev/null 2>&1; then
+            echo "✓ 命中缓存: sing-box reF1nd"
+          else
+            echo "⚠ 缓存的 sing-box reF1nd 无法执行（可能 runner 环境已变更），重新下载..."
+            rm -f .cache/sing-box-ref1nd
+            download_singbox "reF1nd/sing-box-releases" "${{ steps.singbox-ver.outputs.ref1nd }}" ".cache/sing-box-ref1nd"
+          fi
         else
           rm -f .cache/sing-box-ref1nd
           download_singbox "reF1nd/sing-box-releases" "${{ steps.singbox-ver.outputs.ref1nd }}" ".cache/sing-box-ref1nd"
         fi
 
-        # 验证文件存在并通过 GITHUB_ENV 传递绝对路径给后续步骤
+        # 最终验证二进制可执行
+        for bin in .cache/sing-box-official .cache/sing-box-ref1nd; do
+          if ! "$bin" version >/dev/null 2>&1; then
+            echo "::error::$bin 无法执行，请检查 runner 环境兼容性"
+            exit 1
+          fi
+        done
+
+        # 通过 GITHUB_ENV 传递绝对路径给后续步骤
         ABS_OFFICIAL="$(readlink -f .cache/sing-box-official)"
         ABS_REF1ND="$(readlink -f .cache/sing-box-ref1nd)"
         ls -la "$ABS_OFFICIAL" "$ABS_REF1ND"
