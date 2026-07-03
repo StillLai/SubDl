@@ -847,7 +847,7 @@ def upload_to_gist(github_token: str, gist_id: str, files: dict[str, str | None]
     files 中值为 None 的条目会被删除（GitHub API 用 null 表示删除）
     """
     headers = {"Authorization": f"token {github_token}", "Accept": "application/vnd.github.v3+json"}
-    gist_files: dict[str, dict[str, str | None]] = {name: {"content": content} for name, content in files.items()}
+    gist_files: dict[str, dict[str, str] | None] = {name: None if content is None else {"content": content} for name, content in files.items()}
 
     log_info(f"    更新 Gist: {gist_id}")
     resp = http_request("PATCH", f"https://api.github.com/gists/{gist_id}", headers=headers, json_body={"files": gist_files})
