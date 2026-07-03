@@ -884,6 +884,11 @@ def _validate_configs(files: dict[str, str]) -> dict[str, str]:
         log_info("  → SING_BOX_BIN 未设置，跳过配置校验")
         return {}
 
+    # 检查二进制文件是否存在
+    if not os.path.isfile(official_bin):
+        log_warn(f"  → SING_BOX_BIN ({official_bin}) 不存在，跳过配置校验")
+        return {}
+
     failures: dict[str, str] = {}
     checked = 0
     for filename, content in files.items():
@@ -891,7 +896,7 @@ def _validate_configs(files: dict[str, str]) -> dict[str, str]:
             continue
 
         is_providers = '-providers.json' in filename
-        bin_path = ref1nd_bin if is_providers and ref1nd_bin else official_bin
+        bin_path = ref1nd_bin if is_providers and ref1nd_bin and os.path.isfile(ref1nd_bin) else official_bin
 
         tmp_file: str | None = None
         try:
