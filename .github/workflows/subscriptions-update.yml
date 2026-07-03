@@ -35,134 +35,26 @@ jobs:
       run: npm ci
 
     # --- sing-box 二进制缓存（用于配置校验） ---
-    - name: Get sing-box versions
-      id: singbox-ver
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        set -Eeuo pipefail
-        OFFICIAL=$(gh api repos/SagerNet/sing-box/releases/latest --jq '.tag_name')
-        REF1ND=$(gh api repos/reF1nd/sing-box-releases/releases/latest --jq '.tag_name')
-        echo "official=$OFFICIAL" >> $GITHUB_OUTPUT
-        echo "ref1nd=$REF1ND" >> $GITHUB_OUTPUT
-        echo "✓ sing-box 官方版: $OFFICIAL | reF1nd: $REF1ND"
-
-    - name: Cache sing-box (official)
-      uses: actions/cache@v6
-      id: cache-official
+    - name: Setup sing-box (official)
+      id: setup-official
+      uses: ./.github/actions/setup-sing-box
       with:
-        path: .cache/sing-box
-        key: sing-box-${{ steps.singbox-ver.outputs.official }}
+        repo: SagerNet/sing-box
+        output-path: .cache/sing-box
+        token: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Cache sing-box (reF1nd)
-      uses: actions/cache@v6
-      id: cache-ref1nd
+    - name: Setup sing-box (reF1nd)
+      id: setup-ref1nd
+      uses: ./.github/actions/setup-sing-box
       with:
-        path: .cache/sing-box-ref1nd
-        key: sing-box-ref1nd-${{ steps.singbox-ver.outputs.ref1nd }}
+        repo: reF1nd/sing-box-releases
+        output-path: .cache/sing-box-ref1nd
+        token: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Download sing-box binaries
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Export sing-box paths
       run: |
-        set -Eeuo pipefail
-        mkdir -p .cache
-
-        download_singbox() {
-          local repo="$1" ver="$2" dest="$3"
-          echo "→ 从 $repo 下载 $ver..."
-          local tmpdir
-          tmpdir=$(mktemp -d)
-
-          # 1) 精确匹配 linux-amd64-glibc
-          local download_ok=false
-          if gh release download "$ver" --repo "$repo" --pattern "*linux-amd64-glibc.tar.gz" --dir "$tmpdir" --clobber 2>/dev/null; then
-            download_ok=true
-          fi
-
-          # 2) 备用：模糊匹配同时包含 amd64 和 linux 的 .tar.gz
-          if [ "$download_ok" = false ]; then
-            echo "  ⚠ 精确匹配失败，尝试模糊匹配 (含 amd64 + linux)..."
-            local asset_name
-            asset_name=$(gh release view "$ver" --repo "$repo" --json assets -q '.assets[].name' 2>/dev/null \
-              | grep -E 'amd64' | grep -iE 'linux' | grep '\.tar\.gz$' | head -1)
-            if [ -n "$asset_name" ]; then
-              echo "  → 找到候选: $asset_name"
-              gh release download "$ver" --repo "$repo" --pattern "$asset_name" --dir "$tmpdir" --clobber
-              download_ok=true
-            fi
-          fi
-
-          # 3) 更宽泛：只匹配包含 amd64 的 .tar.gz
-          if [ "$download_ok" = false ]; then
-            echo "  ⚠ 宽泛匹配失败，尝试仅匹配 amd64..."
-            local asset_name
-            asset_name=$(gh release view "$ver" --repo "$repo" --json assets -q '.assets[].name' 2>/dev/null \
-              | grep -E 'amd64' | grep '\.tar\.gz$' | head -1)
-            if [ -n "$asset_name" ]; then
-              echo "  → 找到候选: $asset_name"
-              gh release download "$ver" --repo "$repo" --pattern "$asset_name" --dir "$tmpdir" --clobber
-              download_ok=true
-            fi
-          fi
-
-          if [ "$download_ok" = false ]; then
-            echo "::error::找不到 $repo $ver 的二进制（已尝试所有匹配策略）"
-            rm -rf "$tmpdir"
-            exit 1
-          fi
-
-          local bin=""
-          for f in "$tmpdir"/*.tar.gz; do
-            [ -f "$f" ] || continue
-            tar xzf "$f" -C "$tmpdir"
-            bin=$(find "$tmpdir" -name sing-box -type f -not -path "*.json" | head -1)
-            [ -n "$bin" ] && break
-          done
-          if [ -z "$bin" ]; then
-            echo "::error::找不到 $repo $ver 的二进制"
-            rm -rf "$tmpdir"
-            exit 1
-          fi
-          cp "$bin" "$dest"
-          rm -rf "$tmpdir"
-          chmod +x "$dest"
-          if "$dest" version >/dev/null 2>&1; then
-            echo "✓ $dest 就绪: $("$dest" version)"
-          else
-            echo "::error::$dest 下载成功但无法执行，请检查架构兼容性"
-            exit 1
-          fi
-        }
-
-        ensure_singbox() {
-          local cache_hit="$1" file="$2" repo="$3" ver="$4" label="$5"
-          if [ "$cache_hit" == "true" ] && [ -f "$file" ]; then
-            chmod +x "$file"
-            if "$file" version >/dev/null 2>&1; then
-              echo "✓ 命中缓存: $label"
-            else
-              echo "⚠ 缓存的 $label 无法执行（可能 runner 环境已变更），重新下载..."
-              rm -f "$file"
-              download_singbox "$repo" "$ver" "$file"
-            fi
-          else
-            rm -f "$file"
-            download_singbox "$repo" "$ver" "$file"
-          fi
-        }
-
-        ensure_singbox "${{ steps.cache-official.outputs.cache-hit }}" ".cache/sing-box" \
-          "SagerNet/sing-box" "${{ steps.singbox-ver.outputs.official }}" "sing-box 官方版"
-        ensure_singbox "${{ steps.cache-ref1nd.outputs.cache-hit }}" ".cache/sing-box-ref1nd" \
-          "reF1nd/sing-box-releases" "${{ steps.singbox-ver.outputs.ref1nd }}" "sing-box reF1nd"
-
-        # 通过 GITHUB_ENV 传递绝对路径给后续步骤
-        ABS_OFFICIAL="$(readlink -f .cache/sing-box)"
-        ABS_REF1ND="$(readlink -f .cache/sing-box-ref1nd)"
-        ls -la "$ABS_OFFICIAL" "$ABS_REF1ND"
-        echo "SING_BOX_BIN=$ABS_OFFICIAL" >> "$GITHUB_ENV"
-        echo "SING_BOX_REF1ND_BIN=$ABS_REF1ND" >> "$GITHUB_ENV"
+        echo "SING_BOX_BIN=${{ steps.setup-official.outputs.bin-path }}" >> "$GITHUB_ENV"
+        echo "SING_BOX_REF1ND_BIN=${{ steps.setup-ref1nd.outputs.bin-path }}" >> "$GITHUB_ENV"
 
     # 预下载 Sub-Store proxy-utils.esm.mjs（convert.mjs 直接 import，无自动下载能力）
     - name: Pre-download Sub-Store dependency
