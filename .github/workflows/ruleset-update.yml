@@ -90,9 +90,12 @@ jobs:
           echo "✓ sing-box 就绪: $("$DEST" version || echo '未知版本')"
         fi
 
+        # 验证文件存在并通过 GITHUB_ENV 传递绝对路径
+        ABS_BIN="$(readlink -f "$DEST")"
+        ls -la "$ABS_BIN"
+        echo "SING_BOX_BIN=$ABS_BIN" >> "$GITHUB_ENV"
+
     - name: Build rulesets
-      env:
-        SING_BOX_BIN: ${{ github.workspace }}/.cache/sing-box-official
       run: python src/ruleset_convert.py
 
     - name: Verify generated files
