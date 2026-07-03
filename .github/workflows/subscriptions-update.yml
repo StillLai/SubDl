@@ -67,88 +67,64 @@ jobs:
       run: |
         set -Eeuo pipefail
         mkdir -p .cache
-        CACHE_DIR="$(pwd)/.cache"
 
         download_singbox() {
           local repo="$1" ver="$2" dest="$3"
           echo "→ 从 $repo 下载 $ver..."
-          # 使用 Python 下载并提取二进制（可靠且跨平台）
-          python -c "
-        import json, subprocess, tempfile, tarfile, zipfile, os, sys, shutil
-        from urllib.request import urlopen, Request
-        from pathlib import Path
-
-        repo = '$repo'
-        ver = '$ver'
-        dest = '$dest'
-
-        # 通过 gh api 获取所有 asset
-        result = subprocess.run(
-            ['gh', 'api', f'repos/{repo}/releases/tags/{ver}', '--jq', '.assets[] | {name, url: .browser_download_url}'],
-            capture_output=True, text=True
-        )
-        assets = [json.loads(line) for line in result.stdout.strip().split('\n') if line.strip()]
-
-        # 优先找 tar.gz
-        tar_asset = next((a for a in assets if a['name'].endswith('.tar.gz')), None)
-        deb_asset = next((a for a in assets if a['name'].endswith('.deb')), None)
-
-        binary_found = False
-
-        if tar_asset:
-            print(f'  下载 {tar_asset[\"name\"]}...')
-            req = Request(tar_asset['url'], headers={'Authorization': f'token {os.environ[\"GH_TOKEN\"]}'})
-            with tempfile.TemporaryDirectory() as tmpdir:
-                tar_path = os.path.join(tmpdir, 'archive.tar.gz')
-                with urlopen(req, timeout=120) as resp, open(tar_path, 'wb') as f:
-                    shutil.copyfileobj(resp, f)
-                with tarfile.open(tar_path, 'r:gz') as tf:
-                    tf.extractall(tmpdir)
-                # 递归查找 sing-box 二进制
-                for p in Path(tmpdir).rglob('sing-box'):
-                    if p.is_file() and not p.name.endswith('.json'):
-                        shutil.copy2(str(p), dest)
-                        binary_found = True
-                        break
-
-        if not binary_found and deb_asset:
-            print(f'  下载 {deb_asset[\"name\"]}...')
-            req = Request(deb_asset['url'], headers={'Authorization': f'token {os.environ[\"GH_TOKEN\"]}'})
-            with tempfile.TemporaryDirectory() as tmpdir:
-                deb_path = os.path.join(tmpdir, 'package.deb')
-                with urlopen(req, timeout=120) as resp, open(deb_path, 'wb') as f:
-                    shutil.copyfileobj(resp, f)
-                subprocess.run(['dpkg-deb', '-x', deb_path, tmpdir + '/extract'], check=True)
-                for p in Path(tmpdir + '/extract').rglob('sing-box'):
-                    if p.is_file() and not p.name.endswith('.json'):
-                        shutil.copy2(str(p), dest)
-                        binary_found = True
-                        break
-
-        if not binary_found:
-            print(f'::error::找不到 {repo} {ver} 的二进制 asset', file=sys.stderr)
-            sys.exit(1)
-        "
-          chmod +x "$dest"
-          echo "✓ $dest 就绪: $("$dest" version || echo '未知版本')"
+          local tmpdir
+          tmpdir=$(mktemp -d)
+          # gh release download 自动处理认证和 CDN 重定向
+          gh release download "$ver" --repo "$repo" --pattern "*.deb" --dir "$tmpdir" --clobber 2>/dev/null \
+            || gh release download "$ver" --repo "$repo" --pattern "*.tar.gz" --dir "$tmpdir" --clobber
+          # 尝试解压 .deb
+          for f in "$tmpdir"/*.deb; do
+            [ -f "$f" ] || continue
+            dpkg-deb -x "$f" "$tmpdir/extract"
+            local bin
+            bin=$(find "$tmpdir/extract" -name sing-box -type f | head -1)
+            if [ -n "$bin" ]; then
+              cp "$bin" "$dest"
+              rm -rf "$tmpdir"
+              chmod +x "$dest"
+              echo "✓ $dest 就绪: $("$dest" version || echo '未知版本')"
+              return 0
+            fi
+          done
+          # 尝试解压 .tar.gz
+          for f in "$tmpdir"/*.tar.gz; do
+            [ -f "$f" ] || continue
+            tar xzf "$f" -C "$tmpdir"
+            local bin
+            bin=$(find "$tmpdir" -name sing-box -type f -not -path "*.json" | head -1)
+            if [ -n "$bin" ]; then
+              cp "$bin" "$dest"
+              rm -rf "$tmpdir"
+              chmod +x "$dest"
+              echo "✓ $dest 就绪: $("$dest" version || echo '未知版本')"
+              return 0
+            fi
+          done
+          rm -rf "$tmpdir"
+          echo "::error::找不到 $repo $ver 的二进制"
+          exit 1
         }
 
         # 官方版
-        if [ "${{ steps.cache-official.outputs.cache-hit }}" == "true" ] && [ -f "$CACHE_DIR/sing-box-official" ]; then
+        if [ "${{ steps.cache-official.outputs.cache-hit }}" == "true" ] && [ -f .cache/sing-box-official ]; then
           echo "✓ 命中缓存: sing-box 官方版"
-          chmod +x "$CACHE_DIR/sing-box-official"
+          chmod +x .cache/sing-box-official
         else
-          rm -f "$CACHE_DIR/sing-box-official"
-          download_singbox "SagerNet/sing-box" "${{ steps.singbox-ver.outputs.official }}" "$CACHE_DIR/sing-box-official"
+          rm -f .cache/sing-box-official
+          download_singbox "SagerNet/sing-box" "${{ steps.singbox-ver.outputs.official }}" ".cache/sing-box-official"
         fi
 
         # reF1nd 版
-        if [ "${{ steps.cache-ref1nd.outputs.cache-hit }}" == "true" ] && [ -f "$CACHE_DIR/sing-box-ref1nd" ]; then
+        if [ "${{ steps.cache-ref1nd.outputs.cache-hit }}" == "true" ] && [ -f .cache/sing-box-ref1nd ]; then
           echo "✓ 命中缓存: sing-box reF1nd"
-          chmod +x "$CACHE_DIR/sing-box-ref1nd"
+          chmod +x .cache/sing-box-ref1nd
         else
-          rm -f "$CACHE_DIR/sing-box-ref1nd"
-          download_singbox "reF1nd/sing-box-releases" "${{ steps.singbox-ver.outputs.ref1nd }}" "$CACHE_DIR/sing-box-ref1nd"
+          rm -f .cache/sing-box-ref1nd
+          download_singbox "reF1nd/sing-box-releases" "${{ steps.singbox-ver.outputs.ref1nd }}" ".cache/sing-box-ref1nd"
         fi
 
     # 预下载 Sub-Store proxy-utils.esm.mjs（convert.mjs 直接 import，无自动下载能力）
