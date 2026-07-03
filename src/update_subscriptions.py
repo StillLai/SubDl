@@ -881,13 +881,13 @@ def _validate_configs(files: dict[str, str]) -> dict[str, str]:
     official_bin = os.environ.get('SING_BOX_BIN', '')
     ref1nd_bin = os.environ.get('SING_BOX_REF1ND_BIN', '')
     if not official_bin:
-        log_info("  → SING_BOX_BIN 未设置，跳过配置校验")
-        return {}
+        log_error("  ✗ SING_BOX_BIN 未设置，无法进行配置校验，中止上传")
+        sys.exit(1)
 
     # 检查二进制文件是否存在
     if not os.path.isfile(official_bin):
-        log_warn(f"  → SING_BOX_BIN ({official_bin}) 不存在，跳过配置校验")
-        return {}
+        log_error(f"  ✗ SING_BOX_BIN ({official_bin}) 不存在，无法进行配置校验，中止上传")
+        sys.exit(1)
 
     failures: dict[str, str] = {}
     checked = 0
@@ -1021,9 +1021,12 @@ def _generate_and_upload(
     github_token: str,
     gist_id: str,
     gist_owner: str,
-) -> None:
-    """生成合并配置、providers 配置，并上传到 Gist"""
+) -> int:
+    """生成合并配置、providers 配置，并上传到 Gist
 
+    Returns:
+        校验失败的配置数量（0 表示全部通过）
+    """
     log_info("→ 生成合并配置和 providers 配置...")
     templates = _load_templates()
     sub_url_map = {sub.name: sub.url for sub in subscriptions}
@@ -1051,12 +1054,13 @@ def _generate_and_upload(
     (PROJECT_ROOT / "status-dark.svg").write_text(svg_dark, encoding="utf-8")
     log_info("✓ 状态 SVG 已生成（浅色 + 深色）")
 
-    # 校验配置文件（校验失败的不上传）
+    # 校验配置文件（校验失败的移除后上传剩余，最终以非零退出码告警）
     failures = _validate_configs(files)
+    failure_count = len(failures)
     if failures:
         for name in failures:
             files.pop(name, None)
-        log_warn(f"⚠️ 已从上传中移除 {len(failures)} 个校验失败的配置")
+        log_warn(f"⚠️ 已从上传中移除 {failure_count} 个校验失败的配置")
 
     # 清理 Gist 中不再需要的旧文件
     to_delete = _cleanup_old_gist_files(github_token, gist_id, files)
@@ -1068,6 +1072,8 @@ def _generate_and_upload(
 
     log_info(f"上传 {len(files)} 个文件到 Gist...")
     upload_to_gist(github_token, gist_id, upload_payload)
+
+    return failure_count
 
 
 def main() -> None:
@@ -1114,10 +1120,15 @@ def main() -> None:
     log_info(f"✓ 合并节点: {len(subs_nodes_dict)}/{len(subscriptions)}")
 
     log_info("::group::Generate configs & Upload to Gist")
-    _generate_and_upload(files, subs_nodes_dict, subscriptions, subscription_info, github_token, gist_id, gist_owner)
+    failure_count = _generate_and_upload(files, subs_nodes_dict, subscriptions, subscription_info, github_token, gist_id, gist_owner)
     log_info("::endgroup::")
 
     log_info(f"完成! 成功处理 {len(valid_results)} 个订阅，共 {len(files)} 个文件")
+
+    # 校验有失败时以非零退出码告警（CI 会标红），但配置仍已上传
+    if failure_count > 0:
+        log_warn(f"⚠️ {failure_count} 个配置校验失败，请检查配置模板")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
