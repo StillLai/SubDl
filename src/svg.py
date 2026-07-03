@@ -16,12 +16,12 @@ from utils import FlowInfo, SubscriptionInfo
 # ========== 常量 ==========
 
 _FONT = '-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif'
-_SVG_PAD = 20
-_SVG_ROW_H = 56
-_SVG_TITLE_H = 70
-_SVG_COL_HEADER_H = 36
+_SVG_PAD = 30
+_SVG_ROW_H = 84
+_SVG_TITLE_H = 105
+_SVG_COL_HEADER_H = 54
 _SVG_COLS: list[tuple[str, int]] = [
-    ('订阅', 100), ('流量使用', 280), ('到期时间', 90), ('状态', 70), ('节点', 60),
+    ('订阅', 150), ('流量使用', 420), ('到期时间', 135), ('状态', 105), ('节点', 90),
 ]
 
 
@@ -240,12 +240,12 @@ def _build_svg_header(
         '    </filter>',
         '  </defs>',
         f'  <rect x="{p}" y="{p}" width="{content_w}" height="{_SVG_TITLE_H}" rx="8" fill="url(#headerGrad)" filter="url(#cardShadow)"/>',
-        f'  <rect x="{p}" y="{p}" width="4" height="{_SVG_TITLE_H}" rx="2" fill="url(#accentGrad)"/>',
+        f'  <rect x="{p}" y="{p}" width="6" height="{_SVG_TITLE_H}" rx="3" fill="url(#accentGrad)"/>',
         f'  <line x1="{p}" y1="{p + _SVG_TITLE_H - 1}" x2="{p + content_w}" y2="{p + _SVG_TITLE_H - 1}" stroke="{theme.border}" stroke-width="1"/>',
-        f'  <text x="{p + 20}" y="{p + 32}" font-family="{_FONT}" font-size="18" font-weight="bold" fill="{theme.text_pri}">SubDl</text>',
-        f'  <text x="{p + 80}" y="{p + 32}" font-family="{_FONT}" font-size="18" fill="{theme.text_sec}">订阅状态</text>',
-        f'  <text x="{p + content_w - 20}" y="{p + 32}" text-anchor="end" font-family="{_FONT}" font-size="11" fill="{theme.text_sec}">{_svg_esc(now)}</text>',
-        f'  <text x="{p + 20}" y="{p + 56}" font-family="{_FONT}" font-size="12" fill="{theme.text_sec}">共 {sub_count} 个订阅 · {total_nodes} 个节点</text>',
+        f'  <text x="{p + 30}" y="{p + 48}" font-family="{_FONT}" font-size="27" font-weight="bold" fill="{theme.text_pri}">SubDl</text>',
+        f'  <text x="{p + 120}" y="{p + 48}" font-family="{_FONT}" font-size="27" fill="{theme.text_sec}">订阅状态</text>',
+        f'  <text x="{p + content_w - 30}" y="{p + 48}" text-anchor="end" font-family="{_FONT}" font-size="16" fill="{theme.text_sec}">{_svg_esc(now)}</text>',
+        f'  <text x="{p + 30}" y="{p + 84}" font-family="{_FONT}" font-size="18" fill="{theme.text_sec}">共 {sub_count} 个订阅 · {total_nodes} 个节点</text>',
     ]
 
 
@@ -259,12 +259,12 @@ def _build_svg_table(
     # 列标题
     x_offset = p
     for col_name, col_w in _SVG_COLS:
-        tx = x_offset + 16 if col_name in ('订阅', '流量使用') else x_offset + col_w // 2
+        tx = x_offset + 24 if col_name in ('订阅', '流量使用') else x_offset + col_w // 2
         anchor = 'start' if col_name in ('订阅', '流量使用') else 'middle'
         parts.append(
-            f'  <text x="{tx}" y="{table_y + 22}" text-anchor="{anchor}"'
+            f'  <text x="{tx}" y="{table_y + 33}" text-anchor="{anchor}"'
             f' font-family="{_FONT}"'
-            f' font-size="11" font-weight="600" fill="{theme.text_sec}" letter-spacing="0.5">{col_name}</text>'
+            f' font-size="16" font-weight="600" fill="{theme.text_sec}" letter-spacing="0.5">{col_name}</text>'
         )
         x_offset += col_w
     parts.append(f'  <line x1="{p}" y1="{table_y + _SVG_COL_HEADER_H}" x2="{p + content_w}" y2="{table_y + _SVG_COL_HEADER_H}" stroke="{theme.border}" stroke-width="1"/>')
@@ -276,42 +276,42 @@ def _build_svg_table(
         if i % 2 == 1:
             parts.append(f'  <rect x="{p}" y="{ry}" width="{content_w}" height="{_SVG_ROW_H}" fill="{theme.row_alt}"/>')
         if i > 0:
-            parts.append(f'  <line x1="{p + 16}" y1="{ry}" x2="{p + content_w - 16}" y2="{ry}" stroke="{theme.border}" stroke-width="0.5"/>')
+            parts.append(f'  <line x1="{p + 24}" y1="{ry}" x2="{p + content_w - 24}" y2="{ry}" stroke="{theme.border}" stroke-width="0.5"/>')
 
         x_offset = p
         cy = ry + _SVG_ROW_H // 2 + 5
 
         # 环境变量名 + 订阅名
         if rd.get("env_name"):
-            parts.append(f'  <text x="{x_offset + 16}" y="{ry + 18}" font-family="{_FONT}" font-size="10" fill="{theme.text_sec}">{rd["env_name"]}</text>')
-            parts.append(f'  <text x="{x_offset + 16}" y="{ry + 38}" font-family="{_FONT}" font-size="13" font-weight="600" fill="{theme.text_pri}">{rd["name"]}</text>')
+            parts.append(f'  <text x="{x_offset + 24}" y="{ry + 27}" font-family="{_FONT}" font-size="15" fill="{theme.text_sec}">{rd["env_name"]}</text>')
+            parts.append(f'  <text x="{x_offset + 24}" y="{ry + 57}" font-family="{_FONT}" font-size="19" font-weight="600" fill="{theme.text_pri}">{rd["name"]}</text>')
         else:
-            parts.append(f'  <text x="{x_offset + 16}" y="{cy}" font-family="{_FONT}" font-size="13" font-weight="600" fill="{theme.text_pri}">{rd["name"]}</text>')
+            parts.append(f'  <text x="{x_offset + 24}" y="{cy}" font-family="{_FONT}" font-size="19" font-weight="600" fill="{theme.text_pri}">{rd["name"]}</text>')
         x_offset += _SVG_COLS[0][1]
 
         # 流量使用 - 进度条 + 文字
-        bar_x = x_offset + 16
-        bar_y = ry + 12
-        bar_w = _SVG_COLS[1][1] - 32
+        bar_x = x_offset + 24
+        bar_y = ry + 18
+        bar_w = _SVG_COLS[1][1] - 48
         fill_w = max(bar_w * rd['pct'] / 100, 0)
-        parts.append(f'  <rect x="{bar_x}" y="{bar_y}" width="{bar_w}" height="8" rx="4" fill="{theme.bar_bg}"/>')
+        parts.append(f'  <rect x="{bar_x}" y="{bar_y}" width="{bar_w}" height="12" rx="6" fill="{theme.bar_bg}"/>')
         if fill_w > 0:
             _, bar_grad = _bar_color_and_grad(rd['bar_color'], theme)
             fill_val = f"url(#{bar_grad})" if bar_grad else rd['bar_color']
-            parts.append(f'  <rect x="{bar_x}" y="{bar_y}" width="{fill_w}" height="8" rx="4" fill="{fill_val}"/>')
-        parts.append(f'  <text x="{bar_x}" y="{bar_y + 24}" font-family="{_FONT}" font-size="11" fill="{theme.text_sec}">{rd["used"]} / {rd["total"]}  ({rd["pct"]:.0f}%)  剩余: {rd["remaining"]}</text>')
+            parts.append(f'  <rect x="{bar_x}" y="{bar_y}" width="{fill_w}" height="12" rx="6" fill="{fill_val}"/>')
+        parts.append(f'  <text x="{bar_x}" y="{bar_y + 36}" font-family="{_FONT}" font-size="16" fill="{theme.text_sec}">{rd["used"]} / {rd["total"]}  ({rd["pct"]:.0f}%)  剩余: {rd["remaining"]}</text>')
         x_offset += _SVG_COLS[1][1]
 
         # 到期时间
-        parts.append(f'  <text x="{x_offset + _SVG_COLS[2][1] // 2}" y="{cy}" text-anchor="middle" font-family="{_FONT}" font-size="12" fill="{theme.text_sec}">{rd["expire"]}</text>')
+        parts.append(f'  <text x="{x_offset + _SVG_COLS[2][1] // 2}" y="{cy}" text-anchor="middle" font-family="{_FONT}" font-size="18" fill="{theme.text_sec}">{rd["expire"]}</text>')
         x_offset += _SVG_COLS[2][1]
 
         # 状态
-        parts.append(f'  <text x="{x_offset + _SVG_COLS[3][1] // 2}" y="{cy}" text-anchor="middle" font-family="{_FONT}" font-size="13" fill="{rd["status_color"]}">{rd["status"]}</text>')
+        parts.append(f'  <text x="{x_offset + _SVG_COLS[3][1] // 2}" y="{cy}" text-anchor="middle" font-family="{_FONT}" font-size="19" fill="{rd["status_color"]}">{rd["status"]}</text>')
         x_offset += _SVG_COLS[3][1]
 
         # 节点数
-        parts.append(f'  <text x="{x_offset + _SVG_COLS[4][1] // 2}" y="{cy}" text-anchor="middle" font-family="{_FONT}" font-size="13" font-weight="600" fill="{theme.blue}">{rd["nodes"]}</text>')
+        parts.append(f'  <text x="{x_offset + _SVG_COLS[4][1] // 2}" y="{cy}" text-anchor="middle" font-family="{_FONT}" font-size="19" font-weight="600" fill="{theme.blue}">{rd["nodes"]}</text>')
 
     return parts
 
@@ -324,21 +324,21 @@ def _build_svg_footer(
     p = _SVG_PAD
     parts: list[str] = [
         f'  <line x1="{p}" y1="{footer_y}" x2="{p + content_w}" y2="{footer_y}" stroke="{theme.border}" stroke-width="1"/>',
-        f'  <text x="{p + content_w // 2}" y="{footer_y + 32}" text-anchor="middle"'
+        f'  <text x="{p + content_w // 2}" y="{footer_y + 48}" text-anchor="middle"'
         f' font-family="{_FONT}"'
-        f' font-size="13" fill="{theme.text_sec}">合计: <tspan font-weight="700" fill="{theme.blue}">{total_nodes}</tspan> 个节点</text>',
+        f' font-size="19" fill="{theme.text_sec}">合计: <tspan font-weight="700" fill="{theme.blue}">{total_nodes}</tspan> 个节点</text>',
     ]
 
     if versions:
-        ver_y = footer_y + 56
+        ver_y = footer_y + 84
         parts.append(f'  <line x1="{p}" y1="{ver_y}" x2="{p + content_w}" y2="{ver_y}" stroke="{theme.border}" stroke-width="1"/>')
         official_ver = _svg_esc(versions.get('official', '—'))
         ref1nd_ver = _svg_esc(versions.get('reF1nd', '—'))
         parts.append(
-            f'  <text x="{p + 20}" y="{ver_y + 22}" font-family="{_FONT}" font-size="12" font-weight="600" fill="{theme.text_sec}">sing-box 版本</text>'
+            f'  <text x="{p + 30}" y="{ver_y + 33}" font-family="{_FONT}" font-size="18" font-weight="600" fill="{theme.text_sec}">sing-box 版本</text>'
         )
         parts.append(
-            f'  <text x="{p + 20}" y="{ver_y + 40}" font-family="{_FONT}" font-size="11" fill="{theme.text_sec}">'
+            f'  <text x="{p + 30}" y="{ver_y + 60}" font-family="{_FONT}" font-size="16" fill="{theme.text_sec}">'
             f'官方版: <tspan font-weight="600" fill="{theme.text_pri}">{official_ver}</tspan>'
             f'　|　reF1nd 分支: <tspan font-weight="600" fill="{theme.text_pri}">{ref1nd_ver}</tspan>'
             f'</text>'
@@ -363,8 +363,8 @@ def generate_status_svg(
     content_w = svg_w - _SVG_PAD * 2
     rows_data, total_nodes = _build_svg_rows_data(subscription_info, theme)
     rows_total_h = len(subscription_info) * _SVG_ROW_H
-    version_h = 52 if versions else 0
-    svg_h = _SVG_TITLE_H + _SVG_COL_HEADER_H + rows_total_h + 56 + version_h + _SVG_PAD * 2
+    version_h = 78 if versions else 0
+    svg_h = _SVG_TITLE_H + _SVG_COL_HEADER_H + rows_total_h + 84 + version_h + _SVG_PAD * 2
 
     table_y = _SVG_PAD + _SVG_TITLE_H + 8
     footer_y = table_y + _SVG_COL_HEADER_H + rows_total_h + 8

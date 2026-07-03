@@ -668,6 +668,24 @@
     },
     {
       "rule_set": [
+        "XiaoMi"
+      ],
+      "outbound": "📱 小米"
+    },
+    {
+      "rule_set": [
+        "Apple"
+      ],
+      "outbound": "🍎 Apple"
+    },
+    {
+      "rule_set": [
+        "geosite-microsoft"
+      ],
+      "outbound": "🪟 Microsoft"
+    },
+    {
+      "rule_set": [
         "geosite-cloudflare",
         "geoip-cloudflare"
       ],
@@ -694,24 +712,6 @@
         }
       ],
       "outbound": "🇬 Google"
-    },
-    {
-      "rule_set": [
-        "XiaoMi"
-      ],
-      "outbound": "📱 小米"
-    },
-    {
-      "rule_set": [
-        "Apple"
-      ],
-      "outbound": "🍎 Apple"
-    },
-    {
-      "rule_set": [
-        "geosite-microsoft"
-      ],
-      "outbound": "🪟 Microsoft"
     },
     {
       "rule_set": [

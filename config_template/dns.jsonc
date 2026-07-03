@@ -195,6 +195,18 @@
       "server": "Cloudflare-DNS"
     },
     {
+      "rule_set": ["XiaoMi"],
+      "server": "Tencent-DNS"
+    },
+    {
+      "rule_set": ["Apple"],
+      "server": "Tencent-DNS"
+    },
+    {
+      "rule_set": ["geosite-microsoft"],
+      "server": "Cloudflare-DNS"
+    },
+    {
       "rule_set": ["geosite-cloudflare", "geoip-cloudflare"],
       "server": "Cloudflare-DNS"
     },
@@ -206,18 +218,6 @@
         {"package_name": ["com.android.vending", "com.google.android.gms", "com.google.android.gsf", "com.google.android.onetimeinitializer"]}
       ],
       "server": "Google-DNS"
-    },
-    {
-      "rule_set": ["XiaoMi"],
-      "server": "Tencent-DNS"
-    },
-    {
-      "rule_set": ["Apple"],
-      "server": "Tencent-DNS"
-    },
-    {
-      "rule_set": ["geosite-microsoft"],
-      "server": "Cloudflare-DNS"
     },
     {
       "rule_set": ["geosite-geolocation-cn", "custom_direct"],
