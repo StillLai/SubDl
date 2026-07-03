@@ -127,6 +127,13 @@ jobs:
           download_singbox "reF1nd/sing-box-releases" "${{ steps.singbox-ver.outputs.ref1nd }}" ".cache/sing-box-ref1nd"
         fi
 
+        # 验证文件存在并通过 GITHUB_ENV 传递绝对路径给后续步骤
+        ABS_OFFICIAL="$(readlink -f .cache/sing-box-official)"
+        ABS_REF1ND="$(readlink -f .cache/sing-box-ref1nd)"
+        ls -la "$ABS_OFFICIAL" "$ABS_REF1ND"
+        echo "SING_BOX_BIN=$ABS_OFFICIAL" >> "$GITHUB_ENV"
+        echo "SING_BOX_REF1ND_BIN=$ABS_REF1ND" >> "$GITHUB_ENV"
+
     # 预下载 Sub-Store proxy-utils.esm.mjs（convert.mjs 直接 import，无自动下载能力）
     - name: Pre-download Sub-Store dependency
       env:
@@ -148,8 +155,6 @@ jobs:
     - name: Build subscriptions
       env:
         GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        SING_BOX_BIN: ${{ github.workspace }}/.cache/sing-box-official
-        SING_BOX_REF1ND_BIN: ${{ github.workspace }}/.cache/sing-box-ref1nd
         GIST_ID: ${{ secrets.GIST_ID }}
         SUB_URL: ${{ secrets.SUB_URL }}
         SUB_URL_1: ${{ secrets.SUB_URL_1 }}
