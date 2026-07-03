@@ -14,7 +14,7 @@ import copy
 import re
 from typing import Any
 
-from utils import log_info
+from utils import log_info, log_warn
 
 
 def filter_nodes_by_regex(
@@ -73,6 +73,12 @@ def process_providers(
         provider_tags = list(provider_nodes) if use_all else outbound.get('providers', [])
         outbound.pop('use_all_providers', None)
         outbound.pop('providers', None)
+
+        # 检测可能的拼写错误：如果 outbound 有看起来像 providers 配置的字段但没有被处理
+        tag = outbound.get('tag', '<unknown>')
+        if not provider_tags and not fixed_outbounds and outbound.get('type') in ('selector', 'urltest'):
+            log_warn(f"  {tag}: selector/urltest 类型没有 providers 也没有 outbounds，可能配置有误")
+
         if not provider_tags:
             continue
 
