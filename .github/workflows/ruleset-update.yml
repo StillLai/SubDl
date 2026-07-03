@@ -1,0 +1,100 @@
+name: Ruleset Update
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ruleset/custom_rule/**'
+      - 'ruleset/ruleset_source.txt'
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */6 * * *'
+
+# 防止多次运行重叠
+concurrency:
+  group: ruleset-update
+  cancel-in-progress: false
+
+# 缓存经验法则：仅当「直接下载/重新生成」比 8s cache restore 更慢时才用 actions/cache
+# 当前不 cache：GitHub Releases 直接 wget sing-box.deb 比 cache restore 快
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        fetch-depth: 1
+
+    - name: Setup environment
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        set -Eeuo pipefail
+        pip install -r src/requirements.txt &
+        JSON=$(gh api repos/SagerNet/sing-box/releases/latest)
+        ASSET_URL=$(echo "$JSON" | jq -r '.assets[] | select(.name | endswith("linux_amd64.deb")) | .browser_download_url')
+        if [ -z "$ASSET_URL" ] || [ "$ASSET_URL" = "null" ]; then
+          echo "::error::Failed to get sing-box .deb asset URL from release JSON"
+          echo "Release JSON: $JSON"
+          exit 1
+        fi
+        wget -O sing-box.deb "$ASSET_URL"
+        sudo dpkg -i sing-box.deb
+        wait
+
+    - name: Build rulesets
+      run: python src/ruleset_convert.py
+
+    - name: Verify generated files
+      run: |
+        set -Eeuo pipefail
+        JSON_COUNT=$(ls ruleset/json/*.json 2>/dev/null | wc -l)
+        SRS_COUNT=$(ls ruleset/srs/*.srs 2>/dev/null | wc -l)
+        if [ "$JSON_COUNT" -eq 0 ] || [ "$SRS_COUNT" -eq 0 ]; then
+          echo "::error::No generated files found! JSON: $JSON_COUNT, SRS: $SRS_COUNT"
+          exit 1
+        fi
+        echo "✅ Verified: $JSON_COUNT JSON files, $SRS_COUNT SRS files"
+
+    - name: Upload and clean release assets
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        set -Eeuo pipefail
+
+        # ===== 1. 先上传所有新文件（覆盖同名旧文件）=====
+        echo "⬆️ Uploading JSON rulesets..."
+        gh release upload ruleset-json ruleset/json/*.json --clobber
+        echo "⬆️ Uploading SRS rulesets..."
+        gh release upload ruleset-srs ruleset/srs/*.srs --clobber
+        echo "✅ All files uploaded successfully"
+
+        # ===== 2. 上传全部成功后，清理多余的旧 asset =====
+        # 获取当前 release 上的 asset 列表
+        EXISTING_JSON=$(gh release view ruleset-json --json assets --jq '.assets[].name')
+        EXISTING_SRS=$(gh release view ruleset-srs --json assets --jq '.assets[].name')
+
+        # 获取本地新生成的文件名列表
+        LOCAL_JSON=$(ls ruleset/json/*.json | xargs -I{} basename {})
+        LOCAL_SRS=$(ls ruleset/srs/*.srs | xargs -I{} basename {})
+
+        # 删除 release 上存在但本地已不存在的 asset
+        for asset in $EXISTING_JSON; do
+          if ! echo "$LOCAL_JSON" | grep -qxF "$asset"; then
+            echo "🗑️ Deleting stale asset: $asset"
+            gh release delete-asset ruleset-json "$asset" --yes || true
+          fi
+        done
+        for asset in $EXISTING_SRS; do
+          if ! echo "$LOCAL_SRS" | grep -qxF "$asset"; then
+            echo "🗑️ Deleting stale asset: $asset"
+            gh release delete-asset ruleset-srs "$asset" --yes || true
+          fi
+        done
+
+        echo "✅ Release assets updated successfully"
