@@ -544,7 +544,7 @@
   },
   {
     "type": "selector",
-    "tag": "Global",
+    "tag": "GLOBAL",
     "outbounds": [
       "🎈 自动选择",
       "🗂️ 备用自动",
