@@ -165,6 +165,13 @@ def _compile_srs(file_name: str) -> None:
             [singbox_bin, "rule-set", "compile", "--output", str(srs_path), file_name],
             check=True, capture_output=True, text=True
         )
+    except FileNotFoundError as e:
+        # Linux 内核在 ELF 二进制无法执行时（如缺少动态链接器/解释器）
+        # 会返回 ENOENT，Python 将其包装为 FileNotFoundError
+        if os.path.isfile(singbox_bin):
+            log_error(f"  SRS 编译失败: {srs_path.name} — 二进制存在但无法执行（可能是 runner 环境不兼容）: {e}")
+        else:
+            log_error(f"  SRS 编译失败: {srs_path.name} — {e}")
     except Exception as e:
         log_error(f"  SRS 编译失败: {srs_path.name} - {e}")
 
