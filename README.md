@@ -63,11 +63,10 @@ SUB_URL = *山海|https://example.com/api/sub?token=xxx
 |--------|------|
 | `{订阅名}.yaml` | 原始订阅内容 |
 | `{订阅名}-singbox.json` | 转换后的 sing-box 节点 |
-| `sing-box.json` | 合并默认 tun 模板的完整配置 |
-| `sing-box-mixed.json` | 仅含 mixed 入站的配置 |
-| `sing-box-tproxy.json` | 含 tproxy 入站的配置 |
-| `sing-box-tun-win.json` | Windows 专用 tun 配置 |
-| `sing-box-*-providers.json` | 使用 providers 引用节点的配置 |
+| `sing-box-{变体名}.json` | 合并对应入站变体的完整配置 |
+| `sing-box-{变体名}-providers.json` | 使用 providers 引用节点的配置 |
+
+变体名取自 `config_template/inbounds/` 目录下的文件名，例如 `tun.jsonc` → `sing-box-tun.json`。
 
 ## 配置模板
 
@@ -82,14 +81,7 @@ SUB_URL = *山海|https://example.com/api/sub?token=xxx
 | `route.jsonc` | 路由规则（rule_set + rules） |
 | `inbounds/` | 入站变体，每个文件对应一种配置 |
 
-入站变体：
-
-| 文件 | 适用场景 |
-|------|----------|
-| `inbounds/tun.jsonc` | 默认配置（含 tun 入站，生成 `sing-box.json`） |
-| `inbounds/mixed.jsonc` | 仅 mixed 入站（生成 `sing-box-mixed.json`） |
-| `inbounds/tproxy.jsonc` | 含 tproxy 入站（生成 `sing-box-tproxy.json`） |
-| `inbounds/tun-win.jsonc` | Windows 专用 tun 配置，无 `auto_redirect`（生成 `sing-box-tun-win.json`） |
+入站变体：每个文件自动生成对应的配置（`sing-box-{文件名}.json`），新增变体只需在 `inbounds/` 目录下添加文件即可。
 
 ## 自定义规则集
 

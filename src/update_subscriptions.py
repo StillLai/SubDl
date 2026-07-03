@@ -370,20 +370,12 @@ def _aggregate_results(
 
 # ========== 模板处理 ==========
 
-# inbounds 变体文件名 → 输出配置文件名的映射
-_INVARIANT_MAP: dict[str, str] = {
-    'tun': 'sing-box',
-    'mixed': 'sing-box-mixed',
-    'tproxy': 'sing-box-tproxy',
-    'tun-win': 'sing-box-tun-win',
-}
-
-
 def _load_templates() -> list[tuple[str, dict[str, Any]]]:
     """从模块化零件文件组装配置模板
 
     读取 config_template/ 下的公共零件（base/dns/providers/outbounds/route）
     和 inbounds/ 下的变体文件，组装成完整的配置模板。
+    输出文件名自动推导为 sing-box-{变体名}。
     """
     inbounds_dir = TEMPLATE_DIR / 'inbounds'
     if not inbounds_dir.is_dir():
@@ -406,10 +398,6 @@ def _load_templates() -> list[tuple[str, dict[str, Any]]]:
         if f.suffix not in ('.json', '.jsonc'):
             continue
         variant = f.stem
-        output_name = _INVARIANT_MAP.get(variant)
-        if not output_name:
-            log_warn(f"  未知 inbounds 变体: {variant}，跳过")
-            continue
         try:
             inbounds = load_jsonc(f)
             config: dict[str, Any] = {
@@ -420,7 +408,7 @@ def _load_templates() -> list[tuple[str, dict[str, Any]]]:
                 "outbounds": outbounds,
                 "route": route,
             }
-            templates.append((output_name, config))
+            templates.append((f'sing-box-{variant}', config))
         except Exception as e:
             log_error(f"  模板组装失败 {f}: {e}")
 
