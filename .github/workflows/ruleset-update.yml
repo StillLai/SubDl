@@ -56,9 +56,28 @@ jobs:
       run: |
         set -Eeuo pipefail
         VER="${{ steps.singbox-ver.outputs.version }}"
-        URL=$(gh api repos/SagerNet/sing-box/releases/tags/$VER --jq '.assets[] | select(.name | endswith("linux-amd64.tar.gz")) | .browser_download_url')
-        curl -fsSL "$URL" | tar xz && mv sing-box-*/sing-box /tmp/sing-box && chmod +x /tmp/sing-box
-        echo "✓ 下载 sing-box $VER"
+        echo "→ 下载 sing-box $VER..."
+        # 优先查找 tar.gz，找不到则用 .deb
+        TAR_NAME=$(gh api repos/SagerNet/sing-box/releases/tags/$VER --jq '[.assets[].name] | map(select(endswith(".tar.gz"))) | .[0]' 2>/dev/null || true)
+        if [ -n "$TAR_NAME" ] && [ "$TAR_NAME" != "null" ]; then
+          FULL_URL=$(gh api repos/SagerNet/sing-box/releases/tags/$VER --jq ".assets[] | select(.name == \"$TAR_NAME\") | .browser_download_url")
+          curl -fsSL "$FULL_URL" | tar xz -C /tmp/
+          mv /tmp/sing-box-*/sing-box /tmp/sing-box
+          rm -rf /tmp/sing-box-*/
+        else
+          DEB_NAME=$(gh api repos/SagerNet/sing-box/releases/tags/$VER --jq '[.assets[].name] | map(select(endswith(".deb"))) | .[0]' 2>/dev/null || true)
+          if [ -z "$DEB_NAME" ] || [ "$DEB_NAME" = "null" ]; then
+            echo "::error::找不到 sing-box $VER 的二进制 asset"
+            exit 1
+          fi
+          FULL_URL=$(gh api repos/SagerNet/sing-box/releases/tags/$VER --jq ".assets[] | select(.name == \"$DEB_NAME\") | .browser_download_url")
+          curl -fsSL "$FULL_URL" -o /tmp/_singbox.deb
+          dpkg-deb -x /tmp/_singbox.deb /tmp/_singbox-extract
+          find /tmp/_singbox-extract -name sing-box -type f -exec mv {} /tmp/sing-box \;
+          rm -rf /tmp/_singbox.deb /tmp/_singbox-extract
+        fi
+        chmod +x /tmp/sing-box
+        echo "✓ sing-box 就绪: $(/tmp/sing-box version 2>/dev/null || echo '未知版本')"
 
     - name: Build rulesets
       env:
