@@ -50,16 +50,51 @@ jobs:
     - name: Build rulesets
       run: python src/ruleset_convert.py
 
-    - name: Upload JSON to Release
-      uses: softprops/action-gh-release@v3
-      with:
-        tag_name: ruleset-json
-        files: ruleset/json/*.json
-        fail_on_unmatched_files: true
+    - name: Verify generated files
+      run: |
+        set -Eeuo pipefail
+        JSON_COUNT=$(ls ruleset/json/*.json 2>/dev/null | wc -l)
+        SRS_COUNT=$(ls ruleset/srs/*.srs 2>/dev/null | wc -l)
+        if [ "$JSON_COUNT" -eq 0 ] || [ "$SRS_COUNT" -eq 0 ]; then
+          echo "::error::No generated files found! JSON: $JSON_COUNT, SRS: $SRS_COUNT"
+          exit 1
+        fi
+        echo "✅ Verified: $JSON_COUNT JSON files, $SRS_COUNT SRS files"
 
-    - name: Upload SRS to Release
-      uses: softprops/action-gh-release@v3
-      with:
-        tag_name: ruleset-srs
-        files: ruleset/srs/*.srs
-        fail_on_unmatched_files: true
+    - name: Upload and clean release assets
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        set -Eeuo pipefail
+
+        # ===== 1. 先上传所有新文件（覆盖同名旧文件）=====
+        echo "⬆️ Uploading JSON rulesets..."
+        gh release upload ruleset-json ruleset/json/*.json --clobber
+        echo "⬆️ Uploading SRS rulesets..."
+        gh release upload ruleset-srs ruleset/srs/*.srs --clobber
+        echo "✅ All files uploaded successfully"
+
+        # ===== 2. 上传全部成功后，清理多余的旧 asset =====
+        # 获取当前 release 上的 asset 列表
+        EXISTING_JSON=$(gh release view ruleset-json --json assets --jq '.assets[].name')
+        EXISTING_SRS=$(gh release view ruleset-srs --json assets --jq '.assets[].name')
+
+        # 获取本地新生成的文件名列表
+        LOCAL_JSON=$(ls ruleset/json/*.json | xargs -I{} basename {})
+        LOCAL_SRS=$(ls ruleset/srs/*.srs | xargs -I{} basename {})
+
+        # 删除 release 上存在但本地已不存在的 asset
+        for asset in $EXISTING_JSON; do
+          if ! echo "$LOCAL_JSON" | grep -qxF "$asset"; then
+            echo "🗑️ Deleting stale asset: $asset"
+            gh release delete-asset ruleset-json "$asset" --yes || true
+          fi
+        done
+        for asset in $EXISTING_SRS; do
+          if ! echo "$LOCAL_SRS" | grep -qxF "$asset"; then
+            echo "🗑️ Deleting stale asset: $asset"
+            gh release delete-asset ruleset-srs "$asset" --yes || true
+          fi
+        done
+
+        echo "✅ Release assets updated successfully"
