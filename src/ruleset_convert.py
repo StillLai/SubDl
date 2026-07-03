@@ -15,6 +15,7 @@ from utils import (
     log_info, log_warn, log_error, format_bin_error,
     http_get_with_retry,
     RULESET_SOURCE, RULESET_JSON_DIR, RULESET_SRS_DIR,
+    ConversionError,
 )
 
 
@@ -166,9 +167,15 @@ def _compile_srs(file_name: str) -> None:
             check=True, capture_output=True, text=True
         )
     except FileNotFoundError as e:
-        log_error(f"  SRS 编译失败: {srs_path.name} — {format_bin_error(e, singbox_bin)}")
+        raise ConversionError(
+            f"SRS 编译失败: {srs_path.name} — {format_bin_error(e, singbox_bin)}",
+            context={"file": str(srs_path), "binary": singbox_bin},
+        ) from e
     except Exception as e:
-        log_error(f"  SRS 编译失败: {srs_path.name} - {e}")
+        raise ConversionError(
+            f"SRS 编译失败: {srs_path.name} - {e}",
+            context={"file": str(srs_path)},
+        ) from e
 
 
 def prioritize_version_key(obj: Any) -> Any:

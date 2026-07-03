@@ -20,6 +20,44 @@ from urllib.request import Request, urlopen
 import json5  # type: ignore[import-untyped]
 
 
+# ========== 异常类 ==========
+
+class SubDlError(Exception):
+    """SubDl 项目基础异常
+
+    Attributes:
+        message: 人类可读的错误描述
+        context: 附加上下文信息（订阅名、文件名等）
+    """
+    def __init__(self, message: str, context: dict[str, str] | None = None) -> None:
+        super().__init__(message)
+        self.context = context or {}
+
+
+class ConfigError(SubDlError):
+    """环境变量或配置缺失/无效"""
+
+
+class DownloadError(SubDlError):
+    """订阅下载失败"""
+
+
+class ConversionError(SubDlError):
+    """Clash → sing-box 转换失败"""
+
+
+class TemplateError(SubDlError):
+    """模板加载或合并失败"""
+
+
+class ValidationError(SubDlError):
+    """sing-box check 配置校验失败"""
+
+
+class UploadError(SubDlError):
+    """Gist API 上传失败"""
+
+
 # ========== 路径常量 ==========
 
 SCRIPT_DIR = Path(__file__).parent
