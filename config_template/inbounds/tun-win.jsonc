@@ -9,6 +9,7 @@
     ],
     "mtu": 1500,
     "stack": "system",
+    // "auto_redirect": true,
     "auto_route": true,
     "strict_route": true
   },
