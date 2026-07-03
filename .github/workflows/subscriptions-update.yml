@@ -51,14 +51,14 @@ jobs:
       uses: actions/cache@v6
       id: cache-official
       with:
-        path: /tmp/sing-box-official
+        path: .cache/sing-box-official
         key: sing-box-official-${{ steps.singbox-ver.outputs.official }}
 
     - name: Cache sing-box (reF1nd)
       uses: actions/cache@v6
       id: cache-ref1nd
       with:
-        path: /tmp/sing-box-ref1nd
+        path: .cache/sing-box-ref1nd
         key: sing-box-ref1nd-${{ steps.singbox-ver.outputs.ref1nd }}
 
     - name: Download sing-box binaries
@@ -66,15 +66,14 @@ jobs:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         set -Eeuo pipefail
+        mkdir -p .cache
 
         download_singbox() {
           local repo="$1" ver="$2" dest="$3"
           echo "→ 从 $repo 下载 $ver..."
-          # 列出所有 asset 名称，查找 tar.gz
           local url
           url=$(gh api repos/$repo/releases/tags/$ver --jq '[.assets[].name] | map(select(endswith(".tar.gz"))) | .[0]' 2>/dev/null || true)
           if [ -z "$url" ] || [ "$url" = "null" ]; then
-            # 回退：取 .deb 文件并解压
             local deb_url
             deb_url=$(gh api repos/$repo/releases/tags/$ver --jq '[.assets[].name] | map(select(endswith(".deb"))) | .[0]' 2>/dev/null || true)
             if [ -z "$deb_url" ] || [ "$deb_url" = "null" ]; then
@@ -83,37 +82,37 @@ jobs:
             fi
             local full_url
             full_url=$(gh api repos/$repo/releases/tags/$ver --jq ".assets[] | select(.name == \"$deb_url\") | .browser_download_url")
-            curl -fsSL "$full_url" -o /tmp/_singbox.deb
-            dpkg-deb -x /tmp/_singbox.deb /tmp/_singbox-extract
-            find /tmp/_singbox-extract -name sing-box -type f -exec mv {} "$dest" \;
-            rm -rf /tmp/_singbox.deb /tmp/_singbox-extract
+            curl -fsSL "$full_url" -o .cache/_singbox.deb
+            dpkg-deb -x .cache/_singbox.deb .cache/_singbox-extract
+            find .cache/_singbox-extract -name sing-box -type f -exec mv {} "$dest" \;
+            rm -rf .cache/_singbox.deb .cache/_singbox-extract
           else
             local full_url
             full_url=$(gh api repos/$repo/releases/tags/$ver --jq ".assets[] | select(.name == \"$url\") | .browser_download_url")
-            curl -fsSL "$full_url" | tar xz -C /tmp/
-            mv /tmp/sing-box-*/sing-box "$dest"
-            rm -rf /tmp/sing-box-*/
+            curl -fsSL "$full_url" | tar xz -C .cache/
+            mv .cache/sing-box-*/sing-box "$dest"
+            rm -rf .cache/sing-box-*/
           fi
           chmod +x "$dest"
           echo "✓ $dest 就绪: $($dest version || echo '未知版本')"
         }
 
         # 官方版
-        if [ "${{ steps.cache-official.outputs.cache-hit }}" == "true" ] && [ -f /tmp/sing-box-official ]; then
+        if [ "${{ steps.cache-official.outputs.cache-hit }}" == "true" ] && [ -f .cache/sing-box-official ]; then
           echo "✓ 命中缓存: sing-box 官方版"
-          chmod +x /tmp/sing-box-official
+          chmod +x .cache/sing-box-official
         else
-          rm -f /tmp/sing-box-official
-          download_singbox "SagerNet/sing-box" "${{ steps.singbox-ver.outputs.official }}" "/tmp/sing-box-official"
+          rm -f .cache/sing-box-official
+          download_singbox "SagerNet/sing-box" "${{ steps.singbox-ver.outputs.official }}" ".cache/sing-box-official"
         fi
 
         # reF1nd 版
-        if [ "${{ steps.cache-ref1nd.outputs.cache-hit }}" == "true" ] && [ -f /tmp/sing-box-ref1nd ]; then
+        if [ "${{ steps.cache-ref1nd.outputs.cache-hit }}" == "true" ] && [ -f .cache/sing-box-ref1nd ]; then
           echo "✓ 命中缓存: sing-box reF1nd"
-          chmod +x /tmp/sing-box-ref1nd
+          chmod +x .cache/sing-box-ref1nd
         else
-          rm -f /tmp/sing-box-ref1nd
-          download_singbox "reF1nd/sing-box-releases" "${{ steps.singbox-ver.outputs.ref1nd }}" "/tmp/sing-box-ref1nd"
+          rm -f .cache/sing-box-ref1nd
+          download_singbox "reF1nd/sing-box-releases" "${{ steps.singbox-ver.outputs.ref1nd }}" ".cache/sing-box-ref1nd"
         fi
 
     # 预下载 Sub-Store proxy-utils.esm.mjs（convert.mjs 直接 import，无自动下载能力）
@@ -137,8 +136,8 @@ jobs:
     - name: Build subscriptions
       env:
         GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        SING_BOX_BIN: /tmp/sing-box-official
-        SING_BOX_REF1ND_BIN: /tmp/sing-box-ref1nd
+        SING_BOX_BIN: .cache/sing-box-official
+        SING_BOX_REF1ND_BIN: .cache/sing-box-ref1nd
         GIST_ID: ${{ secrets.GIST_ID }}
         SUB_URL: ${{ secrets.SUB_URL }}
         SUB_URL_1: ${{ secrets.SUB_URL_1 }}
