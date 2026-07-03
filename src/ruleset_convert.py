@@ -155,12 +155,14 @@ def parse_and_convert_to_rows(link: str) -> list[dict[str, str | None]]:
 
 def _compile_srs(file_name: str) -> None:
     """使用 subprocess 安全调用 sing-box 编译 SRS，输出到 file_name 同级的 srs/ 目录"""
+    import os
+    singbox_bin = os.environ.get('SING_BOX_BIN', 'sing-box')
     src = Path(file_name)
     srs_path = RULESET_SRS_DIR / (src.stem + '.srs')
     RULESET_SRS_DIR.mkdir(parents=True, exist_ok=True)
     try:
         subprocess.run(
-            ["sing-box", "rule-set", "compile", "--output", str(srs_path), file_name],
+            [singbox_bin, "rule-set", "compile", "--output", str(srs_path), file_name],
             check=True, capture_output=True, text=True
         )
     except Exception as e:
