@@ -26,6 +26,8 @@ from utils import (
     load_jsonc, http_get_with_retry, http_request,
     FlowInfo, Subscription, DownloadResult, SubscriptionInfo,
     PROJECT_ROOT, TEMPLATE_DIR, CONVERT_SCRIPT, USER_AGENT,
+    SubDlError, ConfigError, DownloadError, ConversionError, TemplateError,
+    ValidationError, UploadError,
 )
 from merge_config import merge_config
 
@@ -252,13 +254,17 @@ def _convert_batch(contents_dict: dict[str, str]) -> dict[str, dict[str, Any] | 
         )
 
         if result.returncode != 0:
-            log_error(f"  批量转换失败 (exit {result.returncode}): {result.stderr}")
-            return {name: None for name in contents_dict}
+            raise ConversionError(
+                f"批量转换失败 (exit {result.returncode}): {result.stderr}",
+                context={"subscriptions": ", ".join(contents_dict.keys())},
+            )
 
         stdout = result.stdout.strip()
         if not stdout:
-            log_error(f"  批量转换输出为空 (stderr: {result.stderr.strip() or '(无)'})")
-            return {name: None for name in contents_dict}
+            raise ConversionError(
+                f"批量转换输出为空 (stderr: {result.stderr.strip() or '(无)'})",
+                context={"subscriptions": ", ".join(contents_dict.keys())},
+            )
 
         raw_result = json.loads(stdout)
         return {
@@ -266,9 +272,13 @@ def _convert_batch(contents_dict: dict[str, str]) -> dict[str, dict[str, Any] | 
             for name, val in ((n, raw_result.get(n)) for n in contents_dict)
         }
 
+    except ConversionError:
+        raise
     except Exception as e:
-        log_error(f"  批量转换异常: {e}")
-        return {name: None for name in contents_dict}
+        raise ConversionError(
+            f"批量转换异常: {e}",
+            context={"subscriptions": ", ".join(contents_dict.keys())},
+        ) from e
     finally:
         if batch_input_file:
             os.unlink(batch_input_file)
@@ -380,8 +390,10 @@ def _load_templates() -> list[tuple[str, dict[str, Any]]]:
     """
     inbounds_dir = TEMPLATE_DIR / 'inbounds'
     if not inbounds_dir.is_dir():
-        log_error(f"  inbounds 目录不存在: {inbounds_dir}")
-        return []
+        raise TemplateError(
+            f"inbounds 目录不存在: {inbounds_dir}",
+            context={"path": str(inbounds_dir)},
+        )
 
     # 加载公共零件（只读一次）
     try:
@@ -391,8 +403,10 @@ def _load_templates() -> list[tuple[str, dict[str, Any]]]:
         outbounds = load_jsonc(TEMPLATE_DIR / 'outbounds.jsonc')
         route = load_jsonc(TEMPLATE_DIR / 'route.jsonc')
     except Exception as e:
-        log_error(f"  公共零件加载失败: {e}")
-        return []
+        raise TemplateError(
+            f"公共零件加载失败: {e}",
+            context={"directory": str(TEMPLATE_DIR)},
+        ) from e
 
     templates: list[tuple[str, dict[str, Any]]] = []
     for f in sorted(inbounds_dir.iterdir()):
@@ -411,7 +425,10 @@ def _load_templates() -> list[tuple[str, dict[str, Any]]]:
             }
             templates.append((f'sing-box-{variant}', config))
         except Exception as e:
-            log_error(f"  模板组装失败 {f}: {e}")
+            raise TemplateError(
+                f"模板组装失败 {f.name}: {e}",
+                context={"file": str(f)},
+            ) from e
 
     return templates
 
@@ -881,13 +898,17 @@ def _validate_configs(files: dict[str, str]) -> dict[str, str]:
     official_bin = os.environ.get('SING_BOX_BIN', '')
     ref1nd_bin = os.environ.get('SING_BOX_REF1ND_BIN', '')
     if not official_bin:
-        log_error("  ✗ SING_BOX_BIN 未设置，无法进行配置校验，中止上传")
-        sys.exit(1)
+        raise ConfigError(
+            "SING_BOX_BIN 未设置，无法进行配置校验",
+            context={"env": "SING_BOX_BIN"},
+        )
 
     # 检查二进制文件是否存在
     if not os.path.isfile(official_bin):
-        log_error(f"  ✗ SING_BOX_BIN ({official_bin}) 不存在，无法进行配置校验，中止上传")
-        sys.exit(1)
+        raise ConfigError(
+            f"SING_BOX_BIN ({official_bin}) 不存在，无法进行配置校验",
+            context={"path": official_bin},
+        )
 
     failures: dict[str, str] = {}
     checked = 0
@@ -998,7 +1019,10 @@ def upload_to_gist(github_token: str, gist_id: str, files: dict[str, str | None]
     log_info(f"    更新 Gist: {gist_id}")
     resp = http_request("PATCH", f"https://api.github.com/gists/{gist_id}", headers=headers, json_body={"files": gist_files})
     if resp.status_code >= 400:
-        raise Exception(f"HTTP {resp.status_code}: {resp.text[:200]}")
+        raise UploadError(
+            f"Gist 上传失败: HTTP {resp.status_code}",
+            context={"gist_id": gist_id, "response": resp.text[:200]},
+        )
     log_info("    ✓ 更新成功")
 
 
@@ -1009,7 +1033,10 @@ def _get_gist_owner(github_token: str) -> str:
     headers = {"Authorization": f"token {github_token}", "Accept": "application/vnd.github.v3+json"}
     resp = http_request("GET", "https://api.github.com/user", headers=headers)
     if resp.status_code >= 400:
-        raise Exception(f"获取 Gist 所有者失败: HTTP {resp.status_code}")
+        raise UploadError(
+            f"获取 Gist 所有者失败: HTTP {resp.status_code}",
+            context={"api": "GET /user"},
+        )
     return json.loads(resp.text)["login"]
 
 
@@ -1077,57 +1104,74 @@ def _generate_and_upload(
 
 
 def main() -> None:
-    """主入口"""
+    """主入口
+
+    所有 SubDlError 子类异常在此统一捕获，输出结构化错误报告后以非零退出码退出。
+    未预期的异常也会被捕获并输出。
+    """
     log_info("=" * 60)
     log_info("SubDl - Subscription Downloader")
     log_info(f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     log_info("=" * 60)
 
-    github_token = os.environ.get("GH_TOKEN")
-    if not github_token:
-        log_error("环境变量 GH_TOKEN 未设置")
+    try:
+        github_token = os.environ.get("GH_TOKEN")
+        if not github_token:
+            raise ConfigError("环境变量 GH_TOKEN 未设置", context={"env": "GH_TOKEN"})
+        gist_id = os.environ.get("GIST_ID", "")
+        if not gist_id:
+            raise ConfigError(
+                "环境变量 GIST_ID 未设置，请在 GitHub Secrets 中手动配置",
+                context={"env": "GIST_ID"},
+            )
+        gist_owner = _get_gist_owner(github_token)
+        log_info(f"Gist 所有者: {gist_owner}")
+
+        subscriptions = parse_subscriptions()
+        if not subscriptions:
+            raise ConfigError("未找到订阅配置（SUB_URL 未设置或为空）")
+        log_info(f"找到 {len(subscriptions)} 个订阅")
+
+        log_info("::group::Download & Convert subscriptions")
+        download_results = _download_all(subscriptions, USER_AGENT)
+        log_info("::endgroup::")
+
+        download_results = _try_gist_fallback(download_results, gist_id, gist_owner)
+
+        valid_results = [r for r in download_results if r.is_success]
+        if not valid_results:
+            raise DownloadError("所有订阅下载失败或内容无效")
+        log_info(f"✓ 有效订阅: {len(valid_results)}/{len(subscriptions)}")
+
+        files, subscription_info, subs_nodes_dict = _aggregate_results(download_results)
+
+        if not subs_nodes_dict:
+            raise ConversionError("没有有效的订阅节点，将不上传配置文件")
+        log_info(f"✓ 合并节点: {len(subs_nodes_dict)}/{len(subscriptions)}")
+
+        log_info("::group::Generate configs & Upload to Gist")
+        failure_count = _generate_and_upload(
+            files, subs_nodes_dict, subscriptions, subscription_info,
+            github_token, gist_id, gist_owner,
+        )
+        log_info("::endgroup::")
+
+        log_info(f"完成! 成功处理 {len(valid_results)} 个订阅，共 {len(files)} 个文件")
+
+        # 校验有失败时以非零退出码告警（CI 会标红），但配置仍已上传
+        if failure_count > 0:
+            log_warn(f"⚠️ {failure_count} 个配置校验失败，请检查配置模板")
+            sys.exit(1)
+
+    except SubDlError as e:
+        error_type = type(e).__name__
+        log_error(f"❌ [{error_type}] {e}")
+        if e.context:
+            for k, v in e.context.items():
+                log_error(f"  {k}: {v}")
         sys.exit(1)
-    gist_id = os.environ.get("GIST_ID", "")
-    if not gist_id:
-        log_error("环境变量 GIST_ID 未设置，请在 GitHub Secrets 中手动配置")
-        sys.exit(1)
-    gist_owner = _get_gist_owner(github_token)
-    log_info(f"Gist 所有者: {gist_owner}")
-
-    subscriptions = parse_subscriptions()
-    if not subscriptions:
-        log_error("未找到订阅配置")
-        sys.exit(1)
-    log_info(f"找到 {len(subscriptions)} 个订阅")
-
-    log_info("::group::Download & Convert subscriptions")
-    download_results = _download_all(subscriptions, USER_AGENT)
-    log_info("::endgroup::")
-
-    download_results = _try_gist_fallback(download_results, gist_id, gist_owner)
-
-    valid_results = [r for r in download_results if r.is_success]
-    if not valid_results:
-        log_error("所有订阅下载失败或内容无效")
-        sys.exit(1)
-    log_info(f"✓ 有效订阅: {len(valid_results)}/{len(subscriptions)}")
-
-    files, subscription_info, subs_nodes_dict = _aggregate_results(download_results)
-
-    if not subs_nodes_dict:
-        log_error("没有有效的订阅节点，将不上传配置文件")
-        sys.exit(1)
-    log_info(f"✓ 合并节点: {len(subs_nodes_dict)}/{len(subscriptions)}")
-
-    log_info("::group::Generate configs & Upload to Gist")
-    failure_count = _generate_and_upload(files, subs_nodes_dict, subscriptions, subscription_info, github_token, gist_id, gist_owner)
-    log_info("::endgroup::")
-
-    log_info(f"完成! 成功处理 {len(valid_results)} 个订阅，共 {len(files)} 个文件")
-
-    # 校验有失败时以非零退出码告警（CI 会标红），但配置仍已上传
-    if failure_count > 0:
-        log_warn(f"⚠️ {failure_count} 个配置校验失败，请检查配置模板")
+    except Exception as e:
+        log_error(f"❌ 未预期的错误: {type(e).__name__}: {e}")
         sys.exit(1)
 
 
