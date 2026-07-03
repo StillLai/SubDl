@@ -66,20 +66,46 @@ jobs:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         set -Eeuo pipefail
-        ARCH="linux-amd64"
+
+        download_singbox() {
+          local repo="$1" ver="$2" dest="$3"
+          echo "→ 从 $repo 下载 $ver..."
+          # 列出所有 asset 名称，查找 tar.gz
+          local url
+          url=$(gh api repos/$repo/releases/tags/$ver --jq '[.assets[].name] | map(select(endswith(".tar.gz"))) | .[0]' 2>/dev/null || true)
+          if [ -z "$url" ] || [ "$url" = "null" ]; then
+            # 回退：取 .deb 文件并解压
+            local deb_url
+            deb_url=$(gh api repos/$repo/releases/tags/$ver --jq '[.assets[].name] | map(select(endswith(".deb"))) | .[0]' 2>/dev/null || true)
+            if [ -z "$deb_url" ] || [ "$deb_url" = "null" ]; then
+              echo "::error::找不到 $repo $ver 的二进制 asset"
+              exit 1
+            fi
+            local full_url
+            full_url=$(gh api repos/$repo/releases/tags/$ver --jq ".assets[] | select(.name == \"$deb_url\") | .browser_download_url")
+            curl -fsSL "$full_url" -o /tmp/_singbox.deb
+            dpkg-deb -x /tmp/_singbox.deb /tmp/_singbox-extract
+            find /tmp/_singbox-extract -name sing-box -type f -exec mv {} "$dest" \;
+            rm -rf /tmp/_singbox.deb /tmp/_singbox-extract
+          else
+            local full_url
+            full_url=$(gh api repos/$repo/releases/tags/$ver --jq ".assets[] | select(.name == \"$url\") | .browser_download_url")
+            curl -fsSL "$full_url" | tar xz -C /tmp/
+            mv /tmp/sing-box-*/sing-box "$dest"
+            rm -rf /tmp/sing-box-*/
+          fi
+          chmod +x "$dest"
+          echo "✓ $dest 就绪: $($dest version 2>/dev/null || echo '未知版本')"
+        }
+
         if [ "${{ steps.cache-official.outputs.cache-hit }}" != "true" ]; then
-          VER="${{ steps.singbox-ver.outputs.official }}"
-          URL=$(gh api repos/SagerNet/sing-box/releases/tags/$VER --jq ".assets[] | select(.name | endswith(\"$ARCH.tar.gz\")) | .browser_download_url")
-          curl -fsSL "$URL" | tar xz && mv sing-box-*/sing-box /tmp/sing-box-official && chmod +x /tmp/sing-box-official
-          echo "✓ 下载 sing-box 官方版 $VER"
+          download_singbox "SagerNet/sing-box" "${{ steps.singbox-ver.outputs.official }}" "/tmp/sing-box-official"
         else
           echo "✓ 命中缓存: sing-box 官方版"
         fi
+
         if [ "${{ steps.cache-ref1nd.outputs.cache-hit }}" != "true" ]; then
-          VER="${{ steps.singbox-ver.outputs.ref1nd }}"
-          URL=$(gh api repos/reF1nd/sing-box-releases/releases/tags/$VER --jq ".assets[] | select(.name | endswith(\"$ARCH.tar.gz\")) | .browser_download_url")
-          curl -fsSL "$URL" | tar xz && mv sing-box-*/sing-box /tmp/sing-box-ref1nd && chmod +x /tmp/sing-box-ref1nd
-          echo "✓ 下载 sing-box reF1nd $VER"
+          download_singbox "reF1nd/sing-box-releases" "${{ steps.singbox-ver.outputs.ref1nd }}" "/tmp/sing-box-ref1nd"
         else
           echo "✓ 命中缓存: sing-box reF1nd"
         fi
