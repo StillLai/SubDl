@@ -1,0 +1,36 @@
+[
+  {
+    "type": "remote",
+    "tag": "山海",
+    "health_check": {
+      "enabled": true,
+      "url": "https://cp.cloudflare.com"
+    },
+    "url": "",
+    "user_agent": "ClashMetaForAndroid/2.11.30",
+    "update_interval": "3h"
+  },
+  {
+    "type": "remote",
+    "tag": "雪山",
+    "health_check": {
+      "enabled": true,
+      "url": "https://cp.cloudflare.com"
+    },
+    "url": "",
+    "user_agent": "ClashMetaForAndroid/2.11.30",
+    "update_interval": "3h"
+  },
+  {
+    "type": "remote",
+    "tag": "飞鸟云",
+    "health_check": {
+      "enabled": true,
+      "url": "https://cp.cloudflare.com"
+    },
+    "url": "",
+    "user_agent": "ClashMetaForAndroid/2.11.30",
+    "download_detour": "🗂️ 备用自动",
+    "update_interval": "3h"
+  }
+]
