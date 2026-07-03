@@ -1,6 +1,10 @@
 # SubDl
 
-![订阅状态](https://github.com/StillLai/SubDl/raw/refs/heads/assets/status.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://github.com/StillLai/SubDl/raw/refs/heads/assets/status-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="https://github.com/StillLai/SubDl/raw/refs/heads/assets/status-light.svg">
+  <img src="https://github.com/StillLai/SubDl/raw/refs/heads/assets/status-light.svg" alt="订阅状态">
+</picture>
 
 > 自动下载 Clash 订阅 → 转换为 sing-box 格式 → 合并模板配置 → 上传到 GitHub Gist
 

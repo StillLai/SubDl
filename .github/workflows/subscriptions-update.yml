@@ -73,13 +73,13 @@ jobs:
         # 在独立目录初始化 git 并推送到 assets 分支（避免污染工作区）
         REPO_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
         mkdir -p /tmp/assets-deploy
-        cp status.svg /tmp/assets-deploy/
+        cp status-light.svg status-dark.svg /tmp/assets-deploy/
         cd /tmp/assets-deploy
         git init
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
-        git add status.svg
-        git commit -m "Update status SVG [skip ci]"
+        git add status-light.svg status-dark.svg
+        git commit -m "Update status SVGs [skip ci]"
         git push --force "$REPO_URL" HEAD:assets
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
