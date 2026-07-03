@@ -46,8 +46,8 @@ jobs:
       uses: actions/cache@v6
       id: cache-singbox
       with:
-        path: .cache/sing-box-official
-        key: sing-box-official-${{ steps.singbox-ver.outputs.version }}
+        path: .cache/sing-box
+        key: sing-box-${{ steps.singbox-ver.outputs.version }}
 
     - name: Download sing-box
       env:
@@ -55,7 +55,7 @@ jobs:
       run: |
         set -Eeuo pipefail
         mkdir -p .cache
-        DEST=".cache/sing-box-official"
+        DEST=".cache/sing-box"
 
         download_singbox() {
           local ver="$1" dest="$2"

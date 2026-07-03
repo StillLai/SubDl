@@ -51,8 +51,8 @@ jobs:
       uses: actions/cache@v6
       id: cache-official
       with:
-        path: .cache/sing-box-official
-        key: sing-box-official-${{ steps.singbox-ver.outputs.official }}
+        path: .cache/sing-box
+        key: sing-box-${{ steps.singbox-ver.outputs.official }}
 
     - name: Cache sing-box (reF1nd)
       uses: actions/cache@v6
@@ -97,38 +97,30 @@ jobs:
           fi
         }
 
-        # 官方版
-        if [ "${{ steps.cache-official.outputs.cache-hit }}" == "true" ] && [ -f .cache/sing-box-official ]; then
-          chmod +x .cache/sing-box-official
-          if .cache/sing-box-official version >/dev/null 2>&1; then
-            echo "✓ 命中缓存: sing-box 官方版"
+        ensure_singbox() {
+          local cache_hit="$1" file="$2" repo="$3" ver="$4" label="$5"
+          if [ "$cache_hit" == "true" ] && [ -f "$file" ]; then
+            chmod +x "$file"
+            if "$file" version >/dev/null 2>&1; then
+              echo "✓ 命中缓存: $label"
+            else
+              echo "⚠ 缓存的 $label 无法执行（可能 runner 环境已变更），重新下载..."
+              rm -f "$file"
+              download_singbox "$repo" "$ver" "$file"
+            fi
           else
-            echo "⚠ 缓存的 sing-box 官方版无法执行（可能 runner 环境已变更），重新下载..."
-            rm -f .cache/sing-box-official
-            download_singbox "SagerNet/sing-box" "${{ steps.singbox-ver.outputs.official }}" ".cache/sing-box-official"
+            rm -f "$file"
+            download_singbox "$repo" "$ver" "$file"
           fi
-        else
-          rm -f .cache/sing-box-official
-          download_singbox "SagerNet/sing-box" "${{ steps.singbox-ver.outputs.official }}" ".cache/sing-box-official"
-        fi
+        }
 
-        # reF1nd 版
-        if [ "${{ steps.cache-ref1nd.outputs.cache-hit }}" == "true" ] && [ -f .cache/sing-box-ref1nd ]; then
-          chmod +x .cache/sing-box-ref1nd
-          if .cache/sing-box-ref1nd version >/dev/null 2>&1; then
-            echo "✓ 命中缓存: sing-box reF1nd"
-          else
-            echo "⚠ 缓存的 sing-box reF1nd 无法执行（可能 runner 环境已变更），重新下载..."
-            rm -f .cache/sing-box-ref1nd
-            download_singbox "reF1nd/sing-box-releases" "${{ steps.singbox-ver.outputs.ref1nd }}" ".cache/sing-box-ref1nd"
-          fi
-        else
-          rm -f .cache/sing-box-ref1nd
-          download_singbox "reF1nd/sing-box-releases" "${{ steps.singbox-ver.outputs.ref1nd }}" ".cache/sing-box-ref1nd"
-        fi
+        ensure_singbox "${{ steps.cache-official.outputs.cache-hit }}" ".cache/sing-box" \
+          "SagerNet/sing-box" "${{ steps.singbox-ver.outputs.official }}" "sing-box 官方版"
+        ensure_singbox "${{ steps.cache-ref1nd.outputs.cache-hit }}" ".cache/sing-box-ref1nd" \
+          "reF1nd/sing-box-releases" "${{ steps.singbox-ver.outputs.ref1nd }}" "sing-box reF1nd"
 
         # 通过 GITHUB_ENV 传递绝对路径给后续步骤
-        ABS_OFFICIAL="$(readlink -f .cache/sing-box-official)"
+        ABS_OFFICIAL="$(readlink -f .cache/sing-box)"
         ABS_REF1ND="$(readlink -f .cache/sing-box-ref1nd)"
         ls -la "$ABS_OFFICIAL" "$ABS_REF1ND"
         echo "SING_BOX_BIN=$ABS_OFFICIAL" >> "$GITHUB_ENV"

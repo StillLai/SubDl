@@ -60,6 +60,18 @@ def log_error(msg: str) -> None:
     _log("ERROR", msg)
 
 
+def format_bin_error(e: FileNotFoundError, bin_path: str) -> str:
+    """格式化 subprocess 调用二进制时的 FileNotFoundError
+
+    Linux 内核在 ELF 二进制无法执行时（如缺少动态链接器/解释器）
+    会返回 ENOENT，Python 将其包装为 FileNotFoundError。
+    """
+    import os
+    if os.path.isfile(bin_path):
+        return f"二进制存在但无法执行（可能是 runner 环境不兼容）: {e}"
+    return str(e)
+
+
 # ========== 数据模型 ==========
 
 @dataclass(frozen=True)
