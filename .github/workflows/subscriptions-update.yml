@@ -73,7 +73,45 @@ jobs:
           echo "→ 从 $repo 下载 $ver..."
           local tmpdir
           tmpdir=$(mktemp -d)
-          gh release download "$ver" --repo "$repo" --pattern "*linux-amd64-glibc.tar.gz" --dir "$tmpdir" --clobber
+
+          # 1) 精确匹配 linux-amd64-glibc
+          local download_ok=false
+          if gh release download "$ver" --repo "$repo" --pattern "*linux-amd64-glibc.tar.gz" --dir "$tmpdir" --clobber 2>/dev/null; then
+            download_ok=true
+          fi
+
+          # 2) 备用：模糊匹配同时包含 amd64 和 linux 的 .tar.gz
+          if [ "$download_ok" = false ]; then
+            echo "  ⚠ 精确匹配失败，尝试模糊匹配 (含 amd64 + linux)..."
+            local asset_name
+            asset_name=$(gh release view "$ver" --repo "$repo" --json assets -q '.assets[].name' 2>/dev/null \
+              | grep -E 'amd64' | grep -iE 'linux' | grep '\.tar\.gz$' | head -1)
+            if [ -n "$asset_name" ]; then
+              echo "  → 找到候选: $asset_name"
+              gh release download "$ver" --repo "$repo" --pattern "$asset_name" --dir "$tmpdir" --clobber
+              download_ok=true
+            fi
+          fi
+
+          # 3) 更宽泛：只匹配包含 amd64 的 .tar.gz
+          if [ "$download_ok" = false ]; then
+            echo "  ⚠ 宽泛匹配失败，尝试仅匹配 amd64..."
+            local asset_name
+            asset_name=$(gh release view "$ver" --repo "$repo" --json assets -q '.assets[].name' 2>/dev/null \
+              | grep -E 'amd64' | grep '\.tar\.gz$' | head -1)
+            if [ -n "$asset_name" ]; then
+              echo "  → 找到候选: $asset_name"
+              gh release download "$ver" --repo "$repo" --pattern "$asset_name" --dir "$tmpdir" --clobber
+              download_ok=true
+            fi
+          fi
+
+          if [ "$download_ok" = false ]; then
+            echo "::error::找不到 $repo $ver 的二进制（已尝试所有匹配策略）"
+            rm -rf "$tmpdir"
+            exit 1
+          fi
+
           local bin=""
           for f in "$tmpdir"/*.tar.gz; do
             [ -f "$f" ] || continue
