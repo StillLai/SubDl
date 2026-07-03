@@ -58,8 +58,44 @@ jobs:
         DEST=".cache/sing-box-official"
 
         if [ "${{ steps.cache-singbox.outputs.cache-hit }}" == "true" ] && [ -f "$DEST" ]; then
-          echo "✓ 命中缓存: sing-box"
           chmod +x "$DEST"
+          if "$DEST" version >/dev/null 2>&1; then
+            echo "✓ 命中缓存: sing-box"
+          else
+            echo "⚠ 缓存的 sing-box 无法执行（可能 runner 环境已变更），重新下载..."
+            rm -f "$DEST"
+            VER="${{ steps.singbox-ver.outputs.version }}"
+            echo "→ 下载 sing-box $VER..."
+            tmpdir=$(mktemp -d)
+            gh release download "$VER" --repo SagerNet/sing-box --pattern "*.deb" --dir "$tmpdir" --clobber 2>/dev/null \
+              || gh release download "$VER" --repo SagerNet/sing-box --pattern "*.tar.gz" --dir "$tmpdir" --clobber
+            for f in "$tmpdir"/*.deb; do
+              [ -f "$f" ] || continue
+              dpkg-deb -x "$f" "$tmpdir/extract"
+              bin=$(find "$tmpdir/extract" -name sing-box -type f | head -1)
+              [ -n "$bin" ] && cp "$bin" "$DEST" && break
+            done
+            if [ ! -f "$DEST" ]; then
+              for f in "$tmpdir"/*.tar.gz; do
+                [ -f "$f" ] || continue
+                tar xzf "$f" -C "$tmpdir"
+                bin=$(find "$tmpdir" -name sing-box -type f -not -path "*.json" | head -1)
+                [ -n "$bin" ] && cp "$bin" "$DEST" && break
+              done
+            fi
+            rm -rf "$tmpdir"
+            if [ ! -f "$DEST" ]; then
+              echo "::error::找不到 sing-box $VER 的二进制"
+              exit 1
+            fi
+            chmod +x "$DEST"
+            if "$DEST" version >/dev/null 2>&1; then
+              echo "✓ sing-box 就绪: $("$DEST" version)"
+            else
+              echo "::error::sing-box 下载成功但无法执行，请检查架构兼容性"
+              exit 1
+            fi
+          fi
         else
           rm -f "$DEST"
           VER="${{ steps.singbox-ver.outputs.version }}"
@@ -87,10 +123,21 @@ jobs:
             exit 1
           fi
           chmod +x "$DEST"
-          echo "✓ sing-box 就绪: $("$DEST" version || echo '未知版本')"
+          if "$DEST" version >/dev/null 2>&1; then
+            echo "✓ sing-box 就绪: $("$DEST" version)"
+          else
+            echo "::error::sing-box 下载成功但无法执行，请检查架构兼容性"
+            exit 1
+          fi
         fi
 
-        # 验证文件存在并通过 GITHUB_ENV 传递绝对路径
+        # 最终验证二进制可执行
+        if ! "$DEST" version >/dev/null 2>&1; then
+          echo "::error::$DEST 无法执行，请检查 runner 环境兼容性"
+          exit 1
+        fi
+
+        # 通过 GITHUB_ENV 传递绝对路径
         ABS_BIN="$(readlink -f "$DEST")"
         ls -la "$ABS_BIN"
         echo "SING_BOX_BIN=$ABS_BIN" >> "$GITHUB_ENV"
