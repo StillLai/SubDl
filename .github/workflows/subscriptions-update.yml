@@ -98,16 +98,22 @@ jobs:
           echo "✓ $dest 就绪: $($dest version || echo '未知版本')"
         }
 
-        if [ "${{ steps.cache-official.outputs.cache-hit }}" != "true" ]; then
-          download_singbox "SagerNet/sing-box" "${{ steps.singbox-ver.outputs.official }}" "/tmp/sing-box-official"
-        else
+        # 官方版
+        if [ "${{ steps.cache-official.outputs.cache-hit }}" == "true" ] && [ -f /tmp/sing-box-official ]; then
           echo "✓ 命中缓存: sing-box 官方版"
+          chmod +x /tmp/sing-box-official
+        else
+          rm -f /tmp/sing-box-official
+          download_singbox "SagerNet/sing-box" "${{ steps.singbox-ver.outputs.official }}" "/tmp/sing-box-official"
         fi
 
-        if [ "${{ steps.cache-ref1nd.outputs.cache-hit }}" != "true" ]; then
-          download_singbox "reF1nd/sing-box-releases" "${{ steps.singbox-ver.outputs.ref1nd }}" "/tmp/sing-box-ref1nd"
-        else
+        # reF1nd 版
+        if [ "${{ steps.cache-ref1nd.outputs.cache-hit }}" == "true" ] && [ -f /tmp/sing-box-ref1nd ]; then
           echo "✓ 命中缓存: sing-box reF1nd"
+          chmod +x /tmp/sing-box-ref1nd
+        else
+          rm -f /tmp/sing-box-ref1nd
+          download_singbox "reF1nd/sing-box-releases" "${{ steps.singbox-ver.outputs.ref1nd }}" "/tmp/sing-box-ref1nd"
         fi
 
     # 预下载 Sub-Store proxy-utils.esm.mjs（convert.mjs 直接 import，无自动下载能力）
