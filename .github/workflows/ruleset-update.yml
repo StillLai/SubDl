@@ -57,6 +57,35 @@ jobs:
         mkdir -p .cache
         DEST=".cache/sing-box-official"
 
+        download_singbox() {
+          local ver="$1" dest="$2"
+          echo "→ 下载 sing-box $ver..."
+          local tmpdir
+          tmpdir=$(mktemp -d)
+          gh release download "$ver" --repo SagerNet/sing-box --pattern "*linux-amd64-glibc.tar.gz" --dir "$tmpdir" --clobber
+          local bin=""
+          for f in "$tmpdir"/*.tar.gz; do
+            [ -f "$f" ] || continue
+            tar xzf "$f" -C "$tmpdir"
+            bin=$(find "$tmpdir" -name sing-box -type f -not -path "*.json" | head -1)
+            [ -n "$bin" ] && break
+          done
+          if [ -z "$bin" ]; then
+            echo "::error::找不到 sing-box $ver 的二进制"
+            rm -rf "$tmpdir"
+            exit 1
+          fi
+          cp "$bin" "$dest"
+          rm -rf "$tmpdir"
+          chmod +x "$dest"
+          if "$dest" version >/dev/null 2>&1; then
+            echo "✓ $dest 就绪: $("$dest" version)"
+          else
+            echo "::error::$dest 下载成功但无法执行，请检查架构兼容性"
+            exit 1
+          fi
+        }
+
         if [ "${{ steps.cache-singbox.outputs.cache-hit }}" == "true" ] && [ -f "$DEST" ]; then
           chmod +x "$DEST"
           if "$DEST" version >/dev/null 2>&1; then
@@ -64,61 +93,11 @@ jobs:
           else
             echo "⚠ 缓存的 sing-box 无法执行（可能 runner 环境已变更），重新下载..."
             rm -f "$DEST"
-            VER="${{ steps.singbox-ver.outputs.version }}"
-            arch="$(dpkg --print-architecture 2>/dev/null || echo amd64)"
-            echo "→ 下载 sing-box $VER (arch: $arch)..."
-            tmpdir=$(mktemp -d)
-            gh release download "$VER" --repo SagerNet/sing-box --pattern "*${arch}.deb" --dir "$tmpdir" --clobber
-            for f in "$tmpdir"/*.deb; do
-              [ -f "$f" ] || continue
-              dpkg-deb -x "$f" "$tmpdir/extract"
-              bin=$(find "$tmpdir/extract" -name sing-box -type f | head -1)
-              [ -n "$bin" ] && cp "$bin" "$DEST" && break
-            done
-            rm -rf "$tmpdir"
-            if [ ! -f "$DEST" ]; then
-              echo "::error::找不到 sing-box $VER 的二进制"
-              exit 1
-            fi
-            chmod +x "$DEST"
-            if "$DEST" version >/dev/null 2>&1; then
-              echo "✓ sing-box 就绪: $("$DEST" version)"
-            else
-              echo "::error::sing-box 下载成功但无法执行，请检查架构兼容性"
-              exit 1
-            fi
+            download_singbox "${{ steps.singbox-ver.outputs.version }}" "$DEST"
           fi
         else
           rm -f "$DEST"
-          VER="${{ steps.singbox-ver.outputs.version }}"
-          arch="$(dpkg --print-architecture 2>/dev/null || echo amd64)"
-          echo "→ 下载 sing-box $VER (arch: $arch)..."
-          tmpdir=$(mktemp -d)
-          gh release download "$VER" --repo SagerNet/sing-box --pattern "*${arch}.deb" --dir "$tmpdir" --clobber
-          for f in "$tmpdir"/*.deb; do
-            [ -f "$f" ] || continue
-            dpkg-deb -x "$f" "$tmpdir/extract"
-            bin=$(find "$tmpdir/extract" -name sing-box -type f | head -1)
-            [ -n "$bin" ] && cp "$bin" "$DEST" && break
-          done
-          rm -rf "$tmpdir"
-          if [ ! -f "$DEST" ]; then
-            echo "::error::找不到 sing-box $VER 的二进制"
-            exit 1
-          fi
-          chmod +x "$DEST"
-          if "$DEST" version >/dev/null 2>&1; then
-            echo "✓ sing-box 就绪: $("$DEST" version)"
-          else
-            echo "::error::sing-box 下载成功但无法执行，请检查架构兼容性"
-            exit 1
-          fi
-        fi
-
-        # 最终验证二进制可执行
-        if ! "$DEST" version >/dev/null 2>&1; then
-          echo "::error::$DEST 无法执行，请检查 runner 环境兼容性"
-          exit 1
+          download_singbox "${{ steps.singbox-ver.outputs.version }}" "$DEST"
         fi
 
         # 通过 GITHUB_ENV 传递绝对路径
