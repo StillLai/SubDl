@@ -95,7 +95,7 @@ jobs:
             rm -rf /tmp/sing-box-*/
           fi
           chmod +x "$dest"
-          echo "✓ $dest 就绪: $($dest version 2>/dev/null || echo '未知版本')"
+          echo "✓ $dest 就绪: $($dest version || echo '未知版本')"
         }
 
         if [ "${{ steps.cache-official.outputs.cache-hit }}" != "true" ]; then

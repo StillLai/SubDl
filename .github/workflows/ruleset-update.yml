@@ -77,7 +77,7 @@ jobs:
           rm -rf /tmp/_singbox.deb /tmp/_singbox-extract
         fi
         chmod +x /tmp/sing-box
-        echo "✓ sing-box 就绪: $(/tmp/sing-box version 2>/dev/null || echo '未知版本')"
+        echo "✓ sing-box 就绪: $(/tmp/sing-box version || echo '未知版本')"
 
     - name: Build rulesets
       env:
