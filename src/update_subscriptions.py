@@ -760,10 +760,65 @@ def generate_status_svg(
 
 # ========== Gist 上传 ==========
 
-def upload_to_gist(github_token: str, gist_id: str, files: dict[str, str]) -> None:
-    """上传文件到 GitHub Gist（GIST_ID 必须已在 Secrets 中配置）"""
+# SubDl 托管的文件名匹配模式（用于安全清理旧文件）
+_MANAGED_FILE_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r'^.+\.yaml$'),              # 原始订阅: 山海.yaml
+    re.compile(r'^.+-singbox\.json$'),       # 转换节点: 山海-singbox.json
+    re.compile(r'^sing-box.*\.json$'),       # 合并配置: sing-box.json, sing-box-mixed.json, sing-box-tun-win-providers.json 等
+)
+
+
+def _is_managed_file(filename: str) -> bool:
+    """判断文件名是否属于 SubDl 托管的文件"""
+    return any(p.match(filename) for p in _MANAGED_FILE_PATTERNS)
+
+
+def _fetch_gist_filenames(github_token: str, gist_id: str) -> list[str]:
+    """获取 Gist 中当前所有文件名，失败时返回空列表"""
+    try:
+        headers = {"Authorization": f"token {github_token}", "Accept": "application/vnd.github.v3+json"}
+        resp = http_request("GET", f"https://api.github.com/gists/{gist_id}", headers=headers)
+        if resp.status_code >= 400:
+            log_warn(f"  获取 Gist 文件列表失败: HTTP {resp.status_code}")
+            return []
+        data = json.loads(resp.text)
+        return list(data.get('files', {}).keys())
+    except Exception as e:
+        log_warn(f"  获取 Gist 文件列表失败: {e}")
+        return []
+
+
+def _cleanup_old_gist_files(
+    github_token: str,
+    gist_id: str,
+    current_files: dict[str, str],
+) -> dict[str, None]:
+    """获取 Gist 中已有的托管文件，将本次不在上传集合中的旧文件标记为删除
+
+    Returns:
+        需要删除的文件字典 {filename: None}，可直接合并到上传 payload
+    """
+    existing_names = _fetch_gist_filenames(github_token, gist_id)
+    if not existing_names:
+        return {}
+
+    current_keys = set(current_files.keys())
+    to_delete: dict[str, None] = {}
+
+    for name in existing_names:
+        if _is_managed_file(name) and name not in current_keys:
+            to_delete[name] = None
+
+    return to_delete
+
+
+def upload_to_gist(github_token: str, gist_id: str, files: dict[str, str | None]) -> None:
+    """上传文件到 GitHub Gist（GIST_ID 必须已在 Secrets 中配置）
+
+    files 中值为 None 的条目会被删除（GitHub API 用 null 表示删除）
+    """
     headers = {"Authorization": f"token {github_token}", "Accept": "application/vnd.github.v3+json"}
-    gist_files = {name: {"content": content} for name, content in files.items()}
+    gist_files: dict[str, dict[str, str | None]] = {name: {"content": content} for name, content in files.items()}
 
     log_info(f"    更新 Gist: {gist_id}")
     resp = http_request("PATCH", f"https://api.github.com/gists/{gist_id}", headers=headers, json_body={"files": gist_files})
@@ -820,8 +875,16 @@ def _generate_and_upload(
     svg_output.write_text(svg_content, encoding="utf-8")
     log_info("✓ 状态 SVG 已生成")
 
+    # 清理 Gist 中不再需要的旧文件
+    to_delete = _cleanup_old_gist_files(github_token, gist_id, files)
+    if to_delete:
+        log_info(f"→ 清理 {len(to_delete)} 个旧文件: {', '.join(to_delete.keys())}")
+
+    upload_payload: dict[str, str | None] = dict(files)
+    upload_payload.update(to_delete)
+
     log_info(f"上传 {len(files)} 个文件到 Gist...")
-    upload_to_gist(github_token, gist_id, files)
+    upload_to_gist(github_token, gist_id, upload_payload)
 
 
 def main() -> None:
