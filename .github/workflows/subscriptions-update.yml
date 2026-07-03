@@ -34,6 +34,56 @@ jobs:
       working-directory: src
       run: npm ci
 
+    # --- sing-box 二进制缓存（用于配置校验） ---
+    - name: Get sing-box versions
+      id: singbox-ver
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        set -Eeuo pipefail
+        OFFICIAL=$(gh api repos/SagerNet/sing-box/releases/latest --jq '.tag_name')
+        REF1ND=$(gh api repos/reF1nd/sing-box-releases/releases/latest --jq '.tag_name')
+        echo "official=$OFFICIAL" >> $GITHUB_OUTPUT
+        echo "ref1nd=$REF1ND" >> $GITHUB_OUTPUT
+        echo "✓ sing-box 官方版: $OFFICIAL | reF1nd: $REF1ND"
+
+    - name: Cache sing-box (official)
+      uses: actions/cache@v6
+      id: cache-official
+      with:
+        path: /tmp/sing-box-official
+        key: sing-box-official-${{ steps.singbox-ver.outputs.official }}
+
+    - name: Cache sing-box (reF1nd)
+      uses: actions/cache@v6
+      id: cache-ref1nd
+      with:
+        path: /tmp/sing-box-ref1nd
+        key: sing-box-ref1nd-${{ steps.singbox-ver.outputs.ref1nd }}
+
+    - name: Download sing-box binaries
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        set -Eeuo pipefail
+        ARCH="linux-amd64"
+        if [ "${{ steps.cache-official.outputs.cache-hit }}" != "true" ]; then
+          VER="${{ steps.singbox-ver.outputs.official }}"
+          URL=$(gh api repos/SagerNet/sing-box/releases/tags/$VER --jq ".assets[] | select(.name | endswith(\"$ARCH.tar.gz\")) | .browser_download_url")
+          curl -fsSL "$URL" | tar xz && mv sing-box-*/sing-box /tmp/sing-box-official && chmod +x /tmp/sing-box-official
+          echo "✓ 下载 sing-box 官方版 $VER"
+        else
+          echo "✓ 命中缓存: sing-box 官方版"
+        fi
+        if [ "${{ steps.cache-ref1nd.outputs.cache-hit }}" != "true" ]; then
+          VER="${{ steps.singbox-ver.outputs.ref1nd }}"
+          URL=$(gh api repos/reF1nd/sing-box-releases/releases/tags/$VER --jq ".assets[] | select(.name | endswith(\"$ARCH.tar.gz\")) | .browser_download_url")
+          curl -fsSL "$URL" | tar xz && mv sing-box-*/sing-box /tmp/sing-box-ref1nd && chmod +x /tmp/sing-box-ref1nd
+          echo "✓ 下载 sing-box reF1nd $VER"
+        else
+          echo "✓ 命中缓存: sing-box reF1nd"
+        fi
+
     # 预下载 Sub-Store proxy-utils.esm.mjs（convert.mjs 直接 import，无自动下载能力）
     - name: Pre-download Sub-Store dependency
       env:
@@ -55,6 +105,8 @@ jobs:
     - name: Build subscriptions
       env:
         GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        SING_BOX_BIN: /tmp/sing-box-official
+        SING_BOX_REF1ND_BIN: /tmp/sing-box-ref1nd
         GIST_ID: ${{ secrets.GIST_ID }}
         SUB_URL: ${{ secrets.SUB_URL }}
         SUB_URL_1: ${{ secrets.SUB_URL_1 }}

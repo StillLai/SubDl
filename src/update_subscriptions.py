@@ -867,6 +867,65 @@ def generate_status_svg(
     )
     return '\n'.join(parts)
 
+# ========== 配置校验 ==========
+
+def _validate_configs(files: dict[str, str]) -> dict[str, str]:
+    """用 sing-box check 校验配置文件
+
+    非 providers 配置用 SING_BOX_BIN（官方版），providers 配置用 SING_BOX_REF1ND_BIN。
+    校验失败的文件不上传到 Gist。
+
+    Returns:
+        校验失败的文件字典 {filename: error_msg}，空 dict 表示全部通过。
+    """
+    official_bin = os.environ.get('SING_BOX_BIN', '')
+    ref1nd_bin = os.environ.get('SING_BOX_REF1ND_BIN', '')
+    if not official_bin:
+        log_info("  → SING_BOX_BIN 未设置，跳过配置校验")
+        return {}
+
+    failures: dict[str, str] = {}
+    checked = 0
+    for filename, content in files.items():
+        if not filename.startswith('sing-box') or not filename.endswith('.json'):
+            continue
+
+        is_providers = '-providers.json' in filename
+        bin_path = ref1nd_bin if is_providers and ref1nd_bin else official_bin
+
+        tmp_file: str | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode='w', suffix='.json', delete=False, encoding='utf-8'
+            ) as f:
+                f.write(content)
+                tmp_file = f.name
+
+            result = subprocess.run(
+                [bin_path, 'check', '-c', tmp_file],
+                capture_output=True, text=True, timeout=30
+            )
+            checked += 1
+            if result.returncode != 0:
+                err = result.stderr.strip()[:200] or '未知错误'
+                failures[filename] = err
+                log_error(f"  ✗ {filename}: 校验失败 — {err}")
+            else:
+                log_info(f"  ✓ {filename}: 校验通过")
+        except Exception as e:
+            log_warn(f"  ✗ {filename}: 校验异常 — {e}")
+        finally:
+            if tmp_file:
+                os.unlink(tmp_file)
+
+    if failures:
+        log_warn(f"  ⚠️ {len(failures)}/{checked} 个配置校验失败")
+    else:
+        log_info(f"  ✓ 全部 {checked} 个配置校验通过")
+
+    return failures
+
+
 # ========== Gist 上传 ==========
 
 # SubDl 托管的文件名匹配模式（用于安全清理旧文件）
@@ -984,6 +1043,13 @@ def _generate_and_upload(
     (PROJECT_ROOT / "status-light.svg").write_text(svg_light, encoding="utf-8")
     (PROJECT_ROOT / "status-dark.svg").write_text(svg_dark, encoding="utf-8")
     log_info("✓ 状态 SVG 已生成（浅色 + 深色）")
+
+    # 校验配置文件（校验失败的不上传）
+    failures = _validate_configs(files)
+    if failures:
+        for name in failures:
+            files.pop(name, None)
+        log_warn(f"⚠️ 已从上传中移除 {len(failures)} 个校验失败的配置")
 
     # 清理 Gist 中不再需要的旧文件
     to_delete = _cleanup_old_gist_files(github_token, gist_id, files)
