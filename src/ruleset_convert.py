@@ -12,7 +12,7 @@ from typing import Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from utils import (
-    log_info, log_warn, log_error,
+    log_info, log_warn, log_error, format_bin_error,
     http_get_with_retry,
     RULESET_SOURCE, RULESET_JSON_DIR, RULESET_SRS_DIR,
 )
@@ -166,12 +166,7 @@ def _compile_srs(file_name: str) -> None:
             check=True, capture_output=True, text=True
         )
     except FileNotFoundError as e:
-        # Linux 内核在 ELF 二进制无法执行时（如缺少动态链接器/解释器）
-        # 会返回 ENOENT，Python 将其包装为 FileNotFoundError
-        if os.path.isfile(singbox_bin):
-            log_error(f"  SRS 编译失败: {srs_path.name} — 二进制存在但无法执行（可能是 runner 环境不兼容）: {e}")
-        else:
-            log_error(f"  SRS 编译失败: {srs_path.name} — {e}")
+        log_error(f"  SRS 编译失败: {srs_path.name} — {format_bin_error(e, singbox_bin)}")
     except Exception as e:
         log_error(f"  SRS 编译失败: {srs_path.name} - {e}")
 
