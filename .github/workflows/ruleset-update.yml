@@ -65,24 +65,16 @@ jobs:
             echo "⚠ 缓存的 sing-box 无法执行（可能 runner 环境已变更），重新下载..."
             rm -f "$DEST"
             VER="${{ steps.singbox-ver.outputs.version }}"
-            echo "→ 下载 sing-box $VER..."
+            arch="$(dpkg --print-architecture 2>/dev/null || echo amd64)"
+            echo "→ 下载 sing-box $VER (arch: $arch)..."
             tmpdir=$(mktemp -d)
-            gh release download "$VER" --repo SagerNet/sing-box --pattern "*.deb" --dir "$tmpdir" --clobber 2>/dev/null \
-              || gh release download "$VER" --repo SagerNet/sing-box --pattern "*.tar.gz" --dir "$tmpdir" --clobber
+            gh release download "$VER" --repo SagerNet/sing-box --pattern "*${arch}.deb" --dir "$tmpdir" --clobber
             for f in "$tmpdir"/*.deb; do
               [ -f "$f" ] || continue
               dpkg-deb -x "$f" "$tmpdir/extract"
               bin=$(find "$tmpdir/extract" -name sing-box -type f | head -1)
               [ -n "$bin" ] && cp "$bin" "$DEST" && break
             done
-            if [ ! -f "$DEST" ]; then
-              for f in "$tmpdir"/*.tar.gz; do
-                [ -f "$f" ] || continue
-                tar xzf "$f" -C "$tmpdir"
-                bin=$(find "$tmpdir" -name sing-box -type f -not -path "*.json" | head -1)
-                [ -n "$bin" ] && cp "$bin" "$DEST" && break
-              done
-            fi
             rm -rf "$tmpdir"
             if [ ! -f "$DEST" ]; then
               echo "::error::找不到 sing-box $VER 的二进制"
@@ -99,24 +91,16 @@ jobs:
         else
           rm -f "$DEST"
           VER="${{ steps.singbox-ver.outputs.version }}"
-          echo "→ 下载 sing-box $VER..."
+          arch="$(dpkg --print-architecture 2>/dev/null || echo amd64)"
+          echo "→ 下载 sing-box $VER (arch: $arch)..."
           tmpdir=$(mktemp -d)
-          gh release download "$VER" --repo SagerNet/sing-box --pattern "*.deb" --dir "$tmpdir" --clobber 2>/dev/null \
-            || gh release download "$VER" --repo SagerNet/sing-box --pattern "*.tar.gz" --dir "$tmpdir" --clobber
+          gh release download "$VER" --repo SagerNet/sing-box --pattern "*${arch}.deb" --dir "$tmpdir" --clobber
           for f in "$tmpdir"/*.deb; do
             [ -f "$f" ] || continue
             dpkg-deb -x "$f" "$tmpdir/extract"
             bin=$(find "$tmpdir/extract" -name sing-box -type f | head -1)
             [ -n "$bin" ] && cp "$bin" "$DEST" && break
           done
-          if [ ! -f "$DEST" ]; then
-            for f in "$tmpdir"/*.tar.gz; do
-              [ -f "$f" ] || continue
-              tar xzf "$f" -C "$tmpdir"
-              bin=$(find "$tmpdir" -name sing-box -type f -not -path "*.json" | head -1)
-              [ -n "$bin" ] && cp "$bin" "$DEST" && break
-            done
-          fi
           rm -rf "$tmpdir"
           if [ ! -f "$DEST" ]; then
             echo "::error::找不到 sing-box $VER 的二进制"
