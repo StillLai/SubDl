@@ -917,6 +917,13 @@ def _validate_configs(files: dict[str, str]) -> dict[str, str]:
                 log_error(f"  ✗ {filename}: 校验失败 — {err}")
             else:
                 log_info(f"  ✓ {filename}: 校验通过")
+        except FileNotFoundError as e:
+            # Linux 内核在 ELF 二进制无法执行时（如缺少动态链接器/解释器）
+            # 会返回 ENOENT，Python 将其包装为 FileNotFoundError
+            if os.path.isfile(bin_path):
+                log_warn(f"  ✗ {filename}: 校验异常 — 二进制存在但无法执行（可能是 runner 环境不兼容）: {e}")
+            else:
+                log_warn(f"  ✗ {filename}: 校验异常 — {e}")
         except Exception as e:
             log_warn(f"  ✗ {filename}: 校验异常 — {e}")
         finally:
