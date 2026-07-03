@@ -9,7 +9,6 @@
 """
 
 import base64
-import copy
 import json
 import os
 import re
@@ -625,11 +624,6 @@ _SVG_COL_HEADER_H = 36
 _SVG_COLS: list[tuple[str, int]] = [
     ('订阅', 100), ('流量使用', 280), ('到期时间', 90), ('状态', 70), ('节点', 60),
 ]
-_SVG_BAR_GRAD_MAP: dict[str, str] = {
-    '#10b981': 'barGreenGrad', '#f59e0b': 'barOrangeGrad', '#ef4444': 'barRedGrad',
-}
-
-
 def _flow_status_text(flow: FlowInfo, theme: SvgTheme) -> tuple[str, str]:
     """返回 (状态文本, 颜色)"""
     now = time.time()
@@ -641,6 +635,17 @@ def _flow_status_text(flow: FlowInfo, theme: SvgTheme) -> tuple[str, str]:
     if flow.expire and flow.expire - now < 7 * 24 * 3600:
         return "⚠️ 即将到期", theme.orange
     return "✅ 正常", theme.green
+
+
+def _bar_color_and_grad(color: str, theme: SvgTheme) -> tuple[str, str | None]:
+    """返回 (bar_color_hex, gradient_id)，gradient_id 为 None 时直接用 hex 填充"""
+    if color == theme.green:
+        return theme.green, 'barGreenGrad'
+    if color == theme.orange:
+        return theme.orange, 'barOrangeGrad'
+    if color == theme.red:
+        return theme.red, 'barRedGrad'
+    return color, None
 
 
 # ---------- SVG 子构建函数 ----------
@@ -700,29 +705,29 @@ def _build_svg_header(
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{svg_w}" height="{svg_h}" viewBox="0 0 {svg_w} {svg_h}">',
         f'  <rect width="{svg_w}" height="{svg_h}" rx="12" fill="{theme.bg}"/>',
         '  <defs>',
-        '    <linearGradient id="headerGrad" x1="0" y1="0" x2="1" y2="0">',
-        '      <stop offset="0%" stop-color="#f0f4fa"/>',
-        '      <stop offset="50%" stop-color="#f8fafc"/>',
-        '      <stop offset="100%" stop-color="#eef2f7"/>',
+        f'    <linearGradient id="headerGrad" x1="0" y1="0" x2="1" y2="0">',
+        f'      <stop offset="0%" stop-color="{theme.header_grad_start}"/>',
+        f'      <stop offset="50%" stop-color="{theme.header_grad_mid}"/>',
+        f'      <stop offset="100%" stop-color="{theme.header_grad_end}"/>',
         '    </linearGradient>',
-        '    <linearGradient id="accentGrad" x1="0" y1="0" x2="1" y2="0">',
-        '      <stop offset="0%" stop-color="#3b82f6"/>',
-        '      <stop offset="100%" stop-color="#10b981"/>',
+        f'    <linearGradient id="accentGrad" x1="0" y1="0" x2="1" y2="0">',
+        f'      <stop offset="0%" stop-color="{theme.accent_grad_start}"/>',
+        f'      <stop offset="100%" stop-color="{theme.accent_grad_end}"/>',
         '    </linearGradient>',
-        '    <linearGradient id="barGreenGrad" x1="0" y1="0" x2="1" y2="0">',
-        '      <stop offset="0%" stop-color="#34d399"/>',
-        '      <stop offset="100%" stop-color="#10b981"/>',
+        f'    <linearGradient id="barGreenGrad" x1="0" y1="0" x2="1" y2="0">',
+        f'      <stop offset="0%" stop-color="{theme.bar_grad_green_start}"/>',
+        f'      <stop offset="100%" stop-color="{theme.bar_grad_green_end}"/>',
         '    </linearGradient>',
-        '    <linearGradient id="barOrangeGrad" x1="0" y1="0" x2="1" y2="0">',
-        '      <stop offset="0%" stop-color="#fbbf24"/>',
-        '      <stop offset="100%" stop-color="#f59e0b"/>',
+        f'    <linearGradient id="barOrangeGrad" x1="0" y1="0" x2="1" y2="0">',
+        f'      <stop offset="0%" stop-color="{theme.bar_grad_orange_start}"/>',
+        f'      <stop offset="100%" stop-color="{theme.bar_grad_orange_end}"/>',
         '    </linearGradient>',
-        '    <linearGradient id="barRedGrad" x1="0" y1="0" x2="1" y2="0">',
-        '      <stop offset="0%" stop-color="#f87171"/>',
-        '      <stop offset="100%" stop-color="#ef4444"/>',
+        f'    <linearGradient id="barRedGrad" x1="0" y1="0" x2="1" y2="0">',
+        f'      <stop offset="0%" stop-color="{theme.bar_grad_red_start}"/>',
+        f'      <stop offset="100%" stop-color="{theme.bar_grad_red_end}"/>',
         '    </linearGradient>',
-        '    <filter id="cardShadow" x="-2%" y="-2%" width="104%" height="104%">',
-        '      <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000000" flood-opacity="0.06"/>',
+        f'    <filter id="cardShadow" x="-2%" y="-2%" width="104%" height="104%">',
+        f'      <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000000" flood-opacity="{theme.shadow_opacity}"/>',
         '    </filter>',
         '  </defs>',
         f'  <rect x="{p}" y="{p}" width="{content_w}" height="{_SVG_TITLE_H}" rx="8" fill="url(#headerGrad)" filter="url(#cardShadow)"/>',
@@ -782,7 +787,7 @@ def _build_svg_table(
         fill_w = max(bar_w * rd['pct'] / 100, 0)
         parts.append(f'  <rect x="{bar_x}" y="{bar_y}" width="{bar_w}" height="8" rx="4" fill="{theme.bar_bg}"/>')
         if fill_w > 0:
-            bar_grad = _SVG_BAR_GRAD_MAP.get(rd['bar_color'])
+            _, bar_grad = _bar_color_and_grad(rd['bar_color'], theme)
             fill_val = f"url(#{bar_grad})" if bar_grad else rd['bar_color']
             parts.append(f'  <rect x="{bar_x}" y="{bar_y}" width="{fill_w}" height="8" rx="4" fill="{fill_val}"/>')
         parts.append(f'  <text x="{bar_x}" y="{bar_y + 24}" font-family="{_FONT}" font-size="11" fill="{theme.text_sec}">{rd["used"]} / {rd["total"]}  ({rd["pct"]:.0f}%)  剩余: {rd["remaining"]}</text>')
