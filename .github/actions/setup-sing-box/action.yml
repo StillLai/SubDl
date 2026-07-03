@@ -1,0 +1,159 @@
+name: 'Setup sing-box binary'
+description: 'Download, cache, and set up a sing-box binary for CI usage'
+
+inputs:
+  repo:
+    description: 'GitHub repo (e.g. SagerNet/sing-box or reF1nd/sing-box-releases)'
+    required: true
+  output-path:
+    description: 'Destination path for the binary'
+    default: '.cache/sing-box'
+  token:
+    description: 'GitHub token for API access'
+    required: true
+
+outputs:
+  cache-hit:
+    description: 'Whether the binary was loaded from cache'
+    value: ${{ steps.cache.outputs.cache-hit }}
+  version:
+    description: 'The resolved sing-box version'
+    value: ${{ steps.get-version.outputs.version }}
+  bin-path:
+    description: 'Absolute path to the binary'
+    value: ${{ steps.validate.outputs.bin-path }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Get latest version
+      id: get-version
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+      run: |
+        set -Eeuo pipefail
+        REPO="${{ inputs.repo }}"
+        VERSION=$(gh api "repos/${REPO}/releases/latest" --jq '.tag_name')
+        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+        echo "✓ ${REPO} latest: $VERSION"
+
+    - name: Cache binary
+      id: cache
+      uses: actions/cache@v6
+      with:
+        path: ${{ inputs.output-path }}
+        key: sing-box-${{ inputs.repo }}-${{ steps.get-version.outputs.version }}
+
+    - name: Download binary
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+      run: |
+        set -Eeuo pipefail
+        mkdir -p "$(dirname "${{ inputs.output-path }}")"
+        DEST="${{ inputs.output-path }}"
+        REPO="${{ inputs.repo }}"
+        VERSION="${{ steps.get-version.outputs.version }}"
+        CACHE_HIT="${{ steps.cache.outputs.cache-hit }}"
+
+        download_singbox() {
+          echo "→ 下载 ${REPO} ${VERSION}..."
+          local tmpdir
+          tmpdir=$(mktemp -d)
+          local download_ok=false
+
+          # Strategy 1: exact match linux-amd64-glibc
+          if gh release download "$VERSION" --repo "$REPO" \
+            --pattern "*linux-amd64-glibc.tar.gz" --dir "$tmpdir" --clobber 2>/dev/null; then
+            download_ok=true
+          fi
+
+          # Strategy 2: fuzzy match (contains both amd64 and linux)
+          if [ "$download_ok" = false ]; then
+            echo "  ⚠ 精确匹配失败，尝试模糊匹配..."
+            local asset_name
+            asset_name=$(gh release view "$VERSION" --repo "$REPO" --json assets \
+              -q '.assets[].name' 2>/dev/null \
+              | grep -E 'amd64' | grep -iE 'linux' | grep '\.tar\.gz$' | head -1)
+            if [ -n "$asset_name" ]; then
+              echo "  → 找到候选: $asset_name"
+              gh release download "$VERSION" --repo "$REPO" \
+                --pattern "$asset_name" --dir "$tmpdir" --clobber
+              download_ok=true
+            fi
+          fi
+
+          # Strategy 3: broad match (amd64 only)
+          if [ "$download_ok" = false ]; then
+            echo "  ⚠ 模糊匹配失败，尝试仅匹配 amd64..."
+            local asset_name
+            asset_name=$(gh release view "$VERSION" --repo "$REPO" --json assets \
+              -q '.assets[].name' 2>/dev/null \
+              | grep -E 'amd64' | grep '\.tar\.gz$' | head -1)
+            if [ -n "$asset_name" ]; then
+              echo "  → 找到候选: $asset_name"
+              gh release download "$VERSION" --repo "$REPO" \
+                --pattern "$asset_name" --dir "$tmpdir" --clobber
+              download_ok=true
+            fi
+          fi
+
+          if [ "$download_ok" = false ]; then
+            echo "::error::找不到 ${REPO} ${VERSION} 的二进制（已尝试所有匹配策略）"
+            rm -rf "$tmpdir"
+            exit 1
+          fi
+
+          local bin=""
+          for f in "$tmpdir"/*.tar.gz; do
+            [ -f "$f" ] || continue
+            tar xzf "$f" -C "$tmpdir"
+            bin=$(find "$tmpdir" -name sing-box -type f -not -path "*.json" | head -1)
+            [ -n "$bin" ] && break
+          done
+          if [ -z "$bin" ]; then
+            echo "::error::找不到 ${REPO} ${VERSION} 的二进制"
+            rm -rf "$tmpdir"
+            exit 1
+          fi
+          cp "$bin" "$DEST"
+          rm -rf "$tmpdir"
+          chmod +x "$DEST"
+          if "$DEST" version >/dev/null 2>&1; then
+            echo "✓ $DEST 就绪: $("$DEST" version)"
+          else
+            echo "::error::$DEST 下载成功但无法执行，请检查架构兼容性"
+            exit 1
+          fi
+        }
+
+        if [ "$CACHE_HIT" == "true" ] && [ -f "$DEST" ]; then
+          chmod +x "$DEST"
+          if "$DEST" version >/dev/null 2>&1; then
+            echo "✓ 命中缓存: ${REPO}"
+          else
+            echo "⚠ 缓存的二进制无法执行（可能 runner 环境已变更），重新下载..."
+            rm -f "$DEST"
+            download_singbox
+          fi
+        else
+          rm -f "$DEST"
+          download_singbox
+        fi
+
+    - name: Validate binary
+      id: validate
+      shell: bash
+      run: |
+        set -Eeuo pipefail
+        DEST="${{ inputs.output-path }}"
+        if [ ! -f "$DEST" ]; then
+          echo "::error::Binary not found at $DEST"
+          exit 1
+        fi
+        chmod +x "$DEST"
+        ABS_BIN="$(readlink -f "$DEST")"
+        ls -la "$ABS_BIN"
+        echo "$ABS_BIN version: $("$ABS_BIN" version 2>&1 || echo 'N/A')"
+        echo "bin-path=$ABS_BIN" >> "$GITHUB_OUTPUT"

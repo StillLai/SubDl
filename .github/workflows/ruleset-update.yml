@@ -32,78 +32,17 @@ jobs:
     - name: Install Python dependencies
       run: pip install -r src/requirements.txt
 
-    - name: Get sing-box version
-      id: singbox-ver
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        set -Eeuo pipefail
-        VERSION=$(gh api repos/SagerNet/sing-box/releases/latest --jq '.tag_name')
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
-        echo "✓ sing-box 最新版本: $VERSION"
-
-    - name: Cache sing-box binary
-      uses: actions/cache@v6
-      id: cache-singbox
+    - name: Setup sing-box
+      id: setup-singbox
+      uses: ./.github/actions/setup-sing-box
       with:
-        path: .cache/sing-box
-        key: sing-box-${{ steps.singbox-ver.outputs.version }}
+        repo: SagerNet/sing-box
+        output-path: .cache/sing-box
+        token: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Download sing-box
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Export sing-box path
       run: |
-        set -Eeuo pipefail
-        mkdir -p .cache
-        DEST=".cache/sing-box"
-
-        download_singbox() {
-          local ver="$1" dest="$2"
-          echo "→ 下载 sing-box $ver..."
-          local tmpdir
-          tmpdir=$(mktemp -d)
-          gh release download "$ver" --repo SagerNet/sing-box --pattern "*linux-amd64-glibc.tar.gz" --dir "$tmpdir" --clobber
-          local bin=""
-          for f in "$tmpdir"/*.tar.gz; do
-            [ -f "$f" ] || continue
-            tar xzf "$f" -C "$tmpdir"
-            bin=$(find "$tmpdir" -name sing-box -type f -not -path "*.json" | head -1)
-            [ -n "$bin" ] && break
-          done
-          if [ -z "$bin" ]; then
-            echo "::error::找不到 sing-box $ver 的二进制"
-            rm -rf "$tmpdir"
-            exit 1
-          fi
-          cp "$bin" "$dest"
-          rm -rf "$tmpdir"
-          chmod +x "$dest"
-          if "$dest" version >/dev/null 2>&1; then
-            echo "✓ $dest 就绪: $("$dest" version)"
-          else
-            echo "::error::$dest 下载成功但无法执行，请检查架构兼容性"
-            exit 1
-          fi
-        }
-
-        if [ "${{ steps.cache-singbox.outputs.cache-hit }}" == "true" ] && [ -f "$DEST" ]; then
-          chmod +x "$DEST"
-          if "$DEST" version >/dev/null 2>&1; then
-            echo "✓ 命中缓存: sing-box"
-          else
-            echo "⚠ 缓存的 sing-box 无法执行（可能 runner 环境已变更），重新下载..."
-            rm -f "$DEST"
-            download_singbox "${{ steps.singbox-ver.outputs.version }}" "$DEST"
-          fi
-        else
-          rm -f "$DEST"
-          download_singbox "${{ steps.singbox-ver.outputs.version }}" "$DEST"
-        fi
-
-        # 通过 GITHUB_ENV 传递绝对路径
-        ABS_BIN="$(readlink -f "$DEST")"
-        ls -la "$ABS_BIN"
-        echo "SING_BOX_BIN=$ABS_BIN" >> "$GITHUB_ENV"
+        echo "SING_BOX_BIN=${{ steps.setup-singbox.outputs.bin-path }}" >> "$GITHUB_ENV"
 
     - name: Build rulesets
       run: python src/ruleset_convert.py
