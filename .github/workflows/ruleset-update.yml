@@ -46,42 +46,84 @@ jobs:
       uses: actions/cache@v6
       id: cache-singbox
       with:
-        path: /tmp/sing-box
+        path: .cache/sing-box-official
         key: sing-box-official-${{ steps.singbox-ver.outputs.version }}
 
     - name: Download sing-box
-      if: steps.cache-singbox.outputs.cache-hit != 'true'
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         set -Eeuo pipefail
-        VER="${{ steps.singbox-ver.outputs.version }}"
-        echo "→ 下载 sing-box $VER..."
-        # 优先查找 tar.gz，找不到则用 .deb
-        TAR_NAME=$(gh api repos/SagerNet/sing-box/releases/tags/$VER --jq '[.assets[].name] | map(select(endswith(".tar.gz"))) | .[0]' 2>/dev/null || true)
-        if [ -n "$TAR_NAME" ] && [ "$TAR_NAME" != "null" ]; then
-          FULL_URL=$(gh api repos/SagerNet/sing-box/releases/tags/$VER --jq ".assets[] | select(.name == \"$TAR_NAME\") | .browser_download_url")
-          curl -fsSL "$FULL_URL" | tar xz -C /tmp/
-          mv /tmp/sing-box-*/sing-box /tmp/sing-box
-          rm -rf /tmp/sing-box-*/
+        mkdir -p .cache
+        CACHE_DIR="$(pwd)/.cache"
+        DEST="$CACHE_DIR/sing-box-official"
+
+        if [ "${{ steps.cache-singbox.outputs.cache-hit }}" == "true" ] && [ -f "$DEST" ]; then
+          echo "✓ 命中缓存: sing-box"
+          chmod +x "$DEST"
         else
-          DEB_NAME=$(gh api repos/SagerNet/sing-box/releases/tags/$VER --jq '[.assets[].name] | map(select(endswith(".deb"))) | .[0]' 2>/dev/null || true)
-          if [ -z "$DEB_NAME" ] || [ "$DEB_NAME" = "null" ]; then
-            echo "::error::找不到 sing-box $VER 的二进制 asset"
-            exit 1
-          fi
-          FULL_URL=$(gh api repos/SagerNet/sing-box/releases/tags/$VER --jq ".assets[] | select(.name == \"$DEB_NAME\") | .browser_download_url")
-          curl -fsSL "$FULL_URL" -o /tmp/_singbox.deb
-          dpkg-deb -x /tmp/_singbox.deb /tmp/_singbox-extract
-          find /tmp/_singbox-extract -name sing-box -type f -exec mv {} /tmp/sing-box \;
-          rm -rf /tmp/_singbox.deb /tmp/_singbox-extract
+          rm -f "$DEST"
+          VER="${{ steps.singbox-ver.outputs.version }}"
+          echo "→ 下载 sing-box $VER..."
+          python -c "
+        import json, subprocess, tempfile, tarfile, os, sys, shutil
+        from urllib.request import urlopen, Request
+        from pathlib import Path
+
+        repo = 'SagerNet/sing-box'
+        ver = '$VER'
+        dest = '$DEST'
+        token = os.environ['GH_TOKEN']
+
+        result = subprocess.run(
+            ['gh', 'api', f'repos/{repo}/releases/tags/{ver}', '--jq', '.assets[] | {name, url: .browser_download_url}'],
+            capture_output=True, text=True
+        )
+        assets = [json.loads(line) for line in result.stdout.strip().split('\n') if line.strip()]
+        tar_asset = next((a for a in assets if a['name'].endswith('.tar.gz')), None)
+        deb_asset = next((a for a in assets if a['name'].endswith('.deb')), None)
+        binary_found = False
+
+        if tar_asset:
+            print(f'  下载 {tar_asset[\"name\"]}...')
+            req = Request(tar_asset['url'], headers={'Authorization': f'token {token}'})
+            with tempfile.TemporaryDirectory() as tmpdir:
+                tar_path = os.path.join(tmpdir, 'archive.tar.gz')
+                with urlopen(req, timeout=120) as resp, open(tar_path, 'wb') as f:
+                    shutil.copyfileobj(resp, f)
+                with tarfile.open(tar_path, 'r:gz') as tf:
+                    tf.extractall(tmpdir)
+                for p in Path(tmpdir).rglob('sing-box'):
+                    if p.is_file() and not p.name.endswith('.json'):
+                        shutil.copy2(str(p), dest)
+                        binary_found = True
+                        break
+
+        if not binary_found and deb_asset:
+            print(f'  下载 {deb_asset[\"name\"]}...')
+            req = Request(deb_asset['url'], headers={'Authorization': f'token {token}'})
+            with tempfile.TemporaryDirectory() as tmpdir:
+                deb_path = os.path.join(tmpdir, 'package.deb')
+                with urlopen(req, timeout=120) as resp, open(deb_path, 'wb') as f:
+                    shutil.copyfileobj(resp, f)
+                subprocess.run(['dpkg-deb', '-x', deb_path, tmpdir + '/extract'], check=True)
+                for p in Path(tmpdir + '/extract').rglob('sing-box'):
+                    if p.is_file() and not p.name.endswith('.json'):
+                        shutil.copy2(str(p), dest)
+                        binary_found = True
+                        break
+
+        if not binary_found:
+            print(f'::error::找不到 {repo} {ver} 的二进制 asset', file=sys.stderr)
+            sys.exit(1)
+        "
+          chmod +x "$DEST"
+          echo "✓ sing-box 就绪: $("$DEST" version || echo '未知版本')"
         fi
-        chmod +x /tmp/sing-box
-        echo "✓ sing-box 就绪: $(/tmp/sing-box version || echo '未知版本')"
 
     - name: Build rulesets
       env:
-        SING_BOX_BIN: /tmp/sing-box
+        SING_BOX_BIN: ${{ github.workspace }}/.cache/sing-box-official
       run: python src/ruleset_convert.py
 
     - name: Verify generated files

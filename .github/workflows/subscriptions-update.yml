@@ -67,52 +67,88 @@ jobs:
       run: |
         set -Eeuo pipefail
         mkdir -p .cache
+        CACHE_DIR="$(pwd)/.cache"
 
         download_singbox() {
           local repo="$1" ver="$2" dest="$3"
           echo "→ 从 $repo 下载 $ver..."
-          local url
-          url=$(gh api repos/$repo/releases/tags/$ver --jq '[.assets[].name] | map(select(endswith(".tar.gz"))) | .[0]' 2>/dev/null || true)
-          if [ -z "$url" ] || [ "$url" = "null" ]; then
-            local deb_url
-            deb_url=$(gh api repos/$repo/releases/tags/$ver --jq '[.assets[].name] | map(select(endswith(".deb"))) | .[0]' 2>/dev/null || true)
-            if [ -z "$deb_url" ] || [ "$deb_url" = "null" ]; then
-              echo "::error::找不到 $repo $ver 的二进制 asset"
-              exit 1
-            fi
-            local full_url
-            full_url=$(gh api repos/$repo/releases/tags/$ver --jq ".assets[] | select(.name == \"$deb_url\") | .browser_download_url")
-            curl -fsSL "$full_url" -o .cache/_singbox.deb
-            dpkg-deb -x .cache/_singbox.deb .cache/_singbox-extract
-            find .cache/_singbox-extract -name sing-box -type f -exec mv {} "$dest" \;
-            rm -rf .cache/_singbox.deb .cache/_singbox-extract
-          else
-            local full_url
-            full_url=$(gh api repos/$repo/releases/tags/$ver --jq ".assets[] | select(.name == \"$url\") | .browser_download_url")
-            curl -fsSL "$full_url" | tar xz -C .cache/
-            mv .cache/sing-box-*/sing-box "$dest"
-            rm -rf .cache/sing-box-*/
-          fi
+          # 使用 Python 下载并提取二进制（可靠且跨平台）
+          python -c "
+        import json, subprocess, tempfile, tarfile, zipfile, os, sys, shutil
+        from urllib.request import urlopen, Request
+        from pathlib import Path
+
+        repo = '$repo'
+        ver = '$ver'
+        dest = '$dest'
+
+        # 通过 gh api 获取所有 asset
+        result = subprocess.run(
+            ['gh', 'api', f'repos/{repo}/releases/tags/{ver}', '--jq', '.assets[] | {name, url: .browser_download_url}'],
+            capture_output=True, text=True
+        )
+        assets = [json.loads(line) for line in result.stdout.strip().split('\n') if line.strip()]
+
+        # 优先找 tar.gz
+        tar_asset = next((a for a in assets if a['name'].endswith('.tar.gz')), None)
+        deb_asset = next((a for a in assets if a['name'].endswith('.deb')), None)
+
+        binary_found = False
+
+        if tar_asset:
+            print(f'  下载 {tar_asset[\"name\"]}...')
+            req = Request(tar_asset['url'], headers={'Authorization': f'token {os.environ[\"GH_TOKEN\"]}'})
+            with tempfile.TemporaryDirectory() as tmpdir:
+                tar_path = os.path.join(tmpdir, 'archive.tar.gz')
+                with urlopen(req, timeout=120) as resp, open(tar_path, 'wb') as f:
+                    shutil.copyfileobj(resp, f)
+                with tarfile.open(tar_path, 'r:gz') as tf:
+                    tf.extractall(tmpdir)
+                # 递归查找 sing-box 二进制
+                for p in Path(tmpdir).rglob('sing-box'):
+                    if p.is_file() and not p.name.endswith('.json'):
+                        shutil.copy2(str(p), dest)
+                        binary_found = True
+                        break
+
+        if not binary_found and deb_asset:
+            print(f'  下载 {deb_asset[\"name\"]}...')
+            req = Request(deb_asset['url'], headers={'Authorization': f'token {os.environ[\"GH_TOKEN\"]}'})
+            with tempfile.TemporaryDirectory() as tmpdir:
+                deb_path = os.path.join(tmpdir, 'package.deb')
+                with urlopen(req, timeout=120) as resp, open(deb_path, 'wb') as f:
+                    shutil.copyfileobj(resp, f)
+                subprocess.run(['dpkg-deb', '-x', deb_path, tmpdir + '/extract'], check=True)
+                for p in Path(tmpdir + '/extract').rglob('sing-box'):
+                    if p.is_file() and not p.name.endswith('.json'):
+                        shutil.copy2(str(p), dest)
+                        binary_found = True
+                        break
+
+        if not binary_found:
+            print(f'::error::找不到 {repo} {ver} 的二进制 asset', file=sys.stderr)
+            sys.exit(1)
+        "
           chmod +x "$dest"
-          echo "✓ $dest 就绪: $($dest version || echo '未知版本')"
+          echo "✓ $dest 就绪: $("$dest" version || echo '未知版本')"
         }
 
         # 官方版
-        if [ "${{ steps.cache-official.outputs.cache-hit }}" == "true" ] && [ -f .cache/sing-box-official ]; then
+        if [ "${{ steps.cache-official.outputs.cache-hit }}" == "true" ] && [ -f "$CACHE_DIR/sing-box-official" ]; then
           echo "✓ 命中缓存: sing-box 官方版"
-          chmod +x .cache/sing-box-official
+          chmod +x "$CACHE_DIR/sing-box-official"
         else
-          rm -f .cache/sing-box-official
-          download_singbox "SagerNet/sing-box" "${{ steps.singbox-ver.outputs.official }}" ".cache/sing-box-official"
+          rm -f "$CACHE_DIR/sing-box-official"
+          download_singbox "SagerNet/sing-box" "${{ steps.singbox-ver.outputs.official }}" "$CACHE_DIR/sing-box-official"
         fi
 
         # reF1nd 版
-        if [ "${{ steps.cache-ref1nd.outputs.cache-hit }}" == "true" ] && [ -f .cache/sing-box-ref1nd ]; then
+        if [ "${{ steps.cache-ref1nd.outputs.cache-hit }}" == "true" ] && [ -f "$CACHE_DIR/sing-box-ref1nd" ]; then
           echo "✓ 命中缓存: sing-box reF1nd"
-          chmod +x .cache/sing-box-ref1nd
+          chmod +x "$CACHE_DIR/sing-box-ref1nd"
         else
-          rm -f .cache/sing-box-ref1nd
-          download_singbox "reF1nd/sing-box-releases" "${{ steps.singbox-ver.outputs.ref1nd }}" ".cache/sing-box-ref1nd"
+          rm -f "$CACHE_DIR/sing-box-ref1nd"
+          download_singbox "reF1nd/sing-box-releases" "${{ steps.singbox-ver.outputs.ref1nd }}" "$CACHE_DIR/sing-box-ref1nd"
         fi
 
     # 预下载 Sub-Store proxy-utils.esm.mjs（convert.mjs 直接 import，无自动下载能力）
@@ -136,8 +172,8 @@ jobs:
     - name: Build subscriptions
       env:
         GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        SING_BOX_BIN: .cache/sing-box-official
-        SING_BOX_REF1ND_BIN: .cache/sing-box-ref1nd
+        SING_BOX_BIN: ${{ github.workspace }}/.cache/sing-box-official
+        SING_BOX_REF1ND_BIN: ${{ github.workspace }}/.cache/sing-box-ref1nd
         GIST_ID: ${{ secrets.GIST_ID }}
         SUB_URL: ${{ secrets.SUB_URL }}
         SUB_URL_1: ${{ secrets.SUB_URL_1 }}

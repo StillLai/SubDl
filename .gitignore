@@ -57,5 +57,9 @@ ruleset/json/
 ruleset/srs/
 data/rules_archive.tar
 
-# 状态 SVG（每次自动生成，推送到 gh-pages 分支，不需要本地跟踪）
-status.svg
+# 状态 SVG（每次自动生成，推送到 assets 分支，不需要本地跟踪）
+status-light.svg
+status-dark.svg
+
+# sing-box 二进制缓存（CI 中使用）
+.cache/
