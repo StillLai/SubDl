@@ -186,6 +186,7 @@ ruleset_convert.py     (独立入口，由 Ruleset Update workflow 调用)
 6. 如果改变了数据模型 → 更新本文件中"数据模型"章节
 7. 如果涉及设计决策/理由 → 更新 `ARCHITECTURE.md` "关键设计决策"章节
 8. 涉及代码或架构变更时 → 更新 `CHANGELOG.md` 顶部追加记录（纯模板文件变更除外）
+9. **在调用 `attempt_completion` 之前，必须逐条对照以上 1~8 条，确认所有需要的更新已实际执行（不是"想到"而是"已写入文件"）。此为硬性前置检查，未通过不得提交结果。**
 
 ## 命名规范
 - 文件名：snake_case（Python）、camelCase（Node.js）

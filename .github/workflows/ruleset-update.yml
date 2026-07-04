@@ -95,3 +95,16 @@ jobs:
         done
 
         echo "✅ Release assets updated successfully"
+
+    - name: Update release timestamps
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        set -Eeuo pipefail
+        NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        echo "🕐 Updating release timestamps to $NOW"
+        JSON_ID=$(gh api repos/${{ github.repository }}/releases/tags/ruleset-json --jq '.id')
+        gh api repos/${{ github.repository }}/releases/$JSON_ID -X PATCH -f published_at="$NOW"
+        SRS_ID=$(gh api repos/${{ github.repository }}/releases/tags/ruleset-srs --jq '.id')
+        gh api repos/${{ github.repository }}/releases/$SRS_ID -X PATCH -f published_at="$NOW"
+        echo "✅ Release timestamps updated"
