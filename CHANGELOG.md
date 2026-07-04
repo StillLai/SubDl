@@ -10,6 +10,12 @@ Vibe Coding 规范：每次代码变更完成后，应在此文件顶部追加�
 ### Added
 - 新增 `.clinerules` — AI Vibe Coding 项目规则文件
 - 新增 `ARCHITECTURE.md` — 项目架构文档
+- `_check_rate_limit()` — GitHub API 速率限制检测与预警（应用于 Gist 文件列表、上传、用户信息查询）
+
+### Changed
+- `_try_decode_base64()` 增加假阳性防护：短内容（< 100 字符）跳过检测，解码后验证可打印字符占比 ≥ 90%
+- `_download_all()` 改用 `dict[int, DownloadResult]` 收集结果，消除 `[None] * n` 的 `type: ignore` 不安全写法
+- 导入 `HttpResponse` 类型以支持速率限制检查函数的类型注解
 
 ## 2026-07-03
 
