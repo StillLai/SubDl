@@ -99,8 +99,10 @@ SubDl 是一个自动化订阅管理工具：下载 Clash 订阅 → 转换为 s
 - 统一使用 utils.http_get_with_retry / http_request
 - 不要直接使用 requests 库或 urllib
 
-### 配置加载
-- JSONC 文件使用 utils.load_jsonc（基于 json5）
+### 共享可变状态
+- `_load_templates()` 返回的模板列表共享公共零件对象（providers/outbounds 等）
+- 需要修改模板的函数必须先 `copy.deepcopy()`，不能原地修改
+- 修改 `merge_config.py` 中模板数据时同理
 
 ## 数据流
 ```

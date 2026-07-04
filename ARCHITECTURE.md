@@ -61,6 +61,11 @@ ruleset_convert.py     (独立入口，由 Ruleset Update workflow 调用)
 - 公共零件只读一次，与每个变体组装成完整配置
 - 新增平台变体只需在 `inbounds/` 目录下添加一个 JSONC 文件
 
+### 模板共享对象的防御性复制
+- `_load_templates()` 中多个模板共享同一个 `providers` 列表对象（仅读取一次）
+- 任何需要修改模板数据的函数（如 `generate_provider_configs()`）必须先 `copy.deepcopy()`
+- 不做深拷贝会导致第一个模板处理后的原地修改影响所有后续模板
+
 ### Provider 配置与直接合并的区别
 - **直接合并**：所有节点直接写入 outbounds，配置文件较大但自包含
 - **Provider 版本**：outbounds 中的 urltest 指向远程订阅 URL，客户端自行拉取节点
