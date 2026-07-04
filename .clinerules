@@ -6,6 +6,8 @@ SubDl 是一个自动化订阅管理工具：下载 Clash 订阅 → 转换为 s
 
 详细架构文档见 `ARCHITECTURE.md`，本文件聚焦 AI 编码时需要遵守的规范和约束。
 
+项目完全运行在 GitHub Actions CI 上，本地仅用于编写代码，不在本地运行主流程。
+
 ## 技术栈
 - Python 3.12+（主逻辑）
 - Node.js（Clash → sing-box 转换，通过 subprocess 调用 convert.mjs）
@@ -60,6 +62,12 @@ SubDl 是一个自动化订阅管理工具：下载 Clash 订阅 → 转换为 s
 - `DownloadResult.is_converted=True` 表示内容来自 Gist 备份（已是 sing-box 格式），跳过转换
 - `SubscriptionInfo.from_backup=True` 表示数据来自 Gist 备份，SVG 中显示 📦 标记
 - `Subscription.use_gist` 由 SUB_URL 的 `*` 前缀触发，控制 provider URL 指向
+
+## 文档分工
+- `.clinerules`：AI 编码行为约束（"不要做什么"、"必须做什么"）
+- `ARCHITECTURE.md`：项目架构、设计决策及理由（"为什么这样做"）
+- 需要记录设计决策/理由时 → 更新 `ARCHITECTURE.md`
+- 需要更新编码规范/约束时 → 更新 `.clinerules`
 
 ## 特殊目录
 
@@ -151,6 +159,17 @@ ruleset_convert.py     (独立入口，由 Ruleset Update workflow 调用)
 - 校验失败的文件从上传列表中移除（不阻断流程，但以非零退出码告警）
 - `_cleanup_old_gist_files()` 删除 Gist 中不再生成的旧托管文件
 
+## 设计决策备忘
+
+以下设计选择是有意为之，AI 不应建议"优化"这些方面。
+详见 `ARCHITECTURE.md` "关键设计决策" 章节。
+
+- **运行环境**：完全运行在 GitHub Actions CI 上，本地仅编写代码，不需要 Dry-run/本地预览
+- **不做节点去重**：不同订阅不会出现相同节点，去重逻辑无实际收益
+- **不做地区分布统计**：模板已通过正则 include/exclude 按地区分组，统计功能属于重复劳动
+- **不做订阅过期预警**：机场服务商会在到期前自行发送邮件提醒，无需程序额外处理
+- **不做 HTTP 超时可配置化**：当前硬编码的 30 秒超时已覆盖绝大多数场景，增加环境变量收益不大
+
 ## 代码变更规范
 
 每次修改代码后，必须检查并更新以下内容：
@@ -160,6 +179,7 @@ ruleset_convert.py     (独立入口，由 Ruleset Update workflow 调用)
 4. 如果改变了关键约束 → 更新本文件中"关键设计约束"章节
 5. 如果新增/修改了环境变量 → 更新本文件中"环境变量"章节
 6. 如果改变了数据模型 → 更新本文件中"数据模型"章节
+7. 如果涉及设计决策/理由 → 更新 `ARCHITECTURE.md` "关键设计决策"章节
 
 ## 命名规范
 - 文件名：snake_case（Python）、camelCase（Node.js）
