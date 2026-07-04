@@ -7,7 +7,7 @@
         "enabled": true,
         "url": "https://cp.cloudflare.com"
       },
-      "url": "",
+      "url": "$SUB_URL_2",
       "user_agent": "ClashMetaForAndroid/2.11.30",
       "update_interval": "3h"
     },
@@ -18,7 +18,7 @@
         "enabled": true,
         "url": "https://cp.cloudflare.com"
       },
-      "url": "",
+      "url": "$SUB_URL_1",
       "user_agent": "ClashMetaForAndroid/2.11.30",
       "update_interval": "3h"
     },
@@ -29,7 +29,7 @@
         "enabled": true,
         "url": "https://cp.cloudflare.com"
       },
-      "url": "",
+      "url": "$SUB_URL",
       "user_agent": "ClashMetaForAndroid/2.11.30",
       "download_detour": "🗂️ 备用自动",
       "update_interval": "3h"
