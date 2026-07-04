@@ -10,6 +10,7 @@ import json
 import sys
 import time
 from dataclasses import dataclass
+from email.message import Message
 from http.client import HTTPResponse
 from pathlib import Path
 from typing import Any
@@ -234,7 +235,7 @@ def http_get_with_retry(
             resp = http_request('GET', url, headers=headers, timeout=timeout)
 
             if resp.status_code >= 400:
-                raise HTTPError(url='', code=resp.status_code, msg=f"HTTP {resp.status_code}", hdrs=None, fp=None)
+                raise HTTPError(url='', code=resp.status_code, msg=f"HTTP {resp.status_code}", hdrs=Message(), fp=None)
             return resp
 
         except (HTTPError, URLError, OSError) as e:

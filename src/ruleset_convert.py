@@ -203,10 +203,10 @@ def _group_by_mapped(
     seen: set[tuple[str, str]] = set()
 
     for row in rows:
-        pattern: str = row['pattern']
-        if '#' in pattern:
+        pattern_raw = row.get('pattern')
+        if not pattern_raw or '#' in pattern_raw:
             continue
-        pattern_upper = pattern.upper()
+        pattern_upper = pattern_raw.upper()
         mapped = map_dict.get(pattern_upper)
         if mapped is None:
             continue
