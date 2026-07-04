@@ -394,12 +394,24 @@ def _load_templates() -> list[tuple[str, dict[str, Any]]]:
         )
 
     # 加载公共零件（只读一次）
+    # dns/route/outbounds 带 $schema 包装，需解包；providers 仅带 key 包装
     try:
         base = load_jsonc(TEMPLATE_DIR / 'base.jsonc')
-        dns = load_jsonc(TEMPLATE_DIR / 'dns.jsonc')
-        providers = load_jsonc(TEMPLATE_DIR / 'providers.jsonc')
-        outbounds = load_jsonc(TEMPLATE_DIR / 'outbounds.jsonc')
-        route = load_jsonc(TEMPLATE_DIR / 'route.jsonc')
+
+        dns_raw = load_jsonc(TEMPLATE_DIR / 'dns.jsonc')
+        dns_raw.pop('$schema', None)
+        dns = dns_raw['dns']
+
+        providers_raw = load_jsonc(TEMPLATE_DIR / 'providers.jsonc')
+        providers = providers_raw['providers']
+
+        outbounds_raw = load_jsonc(TEMPLATE_DIR / 'outbounds.jsonc')
+        outbounds_raw.pop('$schema', None)
+        outbounds = outbounds_raw['outbounds']
+
+        route_raw = load_jsonc(TEMPLATE_DIR / 'route.jsonc')
+        route_raw.pop('$schema', None)
+        route = route_raw['route']
     except Exception as e:
         raise TemplateError(
             f"公共零件加载失败: {e}",
@@ -412,7 +424,9 @@ def _load_templates() -> list[tuple[str, dict[str, Any]]]:
             continue
         variant = f.stem
         try:
-            inbounds = load_jsonc(f)
+            inbounds_raw = load_jsonc(f)
+            inbounds_raw.pop('$schema', None)
+            inbounds = inbounds_raw.get('inbounds', inbounds_raw)
             config: dict[str, Any] = {
                 **base,
                 "inbounds": inbounds,
