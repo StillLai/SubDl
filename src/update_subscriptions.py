@@ -109,34 +109,35 @@ def _validate_subscription(content: str) -> str | None:
     return None
 
 
-_SUB_URL_KEY_RE: re.Pattern[str] = re.compile(r'^SUB_URL(_\d+)?$')
-
-
 def parse_subscriptions() -> list[Subscription]:
-    """解析订阅配置 — 从 SUB_URL / SUB_URL_N 环境变量获取
+    """解析订阅配置 — 从 providers.jsonc 读取配置，环境变量提供纯 URL
 
-    名称前加 * 表示该订阅的 provider 应指向 Gist 上已转换的文件，
-    例如: SUB_URL = *山海|https://example.com/sub
+    providers.jsonc 中的 url 字段为 $ENV_VAR 格式的占位符。
+    环境变量前缀决定订阅模式：
+      - SUB_URL / SUB_URL_N → 常规订阅（provider URL 指向原始订阅）
+      - GIST_URL / GIST_URL_N → Gist 订阅（provider URL 指向 Gist 上已转换的文件）
     """
-    sub_keys = sorted(
-        (k for k in os.environ if _SUB_URL_KEY_RE.match(k)),
-        key=lambda k: -1 if k == 'SUB_URL' else int(k.split('_')[-1])
-    )
+    providers_raw = load_jsonc(TEMPLATE_DIR / 'providers.jsonc')
+    providers = providers_raw.get('providers', [])
+
     subscriptions: list[Subscription] = []
-    for env_name in sub_keys:
-        value = os.environ[env_name].strip()
-        if not value:
+    for provider in providers:
+        url_ref = provider.get('url', '')
+        if not url_ref.startswith('$'):
             continue
-        if "|" in value:
-            name, url = value.split("|", 1)
-            use_gist = name.startswith("*")
-            if use_gist:
-                name = name[1:]
-            sub = Subscription.from_url(url.strip(), name.strip(), use_gist=use_gist, env_name=env_name)
-        else:
-            sub = Subscription.from_url(value.strip(), env_name=env_name)
-        if sub:
-            subscriptions.append(sub)
+        env_name = url_ref[1:]  # 去掉 $ 前缀
+        url = os.environ.get(env_name, '').strip()
+        if not url:
+            continue
+
+        use_gist = env_name.startswith('GIST_URL')
+        tag = provider.get('tag', '')
+        if not tag:
+            log_warn(f"  providers.jsonc 中存在无 tag 的 provider，已跳过 (env: {env_name})")
+            continue
+
+        sub = Subscription.from_url(url, name=tag, use_gist=use_gist, env_name=env_name)
+        subscriptions.append(sub)
     return subscriptions
 
 
@@ -480,34 +481,42 @@ def merge_all_templates(
 
 
 def generate_provider_configs(
-    sub_url_map: dict[str, str],
+    subscriptions: list[Subscription],
     templates: list[tuple[str, dict[str, Any]]],
-    gist_subs: set[str] | None = None,
     gist_owner: str = '',
     gist_id: str = '',
 ) -> dict[str, str]:
     """生成 providers 版本的配置文件
 
+    将模板中 provider 的 $ENV_VAR 占位符替换为真实 URL。
+    use_gist 的订阅指向 Gist 上已转换的 sing-box 文件，其余指向原始订阅。
+
     Args:
-        sub_url_map: 订阅名称 -> 原始 URL 的映射
+        subscriptions: 订阅列表（含 env_name、use_gist 等信息）
         templates: 模板列表
-        gist_subs: 标记为使用 Gist 的订阅名称集合
         gist_owner: Gist 所有者用户名
         gist_id: Gist ID
     """
-    gist_subs = gist_subs or set()
+    sub_by_env = {sub.env_name: sub for sub in subscriptions}
+
     results: dict[str, str] = {}
     for base_name, template in templates:
         try:
             filled = 0
             for provider in template.get('providers', []):
-                tag = provider.get('tag', '')
-                if tag in sub_url_map:
-                    if tag in gist_subs and gist_owner and gist_id:
-                        provider['url'] = f"https://gh-proxy.org/https://gist.github.com/{gist_owner}/{gist_id}/raw/{tag}-singbox.json"
-                    else:
-                        provider['url'] = sub_url_map[tag]
-                    filled += 1
+                url_ref = provider.get('url', '')
+                if not url_ref.startswith('$'):
+                    continue
+                env_name = url_ref[1:]
+                sub = sub_by_env.get(env_name)
+                if sub is None:
+                    continue
+
+                if sub.use_gist and gist_owner and gist_id:
+                    provider['url'] = f"https://gh-proxy.org/https://gist.github.com/{gist_owner}/{gist_id}/raw/{sub.name}-singbox.json"
+                else:
+                    provider['url'] = sub.url
+                filled += 1
             if filled > 0:
                 config_filename = base_name + '-providers.json'
                 log_info(f"  → {base_name}.jsonc -> {config_filename} ({filled} 个 providers)")
@@ -738,9 +747,8 @@ def _generate_and_upload(
     """
     log_info("→ 生成合并配置和 providers 配置...")
     templates = _load_templates()
-    sub_url_map = {sub.name: sub.url for sub in subscriptions}
 
-    gist_subs = {sub.name for sub in subscriptions if sub.use_gist}
+    gist_subs = [sub for sub in subscriptions if sub.use_gist]
     if gist_subs:
         log_info(f"  → {len(gist_subs)} 个订阅的 provider 将指向 Gist: {gist_owner}/{gist_id}")
 
@@ -749,7 +757,7 @@ def _generate_and_upload(
     if merged:
         log_info(f"  ✓ 共生成 {len(merged)} 个配置文件")
 
-    providers = generate_provider_configs(sub_url_map, templates, gist_subs, gist_owner, gist_id)
+    providers = generate_provider_configs(subscriptions, templates, gist_owner, gist_id)
     files.update(providers)
     if providers:
         log_info(f"  ✓ 共生成 {len(providers)} 个 providers 配置文件")
@@ -811,7 +819,7 @@ def main() -> None:
 
         subscriptions = parse_subscriptions()
         if not subscriptions:
-            raise ConfigError("未找到订阅配置（SUB_URL 未设置或为空）")
+            raise ConfigError("未找到订阅配置（providers.jsonc 中无有效的 $SUB_URL / $GIST_URL 引用）")
         log_info(f"找到 {len(subscriptions)} 个订阅")
 
         log_info("::group::Download & Convert subscriptions")

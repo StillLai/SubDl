@@ -88,6 +88,16 @@ jobs:
         SUB_URL_7: ${{ secrets.SUB_URL_7 }}
         SUB_URL_8: ${{ secrets.SUB_URL_8 }}
         SUB_URL_9: ${{ secrets.SUB_URL_9 }}
+        GIST_URL: ${{ secrets.GIST_URL }}
+        GIST_URL_1: ${{ secrets.GIST_URL_1 }}
+        GIST_URL_2: ${{ secrets.GIST_URL_2 }}
+        GIST_URL_3: ${{ secrets.GIST_URL_3 }}
+        GIST_URL_4: ${{ secrets.GIST_URL_4 }}
+        GIST_URL_5: ${{ secrets.GIST_URL_5 }}
+        GIST_URL_6: ${{ secrets.GIST_URL_6 }}
+        GIST_URL_7: ${{ secrets.GIST_URL_7 }}
+        GIST_URL_8: ${{ secrets.GIST_URL_8 }}
+        GIST_URL_9: ${{ secrets.GIST_URL_9 }}
       run: python src/update_subscriptions.py
 
     - name: Deploy SVG to assets branch
