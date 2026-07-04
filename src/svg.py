@@ -337,10 +337,18 @@ def _build_svg_footer(
         parts.append(
             f'  <text x="{p + 30}" y="{ver_y + 33}" font-family="{_FONT}" font-size="18" font-weight="600" fill="{theme.text_sec}">sing-box 版本</text>'
         )
+        official_link = (
+            f'<a href="https://github.com/SagerNet/sing-box/releases/tag/{official_ver}" target="_blank">'
+            f'<tspan font-weight="600" fill="{theme.text_pri}">{official_ver}</tspan></a>'
+        ) if official_ver != '—' else f'<tspan font-weight="600" fill="{theme.text_pri}">{official_ver}</tspan>'
+        ref1nd_link = (
+            f'<a href="https://github.com/reF1nd/sing-box-releases/releases/tag/{ref1nd_ver}" target="_blank">'
+            f'<tspan font-weight="600" fill="{theme.text_pri}">{ref1nd_ver}</tspan></a>'
+        ) if ref1nd_ver != '—' else f'<tspan font-weight="600" fill="{theme.text_pri}">{ref1nd_ver}</tspan>'
         parts.append(
             f'  <text x="{p + 30}" y="{ver_y + 60}" font-family="{_FONT}" font-size="16" fill="{theme.text_sec}">'
-            f'官方版: <tspan font-weight="600" fill="{theme.text_pri}">{official_ver}</tspan>'
-            f'　|　reF1nd 分支: <tspan font-weight="600" fill="{theme.text_pri}">{ref1nd_ver}</tspan>'
+            f'官方版: {official_link}'
+            f'　|　reF1nd 分支: {ref1nd_link}'
             f'</text>'
         )
 
