@@ -61,6 +61,13 @@ SubDl 是一个自动化订阅管理工具：下载 Clash 订阅 → 转换为 s
 - `SubscriptionInfo.from_backup=True` 表示数据来自 Gist 备份，SVG 中显示 📦 标记
 - `Subscription.use_gist` 由 SUB_URL 的 `*` 前缀触发，控制 provider URL 指向
 
+## 特殊目录
+
+### sing-box-reF1nd-docs/
+- 用途：sing-box reF1nd 分支的完整文档副本，用于部署到 GitHub Pages 并供 AI 在本地阅读参考
+- 不要删除或将其列为可删减项目
+- 内容包含：mkdocs 配置、多语言文档、客户端说明、配置参考等
+
 ## 代码规范
 
 ### 类型注解

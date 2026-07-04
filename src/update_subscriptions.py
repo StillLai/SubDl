@@ -22,7 +22,7 @@ from typing import Any
 from utils import (
     log_info, log_warn, log_error, format_bin_error,
     load_jsonc, http_get_with_retry, http_request,
-    FlowInfo, Subscription, DownloadResult, SubscriptionInfo,
+    FlowInfo, Subscription, DownloadResult, SubscriptionInfo, HttpResponse,
     PROJECT_ROOT, TEMPLATE_DIR, CONVERT_SCRIPT, USER_AGENT,
     SubDlError, ConfigError, DownloadError, ConversionError, TemplateError,
     UploadError,
@@ -40,12 +40,22 @@ _WORKERS = int(os.environ.get('WORKERS', '8'))
 # ========== Base64 解码 ==========
 
 def _try_decode_base64(content: str) -> str:
-    """尝试将内容作为 Base64 解码，失败则原样返回"""
+    """尝试将内容作为 Base64 解码，失败则原样返回
+
+    防护措施：
+    - 短内容（< 100 字符）跳过检测，避免纯英文短文本被误判
+    - 解码后检查可打印字符占比（≥ 90%），防止乱码内容被采纳
+    """
     try:
         cleaned = ''.join(content.split())
+        if len(cleaned) < 100:
+            return content
         if cleaned and _B64_PATTERN.match(cleaned):
             cleaned += "=" * (-len(cleaned) % 4)
-            return base64.b64decode(cleaned).decode("utf-8")
+            decoded = base64.b64decode(cleaned).decode("utf-8")
+            printable_ratio = sum(c.isprintable() or c in '\n\r\t' for c in decoded) / len(decoded)
+            if printable_ratio >= 0.9:
+                return decoded
     except Exception:
         pass
     return content
@@ -157,24 +167,23 @@ def _download_subscription(sub: Subscription, user_agent: str) -> DownloadResult
 def _download_all(subscriptions: list[Subscription], user_agent: str) -> list[DownloadResult]:
     """并行下载所有订阅，按原始订阅顺序返回结果"""
     log_info(f"→ 并行下载 {len(subscriptions)} 个订阅...")
-    index_map = {sub: i for i, sub in enumerate(subscriptions)}
-    results: list[DownloadResult] = [None] * len(subscriptions)  # type: ignore[list-item]
+    results: dict[int, DownloadResult] = {}
 
     with ThreadPoolExecutor(max_workers=min(len(subscriptions), _WORKERS)) as executor:
         futures = {
-            executor.submit(_download_subscription, sub, user_agent): sub
-            for sub in subscriptions
+            executor.submit(_download_subscription, sub, user_agent): (i, sub)
+            for i, sub in enumerate(subscriptions)
         }
         for future in as_completed(futures):
-            sub = futures[future]
+            i, sub = futures[future]
             result = future.result()
-            results[index_map[sub]] = result
+            results[i] = result
             if result.is_success:
                 log_info(f"  ✓ {result.name}: 下载成功")
             else:
                 log_warn(f"  ✗ {result.name}: {result.reason}")
 
-    return results
+    return [results[i] for i in range(len(subscriptions))]
 
 
 def _fetch_from_gist_fallback(sub_name: str, gist_id: str, gist_owner: str, env_name: str = "") -> DownloadResult | None:
@@ -627,6 +636,18 @@ def _is_managed_file(filename: str) -> bool:
     return any(p.match(filename) for p in _MANAGED_FILE_PATTERNS)
 
 
+def _check_rate_limit(response: HttpResponse, api_name: str) -> None:
+    """检查 GitHub API 速率限制，配额不足时发出警告"""
+    remaining = response.headers.get('x-ratelimit-remaining')
+    if remaining is not None and int(remaining) < 10:
+        reset_ts = response.headers.get('x-ratelimit-reset', '0')
+        try:
+            reset_time = datetime.fromtimestamp(int(reset_ts)).strftime('%H:%M:%S') if reset_ts.isdigit() else '未知'
+        except (ValueError, OSError):
+            reset_time = '未知'
+        log_warn(f"  ⚠️ GitHub API 速率限制即将耗尽 ({api_name}): 剩余 {remaining} 次，重置时间 {reset_time}")
+
+
 def _fetch_gist_filenames(github_token: str, gist_id: str) -> list[str]:
     """获取 Gist 中当前所有文件名，失败时返回空列表"""
     try:
@@ -635,6 +656,7 @@ def _fetch_gist_filenames(github_token: str, gist_id: str) -> list[str]:
         if resp.status_code >= 400:
             log_warn(f"  获取 Gist 文件列表失败: HTTP {resp.status_code}")
             return []
+        _check_rate_limit(resp, "获取 Gist 文件列表")
         data = json.loads(resp.text)
         return list(data.get('files', {}).keys())
     except Exception as e:
@@ -676,6 +698,7 @@ def upload_to_gist(github_token: str, gist_id: str, files: dict[str, str | None]
 
     log_info(f"    更新 Gist: {gist_id}")
     resp = http_request("PATCH", f"https://api.github.com/gists/{gist_id}", headers=headers, json_body={"files": gist_files})
+    _check_rate_limit(resp, "Gist 上传")
     if resp.status_code >= 400:
         raise UploadError(
             f"Gist 上传失败: HTTP {resp.status_code}",
@@ -690,6 +713,7 @@ def _get_gist_owner(github_token: str) -> str:
     """通过 GitHub API 获取当前认证用户的用户名"""
     headers = {"Authorization": f"token {github_token}", "Accept": "application/vnd.github.v3+json"}
     resp = http_request("GET", "https://api.github.com/user", headers=headers)
+    _check_rate_limit(resp, "获取 Gist 所有者")
     if resp.status_code >= 400:
         raise UploadError(
             f"获取 Gist 所有者失败: HTTP {resp.status_code}",
