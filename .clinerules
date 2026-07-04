@@ -4,21 +4,62 @@
 SubDl 是一个自动化订阅管理工具：下载 Clash 订阅 → 转换为 sing-box 格式 → 合并模板配置 → 上传到 GitHub Gist。
 运行环境为 GitHub Actions，由 cron 定时触发。
 
+详细架构文档见 `ARCHITECTURE.md`，本文件聚焦 AI 编码时需要遵守的规范和约束。
+
 ## 技术栈
 - Python 3.12+（主逻辑）
 - Node.js（Clash → sing-box 转换，通过 subprocess 调用 convert.mjs）
-- 零第三方网络依赖（纯 urllib），配置解析用 json5
+- Python 依赖：json5（JSONC 解析）、pyyaml（ruleset_convert.py 规则源解析）
+- Node.js 依赖：jsdom（DOM 环境）、Sub-Store proxy-utils（协议解析与转换）
+- 网络请求：纯 urllib（零第三方网络依赖）
 - JSONC 模板配置（支持注释）
+
+## 环境变量
+
+### 必需
+| 变量 | 说明 | 使用文件 |
+|------|------|----------|
+| `GH_TOKEN` | GitHub Personal Access Token（gist 权限） | update_subscriptions.py |
+| `GIST_ID` | 目标 Gist ID | update_subscriptions.py |
+| `SUB_URL` | 主订阅链接，格式：`名称\|URL` | update_subscriptions.py |
+| `SING_BOX_BIN` | sing-box 官方二进制路径（配置校验用） | update_subscriptions.py |
+
+### 可选
+| 变量 | 说明 | 默认值 | 使用文件 |
+|------|------|--------|----------|
+| `SUB_URL_1` ~ `SUB_URL_9` | 更多订阅 | — | update_subscriptions.py |
+| `SING_BOX_REF1ND_BIN` | sing-box reF1nd 二进制路径（providers 配置校验用） | 回退到官方版 | update_subscriptions.py |
+| `WORKERS` | 并行下载线程数 | `8` | update_subscriptions.py |
+
+### SUB_URL 命名约定
+- 格式：`名称|URL`，如 `山海|https://example.com/sub`
+- `*` 前缀标记 use_gist 模式：`*山海|https://example.com/sub` → provider URL 指向 Gist 上已转换的 sing-box 文件
+- 省略名称时自动从 URL 域名推导
 
 ## 文件职责
 | 文件 | 职责 | 备注 |
 |------|------|------|
 | utils.py | 常量、数据模型、网络、日志、异常类 | 基础模块，不导入其他项目模块 |
-| update_subscriptions.py | 主流程：下载 → 转换 → 合并 → 上传 | 入口 main() 在此文件 |
-| merge_config.py | 模板合并逻辑、provider 展开 | 依赖 utils |
-| convert.mjs | Clash → sing-box 批量转换 | Node.js，通过 subprocess 调用 |
-| ruleset_convert.py | 规则集下载与转换 | 独立 workflow，生成 JSON + SRS |
-| svg.py | 状态图生成（浅色/深色主题） | 依赖 utils |
+| update_subscriptions.py | 主流程：下载 → 转换 → 合并 → 校验 → 上传 | 入口 main() 在此文件 |
+| merge_config.py | 模板合并逻辑、provider 展开、节点正则筛选 | 依赖 utils |
+| convert.mjs | Clash → sing-box 批量转换 | Node.js，依赖 deps/proxy-utils.esm.mjs + jsdom |
+| ruleset_convert.py | 规则集下载与转换 | 独立 workflow，生成 JSON + SRS，依赖 pyyaml |
+| svg.py | 状态图生成（浅色/深色主题）+ sing-box 版本展示 | 依赖 utils |
+
+## 数据模型（utils.py 中定义）
+
+| 数据类 | 不可变 | 说明 |
+|--------|--------|------|
+| `FlowInfo` | ✅ frozen | 订阅流量信息：upload/download/total/expire |
+| `Subscription` | ✅ frozen | 订阅配置：name/url/filename/use_gist/env_name |
+| `DownloadResult` | ❌ | 下载结果：status("ok"/"invalid"/"error")/raw_content/is_converted |
+| `SubscriptionInfo` | ❌ | 订阅统计：name/flow/node_count/from_backup |
+| `HttpResponse` | ❌ | HTTP 响应封装：status_code/text/headers |
+
+关键字段说明：
+- `DownloadResult.is_converted=True` 表示内容来自 Gist 备份（已是 sing-box 格式），跳过转换
+- `SubscriptionInfo.from_backup=True` 表示数据来自 Gist 备份，SVG 中显示 📦 标记
+- `Subscription.use_gist` 由 SUB_URL 的 `*` 前缀触发，控制 provider URL 指向
 
 ## 代码规范
 
@@ -46,16 +87,16 @@ SubDl 是一个自动化订阅管理工具：下载 Clash 订阅 → 转换为 s
 ## 数据流
 ```
 SUB_URL (env)
-  → parse_subscriptions()        # 解析环境变量
+  → parse_subscriptions()        # 解析环境变量（含 * 前缀 use_gist 标记）
   → _download_all()              # 并行下载订阅
-  → _try_gist_fallback()         # 失败时从 Gist 备份获取
-  → _convert_batch()             # Node.js 批量转换
-  → _aggregate_results()         # 聚合结果
+  → _try_gist_fallback()         # 失败时从 Gist 备份获取已转换的 sing-box JSON
+  → _convert_batch()             # Node.js 批量转换（跳过 is_converted=True 的）
+  → _aggregate_results()         # 聚合结果：收集文件、订阅信息、节点字典
   → _load_templates()            # 加载模块化模板
   → merge_all_templates()        # 合并节点到模板
-  → generate_provider_configs()  # 生成 providers 版本
-  → _validate_configs()          # sing-box check 校验
-  → upload_to_gist()             # 上传到 Gist
+  → generate_provider_configs()  # 生成 providers 版本（use_gist 的 provider 指向 Gist）
+  → _validate_configs()          # sing-box check 校验（official + reF1nd 双二进制）
+  → upload_to_gist()             # 清理旧文件 + 上传到 Gist
 ```
 
 ## 模块依赖关系
@@ -65,6 +106,9 @@ update_subscriptions.py (主入口)
   ├── merge_config.py  (模板合并，依赖 utils)
   ├── svg.py           (SVG 生成，依赖 utils)
   └── convert.mjs      (Node.js，通过 subprocess 调用)
+
+ruleset_convert.py     (独立入口，由 Ruleset Update workflow 调用)
+  └── utils.py
 ```
 
 ## 关键设计约束
@@ -74,7 +118,10 @@ update_subscriptions.py (主入口)
 - 所有日志必须走 stderr（通过 log_info 等函数）
 
 ### Gist 文件名模式
-- `_MANAGED_FILE_PATTERNS` 定义了 SubDl 托管的文件名模式
+- `_MANAGED_FILE_PATTERNS` 定义了 SubDl 托管的文件名模式：
+  - `*.yaml` — 原始订阅
+  - `*-singbox.json` — 转换后的 sing-box 节点
+  - `sing-box*.json` — 合并配置 + providers 配置
 - 清理旧文件时根据此模式判断，不要随意修改
 
 ### Provider 前缀机制
@@ -87,6 +134,16 @@ update_subscriptions.py (主入口)
 - inbounds/ 下每个文件自动生成对应配置
 - 新增变体只需在 inbounds/ 目录下添加文件
 
+### Gist 备份容错
+- 当原始订阅下载失败时，`_try_gist_fallback()` 尝试从 Gist 获取上次成功转换的 sing-box JSON
+- 获取到的备份标记为 `is_converted=True`，跳过 Node.js 转换直接使用
+- 仅在所有订阅都下载失败时才会完全中断（抛出 DownloadError）
+
+### 配置校验与清理
+- `_validate_configs()` 用 sing-box check 校验所有配置文件
+- 校验失败的文件从上传列表中移除（不阻断流程，但以非零退出码告警）
+- `_cleanup_old_gist_files()` 删除 Gist 中不再生成的旧托管文件
+
 ## 代码变更规范
 
 每次修改代码后，必须检查并更新以下内容：
@@ -94,6 +151,8 @@ update_subscriptions.py (主入口)
 2. 如果新增/删除/重命名了公共函数 → 更新本文件中"文件职责"章节
 3. 如果改变了数据流 → 更新本文件中"数据流"章节
 4. 如果改变了关键约束 → 更新本文件中"关键设计约束"章节
+5. 如果新增/修改了环境变量 → 更新本文件中"环境变量"章节
+6. 如果改变了数据模型 → 更新本文件中"数据模型"章节
 
 ## 命名规范
 - 文件名：snake_case（Python）、camelCase（Node.js）
