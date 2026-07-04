@@ -62,15 +62,15 @@ jobs:
       run: |
         set -Eeuo pipefail
 
-        # 获取 sing-box 版本
-        SINGBOX_VERSION=$("$SING_BOX_BIN" version 2>/dev/null | head -1 | awk '{print $2}' || echo "unknown")
+        # 获取 sing-box 版本（正则匹配版本号，兼容不同输出格式）
+        SINGBOX_VERSION=$("$SING_BOX_BIN" version 2>/dev/null | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown")
 
         # 获取构建时间（北京时间）
         BUILD_TIME=$(TZ='Asia/Shanghai' date +"%Y-%m-%d %H:%M:%S UTC%:z")
 
-        # 获取规则集文件名列表（去掉扩展名，用 · 分隔）
-        JSON_NAMES=$(ls ruleset/json/*.json | xargs -I{} basename {} .json | sort | tr '\n' ' · ' | sed 's/ · $//')
-        SRS_NAMES=$(ls ruleset/srs/*.srs | xargs -I{} basename {} .srs | sort | tr '\n' ' · ' | sed 's/ · $//')
+        # 获取规则集文件名列表（每个一行，Markdown 列表格式）
+        JSON_NAMES=$(ls ruleset/json/*.json | xargs -I{} basename {} .json | sort | sed 's/^/- /')
+        SRS_NAMES=$(ls ruleset/srs/*.srs | xargs -I{} basename {} .srs | sort | sed 's/^/- /')
 
         # 统计文件数量
         JSON_COUNT=$(ls ruleset/json/*.json | wc -l)
@@ -83,7 +83,9 @@ jobs:
           {
             printf '> 🕐 构建时间：%s | sing-box %s\n\n' "$BUILD_TIME" "$SINGBOX_VERSION"
             printf '### 包含规则集（%s 个）\n\n' "$count"
+            printf '<details>\n<summary>点击展开查看完整列表</summary>\n\n'
             printf '%s\n\n' "$names"
+            printf '</details>\n\n'
             printf '### 使用方法\n\n'
             printf '在 sing-box 配置的 `rule_set` 中引用（%s 格式）：\n\n' "$format_label"
             printf '```json\n'

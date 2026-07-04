@@ -11,6 +11,8 @@ Vibe Coding 规范：每次代码变更完成后，应在此文件顶部追加�
 ### Changed
 - `ruleset-update.yml`：改为每次运行时删除旧 release 并重新创建，使 tag 发布时间保持最新（GitHub API 不支持通过 PATCH 修改 `published_at`）
 - `ruleset-update.yml`：丰富 release notes 内容，动态生成构建时间、sing-box 版本、规则集文件列表及中文使用说明
+  - 修复：sing-box 版本提取改用正则匹配，解决 `awk '{print $2}'` 提取到 "version" 字面值的问题
+  - 规则集列表改为 Markdown 折叠列表 + 每行一项，提升可读性
 - `.clinerules`：代码变更规范新增第 9 条——`attempt_completion` 前必须逐条验证所有文档更新已实际执行
 
 ## 2026-07-04
