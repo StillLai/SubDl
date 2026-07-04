@@ -9,6 +9,7 @@
 """
 
 import base64
+import copy
 import json
 import os
 import re
@@ -502,8 +503,10 @@ def generate_provider_configs(
     results: dict[str, str] = {}
     for base_name, template in templates:
         try:
+            # deep copy 避免原地修改 $ENV_VAR 占位符影响共享 providers 列表
+            template_copy = copy.deepcopy(template)
             filled = 0
-            for provider in template.get('providers', []):
+            for provider in template_copy.get('providers', []):
                 url_ref = provider.get('url', '')
                 if not url_ref.startswith('$'):
                     continue
@@ -520,7 +523,7 @@ def generate_provider_configs(
             if filled > 0:
                 config_filename = base_name + '-providers.json'
                 log_info(f"  → {base_name}.jsonc -> {config_filename} ({filled} 个 providers)")
-                results[config_filename] = json.dumps(template, indent=2, ensure_ascii=False)
+                results[config_filename] = json.dumps(template_copy, indent=2, ensure_ascii=False)
         except Exception as e:
             log_error(f"  Provider 配置生成异常 {base_name}: {e}")
     return results

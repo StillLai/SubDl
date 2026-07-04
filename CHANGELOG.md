@@ -13,6 +13,9 @@ Vibe Coding 规范：每次代码变更完成后，应在此文件顶部追加�
 - 新增 `ARCHITECTURE.md` — 项目架构文档
 - `_check_rate_limit()` — GitHub API 速率限制检测与预警（应用于 Gist 文件列表、上传、用户信息查询）
 
+### Fixed
+- `generate_provider_configs()` 共享 providers 列表导致只有第一个模板生成 providers 配置，使用 `copy.deepcopy()` 隔离每个模板
+
 ### Changed
 - **订阅地址获取方式重构**：`providers.jsonc` 中 `url` 字段改为 `$ENV_VAR` 占位符，环境变量值为纯 URL，订阅名称由 `tag` 字段决定；`SUB_URL`/`GIST_URL` 前缀区分常规订阅与 Gist 订阅
 - `parse_subscriptions()` 从 providers.jsonc 读取 `$ENV_VAR` 映射，不再解析 `名称|URL` 格式
