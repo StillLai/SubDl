@@ -6,6 +6,13 @@ Vibe Coding 规范：每次代码变更完成后，应在此文件顶部追加�
 
 ---
 
+## 2026-07-05
+
+### Changed
+- `ruleset-update.yml`：在上传 release assets 成功后，通过 GitHub API 更新 `published_at` 时间戳，使每次发布时 tag 的显示时间保持最新
+  - 修复：`/releases/tags/{tag}` 端点不支持 PATCH，改为先获取 release ID 再用 `/releases/{id}` 端点更新
+- `.clinerules`：代码变更规范新增第 9 条——`attempt_completion` 前必须逐条验证所有文档更新已实际执行
+
 ## 2026-07-04
 
 ### Added
