@@ -58,6 +58,52 @@ jobs:
         fi
         echo "✅ Verified: $JSON_COUNT JSON files, $SRS_COUNT SRS files"
 
+    - name: Generate release notes
+      run: |
+        set -Eeuo pipefail
+
+        # 获取 sing-box 版本
+        SINGBOX_VERSION=$("$SING_BOX_BIN" version 2>/dev/null | head -1 | awk '{print $2}' || echo "unknown")
+
+        # 获取构建时间（北京时间）
+        BUILD_TIME=$(TZ='Asia/Shanghai' date +"%Y-%m-%d %H:%M:%S UTC%:z")
+
+        # 获取规则集文件名列表（去掉扩展名，用 · 分隔）
+        JSON_NAMES=$(ls ruleset/json/*.json | xargs -I{} basename {} .json | sort | tr '\n' ' · ' | sed 's/ · $//')
+        SRS_NAMES=$(ls ruleset/srs/*.srs | xargs -I{} basename {} .srs | sort | tr '\n' ' · ' | sed 's/ · $//')
+
+        # 统计文件数量
+        JSON_COUNT=$(ls ruleset/json/*.json | wc -l)
+        SRS_COUNT=$(ls ruleset/srs/*.srs | wc -l)
+
+        # 生成 release notes（使用 printf 逐行写入，避免 heredoc 缩进问题）
+        write_notes() {
+          local out="$1" count="$2" names="$3" format="$4" format_label="$5" alt_tag="$6" alt_label="$7"
+          local release_tag="ruleset-${format_label}"
+          {
+            printf '> 🕐 构建时间：%s | sing-box %s\n\n' "$BUILD_TIME" "$SINGBOX_VERSION"
+            printf '### 包含规则集（%s 个）\n\n' "$count"
+            printf '%s\n\n' "$names"
+            printf '### 使用方法\n\n'
+            printf '在 sing-box 配置的 `rule_set` 中引用（%s 格式）：\n\n' "$format_label"
+            printf '```json\n'
+            printf '{\n'
+            printf '  "type": "remote",\n'
+            printf '  "tag": "example",\n'
+            printf '  "format": "%s",\n' "$format"
+            printf '  "url": "https://github.com/%s/releases/download/%s/文件名.%s"\n' "${{ github.repository }}" "$release_tag" "$format_label"
+            printf '}\n'
+            printf '```\n\n'
+            printf '> 💡 %s，详见 [releases/%s](../../releases/tag/%s)\n' "$alt_label" "$alt_tag" "$alt_tag"
+            printf '> 📖 完整规则集说明请查看 [README](../../#readme)\n'
+          } > "$out"
+        }
+
+        write_notes /tmp/notes-json.md "$JSON_COUNT" "$JSON_NAMES" "json" "json" "ruleset-srs" "SRS 格式体积更小、加载更快"
+        write_notes /tmp/notes-srs.md "$SRS_COUNT" "$SRS_NAMES" "binary" "srs" "ruleset-json" "JSON 格式可读性更好"
+
+        echo "✅ Release notes generated"
+
     - name: Recreate releases with fresh timestamps
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -70,9 +116,9 @@ jobs:
           echo "🔄 Recreating release: $TAG"
           gh release delete "$TAG" --yes 2>/dev/null || true
           if [ "$TAG" = "ruleset-json" ]; then
-            gh release create "$TAG" --target main --title "$TAG" --notes "Auto-generated JSON rulesets" ruleset/json/*.json
+            gh release create "$TAG" --target main --title "$TAG" --notes-file /tmp/notes-json.md ruleset/json/*.json
           else
-            gh release create "$TAG" --target main --title "$TAG" --notes "Auto-generated SRS rulesets" ruleset/srs/*.srs
+            gh release create "$TAG" --target main --title "$TAG" --notes-file /tmp/notes-srs.md ruleset/srs/*.srs
           fi
           echo "✅ Release $TAG recreated"
         done
