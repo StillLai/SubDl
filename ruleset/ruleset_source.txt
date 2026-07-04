@@ -3,7 +3,6 @@ https://github.com/StillLai/SubDl/raw/refs/heads/main/ruleset/custom_rule/custom
 https://github.com/StillLai/SubDl/raw/refs/heads/main/ruleset/custom_rule/custom_proxy.list
 https://github.com/StillLai/SubDl/raw/refs/heads/main/ruleset/custom_rule/custom_whitelist.list
 https://github.com/Accademia/Additional_Rule_For_Clash/raw/refs/heads/main/GeositeCN/GeositeCN.yaml
-https://github.com/Accademia/Additional_Rule_For_Clash/raw/refs/heads/main/ChinaMax/ChinaMax.yaml
 https://github.com/Accademia/Additional_Rule_For_Clash/raw/refs/heads/main/Apple/Apple.yaml
 https://github.com/TG-Twilight/AWAvenue-Ads-Rule/raw/refs/heads/main/Filters/AWAvenue-Ads-Rule-Singbox.json
 https://github.com/GitMetaio/Surfing/raw/refs/heads/rm/Home/rules/WebRTC.list
@@ -13,4 +12,3 @@ https://github.com/blackmatrix7/ios_rule_script/raw/refs/heads/master/rule/Clash
 https://github.com/blackmatrix7/ios_rule_script/raw/refs/heads/master/rule/Clash/BiliBili/BiliBili.list
 https://github.com/blackmatrix7/ios_rule_script/raw/refs/heads/master/rule/Clash/Weibo/Weibo.list
 https://github.com/blackmatrix7/ios_rule_script/raw/refs/heads/master/rule/Clash/XiaoMi/XiaoMi.list
-https://github.com/blackmatrix7/ios_rule_script/raw/refs/heads/master/rule/Clash/GlobalMedia/GlobalMedia.list
