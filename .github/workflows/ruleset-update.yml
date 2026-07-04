@@ -58,53 +58,23 @@ jobs:
         fi
         echo "✅ Verified: $JSON_COUNT JSON files, $SRS_COUNT SRS files"
 
-    - name: Upload and clean release assets
+    - name: Recreate releases with fresh timestamps
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         set -Eeuo pipefail
 
-        # ===== 1. 先上传所有新文件（覆盖同名旧文件）=====
-        echo "⬆️ Uploading JSON rulesets..."
-        gh release upload ruleset-json ruleset/json/*.json --clobber
-        echo "⬆️ Uploading SRS rulesets..."
-        gh release upload ruleset-srs ruleset/srs/*.srs --clobber
-        echo "✅ All files uploaded successfully"
-
-        # ===== 2. 上传全部成功后，清理多余的旧 asset =====
-        # 获取当前 release 上的 asset 列表
-        EXISTING_JSON=$(gh release view ruleset-json --json assets --jq '.assets[].name')
-        EXISTING_SRS=$(gh release view ruleset-srs --json assets --jq '.assets[].name')
-
-        # 获取本地新生成的文件名列表
-        LOCAL_JSON=$(ls ruleset/json/*.json | xargs -I{} basename {})
-        LOCAL_SRS=$(ls ruleset/srs/*.srs | xargs -I{} basename {})
-
-        # 删除 release 上存在但本地已不存在的 asset
-        for asset in $EXISTING_JSON; do
-          if ! echo "$LOCAL_JSON" | grep -qxF "$asset"; then
-            echo "🗑️ Deleting stale asset: $asset"
-            gh release delete-asset ruleset-json "$asset" --yes || true
+        # 删除旧 release（保留 tag），然后重新创建
+        # GH API 无法通过 PATCH 更新 published_at，只能重建 release
+        for TAG in ruleset-json ruleset-srs; do
+          echo "🔄 Recreating release: $TAG"
+          gh release delete "$TAG" --yes 2>/dev/null || true
+          if [ "$TAG" = "ruleset-json" ]; then
+            gh release create "$TAG" --target main --title "$TAG" --notes "Auto-generated JSON rulesets" ruleset/json/*.json
+          else
+            gh release create "$TAG" --target main --title "$TAG" --notes "Auto-generated SRS rulesets" ruleset/srs/*.srs
           fi
-        done
-        for asset in $EXISTING_SRS; do
-          if ! echo "$LOCAL_SRS" | grep -qxF "$asset"; then
-            echo "🗑️ Deleting stale asset: $asset"
-            gh release delete-asset ruleset-srs "$asset" --yes || true
-          fi
+          echo "✅ Release $TAG recreated"
         done
 
-        echo "✅ Release assets updated successfully"
-
-    - name: Update release timestamps
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        set -Eeuo pipefail
-        NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-        echo "🕐 Updating release timestamps to $NOW"
-        JSON_ID=$(gh api repos/${{ github.repository }}/releases/tags/ruleset-json --jq '.id')
-        gh api repos/${{ github.repository }}/releases/$JSON_ID -X PATCH -f published_at="$NOW"
-        SRS_ID=$(gh api repos/${{ github.repository }}/releases/tags/ruleset-srs --jq '.id')
-        gh api repos/${{ github.repository }}/releases/$SRS_ID -X PATCH -f published_at="$NOW"
-        echo "✅ Release timestamps updated"
+        echo "✅ All releases recreated with fresh timestamps"
