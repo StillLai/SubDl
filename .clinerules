@@ -1,0 +1,104 @@
+# SubDl 项目规则
+
+## 项目概述
+SubDl 是一个自动化订阅管理工具：下载 Clash 订阅 → 转换为 sing-box 格式 → 合并模板配置 → 上传到 GitHub Gist。
+运行环境为 GitHub Actions，由 cron 定时触发。
+
+## 技术栈
+- Python 3.12+（主逻辑）
+- Node.js（Clash → sing-box 转换，通过 subprocess 调用 convert.mjs）
+- 零第三方网络依赖（纯 urllib），配置解析用 json5
+- JSONC 模板配置（支持注释）
+
+## 文件职责
+| 文件 | 职责 | 备注 |
+|------|------|------|
+| utils.py | 常量、数据模型、网络、日志、异常类 | 基础模块，不导入其他项目模块 |
+| update_subscriptions.py | 主流程：下载 → 转换 → 合并 → 上传 | 入口 main() 在此文件 |
+| merge_config.py | 模板合并逻辑、provider 展开 | 依赖 utils |
+| convert.mjs | Clash → sing-box 批量转换 | Node.js，通过 subprocess 调用 |
+| ruleset_convert.py | 规则集下载与转换 | 独立 workflow，生成 JSON + SRS |
+| svg.py | 状态图生成（浅色/深色主题） | 依赖 utils |
+
+## 代码规范
+
+### 类型注解
+- 所有函数必须有完整的类型注解（参数 + 返回值）
+- 使用 Python 3.12+ 语法：`list[str]` 而非 `List[str]`，`str | None` 而非 `Optional[str]`
+
+### 日志
+- 使用 utils 中的 log_info / log_warn / log_error
+- 日志输出到 stderr（避免污染 stdout 数据流）
+- stdout 只用于 Node.js 子进程的 JSON 输出
+
+### 异常
+- 使用 SubDlError 异常体系（ConfigError / DownloadError / ConversionError / TemplateError / ValidationError / UploadError）
+- 不要使用裸 Exception，自定义异常时继承 SubDlError
+- 异常应携带 context 字典，包含相关上下文信息
+
+### 网络请求
+- 统一使用 utils.http_get_with_retry / http_request
+- 不要直接使用 requests 库或 urllib
+
+### 配置加载
+- JSONC 文件使用 utils.load_jsonc（基于 json5）
+
+## 数据流
+```
+SUB_URL (env)
+  → parse_subscriptions()        # 解析环境变量
+  → _download_all()              # 并行下载订阅
+  → _try_gist_fallback()         # 失败时从 Gist 备份获取
+  → _convert_batch()             # Node.js 批量转换
+  → _aggregate_results()         # 聚合结果
+  → _load_templates()            # 加载模块化模板
+  → merge_all_templates()        # 合并节点到模板
+  → generate_provider_configs()  # 生成 providers 版本
+  → _validate_configs()          # sing-box check 校验
+  → upload_to_gist()             # 上传到 Gist
+```
+
+## 模块依赖关系
+```
+update_subscriptions.py (主入口)
+  ├── utils.py         (基础工具，无项目内依赖)
+  ├── merge_config.py  (模板合并，依赖 utils)
+  ├── svg.py           (SVG 生成，依赖 utils)
+  └── convert.mjs      (Node.js，通过 subprocess 调用)
+```
+
+## 关键设计约束
+
+### stdout/stderr 分离
+- stdout 只输出 JSON 数据（Node.js 子进程通信）
+- 所有日志必须走 stderr（通过 log_info 等函数）
+
+### Gist 文件名模式
+- `_MANAGED_FILE_PATTERNS` 定义了 SubDl 托管的文件名模式
+- 清理旧文件时根据此模式判断，不要随意修改
+
+### Provider 前缀机制
+- merge_config 步骤 1 中会给所有节点 tag 加上 "{sub_name}/" 前缀
+- process_providers 展开 provider 引用时必须使用 "{provider_tag}/{node_tag}" 格式
+- 否则 selector 中的引用会指向不存在的节点
+
+### 模板结构
+- config_template/ 采用模块化：base / dns / providers / outbounds / route + inbounds/ 变体
+- inbounds/ 下每个文件自动生成对应配置
+- 新增变体只需在 inbounds/ 目录下添加文件
+
+## 代码变更规范
+
+每次修改代码后，必须检查并更新以下内容：
+1. 如果改变了模块职责或文件分工 → 更新本文件中"文件职责"章节
+2. 如果新增/删除/重命名了公共函数 → 更新本文件中"文件职责"章节
+3. 如果改变了数据流 → 更新本文件中"数据流"章节
+4. 如果改变了关键约束 → 更新本文件中"关键设计约束"章节
+
+## 命名规范
+- 文件名：snake_case（Python）、camelCase（Node.js）
+- 函数名：snake_case
+- 常量：UPPER_SNAKE_CASE
+- 异常类：PascalCase
+- 数据类：PascalCase，使用 @dataclass 装饰器
+- 私有函数/变量：_single_underscore 前缀
