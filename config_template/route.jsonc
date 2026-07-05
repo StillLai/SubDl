@@ -371,437 +371,248 @@
       }
     ],
     "rules": [
-      {
-        "action": "sniff"
-      },
-      {
+      {"action": "sniff"}, // 流量嗅探
+      { // DNS 劫持
         "type": "logical",
         "mode": "or",
         "rules": [
-          {
-            "protocol": "dns"
-          },
-          {
-            "port": 53
-          }
+          {"protocol": "dns"},
+          {"port": 53}
         ],
         "action": "hijack-dns"
       },
-      {
+      { // 私有网络直连
         "type": "logical",
         "mode": "or",
         "rules": [
-          {
-            "ip_is_private": true
-          },
-          {
-            "rule_set": [
-              "geosite-private",
-              "geoip-private"
-            ]
-          }
+          {"ip_is_private": true},
+          {"rule_set": ["geosite-private", "geoip-private"]}
         ],
         "outbound": "🎯 全球直连"
       },
-      {
+      { // 拒绝 DoT/QUIC/STUN
         "type": "logical",
         "mode": "or",
         "rules": [
-          {
-            "port": 853
-          },
-          {
-            "network": "udp",
-            "port": 443
-          },
-          {
-            "protocol": "stun"
-          }
+          {"port": 853},
+          {"network": "udp", "port": 443},
+          {"protocol": "stun"}
         ],
         "action": "reject"
       },
-      {
-        "clash_mode": "Direct",
-        "outbound": "🎯 全球直连"
-      },
-      {
+      {"clash_mode": "Direct", "outbound": "🎯 全球直连"}, // 直连模式
+      { // 全局模式
         "type": "logical",
         "mode": "or",
         "rules": [
-          {
-            "clash_mode": "Global"
-          },
-          {
-            "inbound": "mixed-in-global"
-          }
+          {"clash_mode": "Global"},
+          {"inbound": "mixed-in-global"}
         ],
         "outbound": "Global"
       },
-      {
+      { // 广告拦截
         "type": "logical",
         "mode": "and",
         "rules": [
-          {
-            "clash_mode": "AlwAds",
-            "invert": true
-          },
-          {
-            "rule_set": [
-              "custom_whitelist",
-              "geosite-amazon",
-              "geosite-amazon@ads"
-            ],
-            "invert": true
-          },
-          {
-            "rule_set": [
-              "ads",
-              "custom_block",
-              "WebRTC"
-            ]
-          }
+          {"clash_mode": "AlwAds", "invert": true},
+          {"rule_set": ["custom_whitelist", "geosite-amazon", "geosite-amazon@ads"], "invert": true},
+          {"rule_set": ["ads", "custom_block", "WebRTC"]}
         ],
         "action": "reject"
       },
-      {
+      { // 银行APP（工商/建设/农业/中国/交通/招商）
         "type": "logical",
         "mode": "or",
         "rules": [
-          {
-            "rule_set": [
-              "geosite-icbc",
-              "geosite-ccb",
-              "geosite-abc",
-              "geosite-boc",
-              "BOCOM",
-              "geosite-cmb"
-            ]
-          },
-          {
-            "package_name": [
-              "com.icbc",
-              "com.chinamworld.main",
-              "com.android.bankabc",
-              "com.chinamworld.bocmbci",
-              "com.bankcomm.Bankcomm",
-              "com.cmbchina.ccd.pluto.cmbActivity",
-              "cmb.pb"
-            ]
-          }
+          {"rule_set": ["geosite-icbc", "geosite-ccb", "geosite-abc", "geosite-boc", "BOCOM", "geosite-cmb"]},
+          {"package_name": ["com.icbc", "com.chinamworld.main", "com.android.bankabc", "com.chinamworld.bocmbci", "com.bankcomm.Bankcomm", "com.cmbchina.ccd.pluto.cmbActivity", "cmb.pb"]}
         ],
         "outbound": "🎯 全球直连"
       },
-      {
-        "rule_set": [
-          "geosite-amazon",
-          "geosite-amazon@ads"
-        ],
+      { // 亚马逊
+        "rule_set": ["geosite-amazon", "geosite-amazon@ads"],
         "outbound": "🅰️ 亚马逊"
       },
-      {
+      { // Jav
         "type": "logical",
         "mode": "or",
         "rules": [
-          {
-            "rule_set": [
-              "WeChat"
-            ]
-          },
-          {
-            "package_name": [
-              "com.tencent.mm"
-            ]
-          }
+          {"domain": ["javdb.com", "jdbstatic.com", "jav.app"]},
+          {"domain_keyword": ["javbus"]},
+          {"package_name": ["xxx.pornhub.fuck"]}
+        ],
+        "outbound": "🔞 版权内容"
+      },
+      { // 微信
+        "type": "logical",
+        "mode": "or",
+        "rules": [
+          {"rule_set": ["WeChat"]},
+          {"package_name": ["com.tencent.mm"]}
         ],
         "outbound": "🟢 微信"
       },
-      {
+      { // 支付宝
         "type": "logical",
         "mode": "or",
         "rules": [
-          {
-            "rule_set": [
-              "AliPay"
-            ]
-          },
-          {
-            "package_name": [
-              "com.eg.android.AlipayGphone"
-            ]
-          }
+          {"rule_set": ["AliPay"]},
+          {"package_name": ["com.eg.android.AlipayGphone"]}
         ],
         "outbound": "🟦 支付宝"
       },
-      {
+      { // 哔哩哔哩
         "type": "logical",
         "mode": "or",
         "rules": [
-          {
-            "rule_set": [
-              "BiliBili"
-            ]
-          },
-          {
-            "package_name": [
-              "tv.danmaku.bili"
-            ]
-          }
+          {"rule_set": ["BiliBili"]},
+          {"package_name": ["tv.danmaku.bili"]}
         ],
         "outbound": "📺 哔哩哔哩"
       },
-      {
+      { // 抖音
         "type": "logical",
         "mode": "or",
         "rules": [
-          {
-            "rule_set": [
-              "geosite-douyin"
-            ]
-          },
-          {
-            "package_name": [
-              "com.ss.android.ugc.aweme"
-            ]
-          }
+          {"rule_set": ["geosite-douyin"]},
+          {"package_name": ["com.ss.android.ugc.aweme"]}
         ],
         "outbound": "🎵 抖音"
       },
-      {
-        "rule_set": [
-          "Weibo"
-        ],
+      { // 微博
+        "rule_set": ["Weibo"],
         "outbound": "👁️ 微博"
       },
-      {
+      { // 小红书
         "type": "logical",
         "mode": "or",
         "rules": [
-          {
-            "rule_set": [
-              "geosite-xiaohongshu"
-            ]
-          },
-          {
-            "package_name": [
-              "com.xingin.xhs"
-            ]
-          }
+          {"rule_set": ["geosite-xiaohongshu"]},
+          {"package_name": ["com.xingin.xhs"]}
         ],
         "outbound": "🍠 小红书"
       },
-      {
-        "rule_set": [
-          "geosite-steam"
-        ],
+      { // Steam
+        "rule_set": ["geosite-steam"],
         "outbound": "🎮 Steam"
       },
-      {
-        "rule_set": [
-          "geosite-ubisoft"
-        ],
+      { // 育碧
+        "rule_set": ["geosite-ubisoft"],
         "outbound": "🌀 育碧"
       },
-      {
-        "rule_set": [
-          "geosite-epicgames"
-        ],
+      { // Epic Games
+        "rule_set": ["geosite-epicgames"],
         "outbound": "🎁 Epic"
       },
-      {
-        "rule_set": [
-          "geosite-github"
-        ],
+      { // GitHub
+        "rule_set": ["geosite-github"],
         "outbound": "🐱 GitHub"
       },
-      {
-        "rule_set": [
-          "geosite-youtube"
-        ],
+      { // YouTube
+        "rule_set": ["geosite-youtube"],
         "outbound": "📹 YouTube"
       },
-      {
+      { // Netflix
         "type": "logical",
         "mode": "or",
         "rules": [
-          {
-            "rule_set": [
-              "geosite-netflix",
-              "geoip-netflix"
-            ]
-          },
-          {
-            "package_name": [
-              "com.netflix.mediaclient"
-            ]
-          }
+          {"rule_set": ["geosite-netflix", "geoip-netflix"]},
+          {"package_name": ["com.netflix.mediaclient"]}
         ],
         "outbound": "🎥 Netflix"
       },
-      {
+      { // TikTok
         "type": "logical",
         "mode": "or",
         "rules": [
-          {
-            "rule_set": [
-              "geosite-tiktok"
-            ]
-          },
-          {
-            "package_name": [
-              "com.zhiliaoapp.musically"
-            ]
-          }
+          {"rule_set": ["geosite-tiktok"]},
+          {"package_name": ["com.zhiliaoapp.musically"]}
         ],
         "outbound": "🎶 TikTok"
       },
-      {
+      { // Spotify
         "type": "logical",
         "mode": "or",
         "rules": [
-          {
-            "rule_set": [
-              "geosite-spotify"
-            ]
-          },
-          {
-            "package_name": [
-              "com.spotify.music"
-            ]
-          }
+          {"rule_set": ["geosite-spotify"]},
+          {"package_name": ["com.spotify.music"]}
         ],
         "outbound": "💚 Spotify"
       },
-      {
+      { // Telegram
         "type": "logical",
         "mode": "or",
         "rules": [
-          {
-            "rule_set": [
-              "geosite-telegram",
-              "geoip-telegram"
-            ]
-          },
-          {
-            "package_name": [
-              "nekox.messenger",
-              "org.telegram.messenger",
-              "tw.nekomimi.nekogram",
-              "xyz.nextalone.nagram"
-            ]
-          }
+          {"rule_set": ["geosite-telegram", "geoip-telegram"]},
+          {"package_name": ["nekox.messenger", "org.telegram.messenger", "tw.nekomimi.nekogram", "xyz.nextalone.nagram"]}
         ],
         "outbound": "✈️ Telegram"
       },
-      {
-        "rule_set": [
-          "geosite-twitter",
-          "geoip-twitter"
-        ],
+      { // Twitter(X)
+        "rule_set": ["geosite-twitter", "geoip-twitter"],
         "outbound": "🐦 Twitter(X)"
       },
-      {
-        "rule_set": [
-          "geosite-facebook",
-          "geoip-facebook"
-        ],
+      { // Facebook
+        "rule_set": ["geosite-facebook", "geoip-facebook"],
         "outbound": "👍 Facebook"
       },
-      {
-        "rule_set": [
-          "geosite-discord"
-        ],
+      { // Discord
+        "rule_set": ["geosite-discord"],
         "outbound": "💬 Discord"
       },
-      {
-        "rule_set": [
-          "geosite-openai"
-        ],
+      { // ChatGPT/OpenAI
+        "rule_set": ["geosite-openai"],
         "outbound": "🤖 OpenAI"
       },
-      {
-        "rule_set": [
-          "XiaoMi"
-        ],
-        "outbound": "📱 小米"
-      },
-      {
-        "rule_set": [
-          "Apple"
-        ],
-        "outbound": "🍎 Apple"
-      },
-      {
-        "rule_set": [
-          "geosite-microsoft"
-        ],
-        "outbound": "🪟 Microsoft"
-      },
-      {
-        "rule_set": [
-          "geosite-cloudflare",
-          "geoip-cloudflare"
-        ],
-        "outbound": "☁️ Cloudflare"
-      },
-      {
+      { // 小米
         "type": "logical",
         "mode": "or",
         "rules": [
-          {
-            "rule_set": [
-              "geosite-google",
-              "geoip-google",
-              "geosite-google-play"
-            ]
-          },
-          {
-            "package_name": [
-              "com.android.vending",
-              "com.google.android.gms",
-              "com.google.android.gsf",
-              "com.google.android.onetimeinitializer"
-            ]
-          }
+          {"rule_set": ["XiaoMi"]},
+          {"package_name": ["com.xiaomi.vipaccount"]}
+        ],
+        "outbound": "📱 小米"
+      },
+      { // Apple
+        "rule_set": ["Apple"],
+        "outbound": "🍎 Apple"
+      },
+      { // Microsoft
+        "rule_set": ["geosite-microsoft"],
+        "outbound": "🪟 Microsoft"
+      },
+      { // Cloudflare
+        "rule_set": ["geosite-cloudflare", "geoip-cloudflare"],
+        "outbound": "☁️ Cloudflare"
+      },
+      { // Google 服务
+        "type": "logical",
+        "mode": "or",
+        "rules": [
+          {"rule_set": ["geosite-google", "geoip-google", "geosite-google-play"]},
+          {"package_name": ["com.android.vending", "com.google.android.gms", "com.google.android.gsf", "com.google.android.onetimeinitializer"]}
         ],
         "outbound": "🇬 Google"
       },
-      {
-        "rule_set": [
-          "geosite-geolocation-cn",
-          "custom_direct"
-        ],
+      { // 国内网站
+        "rule_set": ["geosite-geolocation-cn", "custom_direct"],
         "outbound": "🎯 全球直连"
       },
-      {
+      { // 国内IP（排除海外）
         "type": "logical",
         "mode": "and",
         "rules": [
-          {
-            "rule_set": [
-              "geosite-geolocation-!cn",
-              "custom_proxy"
-            ],
-            "invert": true
-          },
-          {
-            "rule_set": "geoip-cn"
-          }
+          {"rule_set": ["geosite-geolocation-!cn", "custom_proxy"], "invert": true},
+          {"rule_set": "geoip-cn"}
         ],
         "outbound": "🎯 全球直连"
       },
-      {
-        "rule_set": [
-          "geosite-geolocation-!cn",
-          "custom_proxy"
-        ],
+      { // 海外网站
+        "rule_set": ["geosite-geolocation-!cn", "custom_proxy"],
         "outbound": "🚀 节点选择"
       },
-      {
-        "rule_set": [
-          "geosite-tld-cn",
-          "GeositeCN",
-          "geoip-cn"
-        ],
+      { // CN域名/IP
+        "rule_set": ["geosite-tld-cn", "GeositeCN", "geoip-cn"],
         "outbound": "🎯 全球直连"
       }
     ],
