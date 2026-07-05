@@ -146,6 +146,13 @@
         "update_interval": "6h"
       },
       {
+        "tag": "geosite-category-game-accelerator-cn",
+        "type": "remote",
+        "url": "https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/category-game-accelerator-cn.srs",
+        "download_detour": "🎈 自动选择",
+        "update_interval": "6h"
+      },
+      {
         "tag": "geosite-steam",
         "type": "remote",
         "url": "https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/steam.srs",
@@ -371,7 +378,9 @@
       }
     ],
     "rules": [
-      {"action": "sniff"}, // 流量嗅探
+      { // 流量嗅探
+        "action": "sniff"
+      },
       { // DNS 劫持
         "type": "logical",
         "mode": "or",
@@ -400,7 +409,10 @@
         ],
         "action": "reject"
       },
-      {"clash_mode": "Direct", "outbound": "🎯 全球直连"}, // 直连模式
+      { // 直连模式
+        "clash_mode": "Direct",
+        "outbound": "🎯 全球直连"
+      },
       { // 全局模式
         "type": "logical",
         "mode": "or",
@@ -491,6 +503,10 @@
           {"package_name": ["com.xingin.xhs"]}
         ],
         "outbound": "🍠 小红书"
+      },
+      { // 加速器
+        "rule_set": ["geosite-category-game-accelerator-cn"],
+        "outbound": "🎯 全球直连"
       },
       { // Steam
         "rule_set": ["geosite-steam"],

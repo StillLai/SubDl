@@ -134,6 +134,10 @@
         ],
         "server": "Tencent-DNS"
       },
+      { // 加速器
+        "rule_set": ["geosite-category-game-accelerator-cn"],
+        "server": "Tencent-DNS"
+      },
       { // Steam
         "rule_set": ["geosite-steam"],
         "server": "Cloudflare-DNS"
