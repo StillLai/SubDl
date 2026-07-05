@@ -1,0 +1,65 @@
+name: Docs Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'sing-box-reF1nd-docs/**'
+  workflow_dispatch:
+
+# 防止多次运行重叠
+concurrency:
+  group: docs-deploy
+  cancel-in-progress: false
+
+permissions:
+  pages: write       # 部署 Pages
+  id-token: write    # Pages OIDC token
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        fetch-depth: 1
+
+    - name: Install mkdocs-material
+      run: pip install mkdocs-material mkdocs-static-i18n
+
+    - name: Adjust mkdocs.yml for this repo
+      run: |
+        # 修正 site_url 为实际 GitHub Pages 地址
+        sed -i 's|^site_url:.*|site_url: https://stilllai.github.io/SubDl/|' sing-box-reF1nd-docs/mkdocs.yml
+        # 修正 repo 指向 reF1nd 发布仓库（右上角版本号/星标实时从此仓库获取）
+        sed -i 's|^repo_url:.*|repo_url: https://github.com/reF1nd/sing-box-releases|' sing-box-reF1nd-docs/mkdocs.yml
+        sed -i 's|^repo_name:.*|repo_name: reF1nd/sing-box-releases|' sing-box-reF1nd-docs/mkdocs.yml
+        # 追加路径覆盖
+        echo "docs_dir: $GITHUB_WORKSPACE/sing-box-reF1nd-docs" >> sing-box-reF1nd-docs/mkdocs.yml
+        echo "site_dir: $GITHUB_WORKSPACE/site" >> sing-box-reF1nd-docs/mkdocs.yml
+
+    - name: Fix absolute links for subpath deployment
+      run: |
+        # GitHub Pages 部署在 /SubDl/ 子路径下，
+        # 但 markdown 中以 / 开头的绝对路径链接不包含此前缀，
+        # 浏览器会解析到 https://stilllai.github.io/zh/... 而非 .../SubDl/zh/...
+        # 将 ](/x → ](/SubDl/x 统一修复
+        find sing-box-reF1nd-docs -name "*.md" -exec sed -i \
+          's|\](/\([a-z]\)|](/SubDl/\1|g' {} +
+
+    - name: Build documentation
+      run: mkdocs build -f sing-box-reF1nd-docs/mkdocs.yml --strict
+
+    - name: Upload Pages artifact
+      uses: actions/upload-pages-artifact@v5
+      with:
+        path: site
+
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v5
