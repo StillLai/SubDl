@@ -43,6 +43,15 @@ jobs:
         echo "docs_dir: $GITHUB_WORKSPACE/sing-box-reF1nd-docs" >> sing-box-reF1nd-docs/mkdocs.yml
         echo "site_dir: $GITHUB_WORKSPACE/site" >> sing-box-reF1nd-docs/mkdocs.yml
 
+    - name: Fix absolute links for subpath deployment
+      run: |
+        # GitHub Pages 部署在 /SubDl/ 子路径下，
+        # 但 markdown 中以 / 开头的绝对路径链接不包含此前缀，
+        # 浏览器会解析到 https://stilllai.github.io/zh/... 而非 .../SubDl/zh/...
+        # 将 ](/x → ](/SubDl/x 统一修复
+        find sing-box-reF1nd-docs -name "*.md" -exec sed -i \
+          's|\](/\([a-z]\)|](/SubDl/\1|g' {} +
+
     - name: Build documentation
       run: mkdocs build -f sing-box-reF1nd-docs/mkdocs.yml --strict
 

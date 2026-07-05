@@ -8,6 +8,9 @@ Vibe Coding 规范：每次代码变更完成后，应在此文件顶部追加�
 
 ## 2026-07-05
 
+### Fixed
+- `docs-deploy.yml`：修复文档中绝对路径链接在 GitHub Pages 子路径 `/SubDl/` 下 404 的问题（如 `[拨号字段覆写](/zh/configuration/provider/override_dialer/)` 解析为 `https://stilllai.github.io/zh/...` 而非 `https://stilllai.github.io/SubDl/zh/...`），构建前通过 sed 将所有 `](/x` 统一替换为 `](/SubDl/x`
+
 ### Changed
 - `ruleset-update.yml`：改为每次运行时删除旧 release 并重新创建，使 tag 发布时间保持最新（GitHub API 不支持通过 PATCH 修改 `published_at`）
 - `ruleset-update.yml`：丰富 release notes 内容，动态生成构建时间、sing-box 版本、规则集文件列表及中文使用说明
