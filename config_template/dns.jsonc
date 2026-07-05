@@ -39,11 +39,11 @@
       }
     ],
     "rules": [
-      {
+      { // 直连模式
         "clash_mode": "Direct",
         "server": "Tencent-DNS"
       },
-      {
+      { // 全局模式
         "type": "logical",
         "mode": "or",
         "rules": [
@@ -52,7 +52,7 @@
         ],
         "server": "Google-DNS"
       },
-      {
+      { // 广告拦截
         "type": "logical",
         "mode": "and",
         "rules": [
@@ -62,7 +62,7 @@
         ],
         "action": "reject"
       },
-      {
+      { // 银行APP（工商/建设/农业/中国/交通/招商）
         "type": "logical",
         "mode": "or",
         "rules": [
@@ -71,11 +71,21 @@
         ],
         "server": "Tencent-DNS"
       },
-      {
+      { // 亚马逊
         "rule_set": ["geosite-amazon", "geosite-amazon@ads"],
         "server": "Cloudflare-DNS"
       },
-      {
+      { // Jav
+        "type": "logical",
+        "mode": "or",
+        "rules": [
+          {"domain": ["javdb.com", "jdbstatic.com", "jav.app"]},
+          {"domain_keyword": ["javbus"]},
+          {"package_name": ["xxx.pornhub.fuck"]}
+        ],
+        "server": "Cloudflare-DNS"
+      },
+      { // 微信
         "type": "logical",
         "mode": "or",
         "rules": [
@@ -84,7 +94,7 @@
         ],
         "server": "Tencent-DNS"
       },
-      {
+      { // 支付宝
         "type": "logical",
         "mode": "or",
         "rules": [
@@ -93,7 +103,7 @@
         ],
         "server": "Ali-DNS"
       },
-      {
+      { // 哔哩哔哩
         "type": "logical",
         "mode": "or",
         "rules": [
@@ -102,7 +112,7 @@
         ],
         "server": "Tencent-DNS"
       },
-      {
+      { // 抖音
         "type": "logical",
         "mode": "or",
         "rules": [
@@ -111,11 +121,11 @@
         ],
         "server": "Tencent-DNS"
       },
-      {
+      { // 微博
         "rule_set": ["Weibo"],
         "server": "Ali-DNS"
       },
-      {
+      { // 小红书
         "type": "logical",
         "mode": "or",
         "rules": [
@@ -124,27 +134,27 @@
         ],
         "server": "Tencent-DNS"
       },
-      {
+      { // Steam
         "rule_set": ["geosite-steam"],
         "server": "Cloudflare-DNS"
       },
-      {
+      { // 育碧
         "rule_set": ["geosite-ubisoft"],
         "server": "Cloudflare-DNS"
       },
-      {
+      { // Epic Games
         "rule_set": ["geosite-epicgames"],
         "server": "Cloudflare-DNS"
       },
-      {
+      { // GitHub
         "rule_set": ["geosite-github"],
         "server": "Cloudflare-DNS"
       },
-      {
+      { // YouTube
         "rule_set": ["geosite-youtube"],
         "server": "Google-DNS"
       },
-      {
+      { // Netflix
         "type": "logical",
         "mode": "or",
         "rules": [
@@ -153,7 +163,7 @@
         ],
         "server": "Cloudflare-DNS"
       },
-      {
+      { // TikTok
         "type": "logical",
         "mode": "or",
         "rules": [
@@ -162,7 +172,7 @@
         ],
         "server": "Cloudflare-DNS"
       },
-      {
+      { // Spotify
         "type": "logical",
         "mode": "or",
         "rules": [
@@ -171,7 +181,7 @@
         ],
         "server": "Cloudflare-DNS"
       },
-      {
+      { // Telegram
         "type": "logical",
         "mode": "or",
         "rules": [
@@ -180,39 +190,44 @@
         ],
         "server": "Cloudflare-DNS"
       },
-      {
+      { // Twitter(X)
         "rule_set": ["geosite-twitter", "geoip-twitter"],
         "server": "Cloudflare-DNS"
       },
-      {
+      { // Facebook
         "rule_set": ["geosite-facebook", "geoip-facebook"],
         "server": "Cloudflare-DNS"
       },
-      {
+      { // Discord
         "rule_set": ["geosite-discord"],
         "server": "Cloudflare-DNS"
       },
-      {
+      { // ChatGPT/OpenAI
         "rule_set": ["geosite-openai"],
         "server": "Cloudflare-DNS"
       },
-      {
-        "rule_set": ["XiaoMi"],
+      { // 小米
+        "type": "logical",
+        "mode": "or",
+        "rules": [
+          {"rule_set": ["XiaoMi"]},
+          {"package_name": ["com.xiaomi.vipaccount"]}
+        ],
         "server": "Tencent-DNS"
       },
-      {
+      { // Apple
         "rule_set": ["Apple"],
         "server": "Tencent-DNS"
       },
-      {
+      { // Microsoft
         "rule_set": ["geosite-microsoft"],
         "server": "Cloudflare-DNS"
       },
-      {
+      { // Cloudflare
         "rule_set": ["geosite-cloudflare", "geoip-cloudflare"],
         "server": "Cloudflare-DNS"
       },
-      {
+      { // Google 服务
         "type": "logical",
         "mode": "or",
         "rules": [
@@ -221,11 +236,11 @@
         ],
         "server": "Google-DNS"
       },
-      {
+      { // 国内网站
         "rule_set": ["geosite-geolocation-cn", "custom_direct"],
         "server": "Tencent-DNS"
       },
-      {
+      { // 国内IP（排除海外）
         "type": "logical",
         "mode": "and",
         "rules": [
@@ -234,11 +249,11 @@
         ],
         "server": "Tencent-DNS"
       },
-      {
+      { // 海外网站
         "rule_set": ["geosite-geolocation-!cn", "custom_proxy"],
         "server": "Cloudflare-DNS"
       },
-      {
+      { // CN域名/IP
         "rule_set": ["geosite-tld-cn", "GeositeCN", "geoip-cn"],
         "server": "Tencent-DNS"
       }
