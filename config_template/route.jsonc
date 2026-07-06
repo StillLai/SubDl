@@ -1,5 +1,5 @@
 {
-  "$schema": "https://gh-proxy.org/https://github.com/jiang-zhexin/typebox/releases/latest/download/schema.json",
+  "$schema": "https://ghfast.top/https://github.com/jiang-zhexin/typebox/releases/latest/download/schema.json",
   "route": {
     "default_domain_resolver": "Tencent-DNS",
     "auto_detect_interface": true,
@@ -8,321 +8,321 @@
       {
         "tag": "custom_whitelist",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/custom_whitelist.srs",
+        "url": "https://ghfast.top/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/custom_whitelist.srs",
         "update_interval": "3h"
       },
       {
         "tag": "custom_block",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/custom_block.srs",
+        "url": "https://ghfast.top/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/custom_block.srs",
         "update_interval": "3h"
       },
       {
         "tag": "custom_direct",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/custom_direct.srs",
+        "url": "https://ghfast.top/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/custom_direct.srs",
         "update_interval": "3h"
       },
       {
         "tag": "custom_proxy",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/custom_proxy.srs",
+        "url": "https://ghfast.top/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/custom_proxy.srs",
         "update_interval": "3h"
       },
       {
         "tag": "geosite-amazon",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/amazon.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/amazon.srs",
         "update_interval": "6h"
       },
       {
         "tag": "geosite-amazon@ads",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/amazon@ads.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/amazon@ads.srs",
         "update_interval": "6h"
       },
       {
         "tag": "ads",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/AWAvenue-Ads-Rule-Singbox.srs",
+        "url": "https://ghfast.top/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/AWAvenue-Ads-Rule-Singbox.srs",
         "update_interval": "6h"
       },
       {
         "tag": "WebRTC",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/WebRTC.srs",
+        "url": "https://ghfast.top/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/WebRTC.srs",
         "update_interval": "6h"
       },
       {
         "tag": "geosite-icbc",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/icbc.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/icbc.srs",
         "update_interval": "6h"
       },
       {
         "tag": "geosite-ccb",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/ccb.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/ccb.srs",
         "update_interval": "6h"
       },
       {
         "tag": "geosite-abc",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/abc.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/abc.srs",
         "update_interval": "6h"
       },
       {
         "tag": "geosite-boc",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/boc.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/boc.srs",
         "update_interval": "6h"
       },
       {
         "tag": "BOCOM",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/BOCOM.srs",
+        "url": "https://ghfast.top/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/BOCOM.srs",
         "update_interval": "6h"
       },
       {
         "tag": "geosite-cmb",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/cmb.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/cmb.srs",
         "update_interval": "6h"
       },
       {
         "tag": "WeChat",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/WeChat.srs",
+        "url": "https://ghfast.top/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/WeChat.srs",
         "update_interval": "6h"
       },
       {
         "tag": "AliPay",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/AliPay.srs",
+        "url": "https://ghfast.top/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/AliPay.srs",
         "update_interval": "6h"
       },
       {
         "tag": "BiliBili",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/BiliBili.srs",
+        "url": "https://ghfast.top/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/BiliBili.srs",
         "update_interval": "6h"
       },
       {
         "tag": "geosite-douyin",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/douyin.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/douyin.srs",
         "update_interval": "6h"
       },
       {
         "tag": "Weibo",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/Weibo.srs",
+        "url": "https://ghfast.top/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/Weibo.srs",
         "update_interval": "6h"
       },
       {
         "tag": "geosite-xiaohongshu",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/xiaohongshu.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/xiaohongshu.srs",
         "update_interval": "6h"
       },
       {
         "tag": "geosite-category-game-accelerator-cn",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/category-game-accelerator-cn.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/category-game-accelerator-cn.srs",
         "update_interval": "6h"
       },
       {
         "tag": "geosite-steam",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/steam.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/steam.srs",
         "update_interval": "6h"
       },
       {
         "tag": "geosite-ubisoft",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/ubisoft.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/ubisoft.srs",
         "update_interval": "6h"
       },
       {
         "tag": "geosite-epicgames",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/epicgames.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/epicgames.srs",
         "update_interval": "6h"
       },
       {
         "tag": "geosite-github",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/github.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/github.srs",
         "update_interval": "6h"
       },
       {
         "tag": "geosite-youtube",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/youtube.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/youtube.srs",
         "update_interval": "6h"
       },
       {
         "tag": "geosite-netflix",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/netflix.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/netflix.srs",
         "update_interval": "6h"
       },
       {
         "tag": "geoip-netflix",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geoip/netflix.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geoip/netflix.srs",
         "update_interval": "6h"
       },
       {
         "tag": "geosite-tiktok",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/tiktok.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/tiktok.srs",
         "update_interval": "6h"
       },
       {
         "tag": "geosite-spotify",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/spotify.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/spotify.srs",
         "update_interval": "6h"
       },
       {
         "tag": "geosite-telegram",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/telegram.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/telegram.srs",
         "update_interval": "6h"
       },
       {
         "tag": "geoip-telegram",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geoip/telegram.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geoip/telegram.srs",
         "update_interval": "6h"
       },
       {
         "tag": "geosite-twitter",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/twitter.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/twitter.srs",
         "update_interval": "6h"
       },
       {
         "tag": "geoip-twitter",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geoip/twitter.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geoip/twitter.srs",
         "update_interval": "6h"
       },
       {
         "tag": "geosite-facebook",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/facebook.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/facebook.srs",
         "update_interval": "6h"
       },
       {
         "tag": "geoip-facebook",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geoip/facebook.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geoip/facebook.srs",
         "update_interval": "6h"
       },
       {
         "tag": "geosite-discord",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/discord.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/discord.srs",
         "update_interval": "6h"
       },
       {
         "tag": "geosite-openai",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/openai.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/openai.srs",
         "update_interval": "6h"
       },
       {
         "tag": "geosite-cloudflare",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/cloudflare.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/cloudflare.srs",
         "update_interval": "6h"
       },
       {
         "tag": "geoip-cloudflare",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geoip/cloudflare.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geoip/cloudflare.srs",
         "update_interval": "6h"
       },
       {
         "tag": "geosite-google-play",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/google-play.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/google-play.srs",
         "update_interval": "6h"
       },
       {
         "tag": "geosite-google",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/google.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/google.srs",
         "update_interval": "6h"
       },
       {
         "tag": "geoip-google",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geoip/google.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geoip/google.srs",
         "update_interval": "6h"
       },
       {
         "tag": "Apple",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/Apple.srs",
+        "url": "https://ghfast.top/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/Apple.srs",
         "update_interval": "6h"
       },
       {
         "tag": "geosite-microsoft",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/microsoft.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/microsoft.srs",
         "update_interval": "6h"
       },
       {
         "tag": "XiaoMi",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/XiaoMi.srs",
+        "url": "https://ghfast.top/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/XiaoMi.srs",
         "update_interval": "6h"
       },
       {
         "tag": "geosite-private",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/private.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/private.srs",
         "format": "binary",
         "update_interval": "6h"
       },
       {
         "tag": "geoip-private",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geoip/private.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geoip/private.srs",
         "format": "binary",
         "update_interval": "6h"
       },
       {
         "tag": "geosite-geolocation-!cn",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/geolocation-!cn.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/geolocation-!cn.srs",
         "update_interval": "6h"
       },
       {
         "tag": "geosite-geolocation-cn",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/geolocation-cn.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/geolocation-cn.srs",
         "update_interval": "6h"
       },
       {
         "tag": "geosite-tld-cn",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/tld-cn.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/tld-cn.srs",
         "update_interval": "6h"
       },
       {
         "tag": "GeositeCN",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/GeositeCN.srs",
+        "url": "https://ghfast.top/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/GeositeCN.srs",
         "update_interval": "6h"
       },
       {
         "tag": "geoip-cn",
         "type": "remote",
-        "url": "https://gh-proxy.org/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geoip/cn.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geoip/cn.srs",
         "update_interval": "6h"
       }
     ],
