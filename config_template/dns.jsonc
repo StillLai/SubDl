@@ -85,20 +85,16 @@
         ],
         "server": "Tencent-DNS"
       },
-      { // 亚马逊
-        "rule_set": ["geosite-amazon", "geosite-amazon@ads"],
-        "server": "Cloudflare-DNS"
-      },
       { // 加速器
         "rule_set": ["geosite-category-game-accelerator-cn"],
         "server": "Tencent-DNS"
       },
-      { // Steam
-        "rule_set": ["geosite-steam"],
-        "server": "Cloudflare-DNS"
-      },
       { // 育碧
         "rule_set": ["geosite-ubisoft"],
+        "server": "Cloudflare-DNS"
+      },
+      { // Steam
+        "rule_set": ["geosite-steam"],
         "server": "Cloudflare-DNS"
       },
       { // Epic Games
@@ -109,6 +105,10 @@
         "domain_suffix": ["browserleaks.com", "browserleaks.org", "browserleaks.net", "dnsleaktest.com"],
         "server": "Yandex-DNS"
       },
+      // { // 亚马逊
+      //   "rule_set": ["geosite-amazon", "geosite-amazon@ads"],
+      //   "server": "Cloudflare-DNS"
+      // },
       // { // Jav
       //   "type": "logical",
       //   "mode": "or",
