@@ -101,10 +101,10 @@
         "rule_set": ["geosite-epicgames"],
         "server": "Cloudflare-DNS"
       },
-      { // DNS测试
-        "domain_suffix": ["browserleaks.com", "browserleaks.org", "browserleaks.net", "dnsleaktest.com"],
-        "server": "DNS.SB"
-      },
+      // { // DNS测试
+      //   "domain_suffix": ["browserleaks.com", "browserleaks.org", "browserleaks.net", "dnsleaktest.com"],
+      //   "server": "DNS.SB"
+      // },
       // { // 亚马逊
       //   "rule_set": ["geosite-amazon", "geosite-amazon@ads"],
       //   "server": "Cloudflare-DNS"
