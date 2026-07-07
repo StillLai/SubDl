@@ -35,9 +35,10 @@
         "detour": "🚀 节点选择"
       },
       {
-        "tag": "Yandex-DNS",
+        "tag": "DNS.SB",
         "type": "tls",
-        "server": "77.88.8.8",
+        "server": "dot.sb",
+        "domain_resolver": "DNS-Resolver",
         "detour": "🚀 节点选择"
       },
       {
@@ -102,7 +103,7 @@
       },
       { // DNS测试
         "domain_suffix": ["browserleaks.com", "browserleaks.org", "browserleaks.net", "dnsleaktest.com"],
-        "server": "Yandex-DNS"
+        "server": "DNS.SB"
       },
       // { // 亚马逊
       //   "rule_set": ["geosite-amazon", "geosite-amazon@ads"],
