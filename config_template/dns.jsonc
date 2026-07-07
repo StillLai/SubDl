@@ -37,8 +37,7 @@
       {
         "tag": "Yandex-DNS",
         "type": "tls",
-        "server": "common.dot.dns.yandex.net",
-        "domain_resolver": "DNS-Resolver",
+        "server": "77.88.8.8",
         "detour": "🚀 节点选择"
       },
       {
