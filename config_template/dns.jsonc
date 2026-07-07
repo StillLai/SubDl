@@ -35,9 +35,9 @@
         "detour": "🚀 节点选择"
       },
       {
-        "tag": "Quad9-DNS",
+        "tag": "DNS.SB",
         "type": "tls",
-        "server": "dns.quad9.net",
+        "server": "dns.sb",
         "detour": "🚀 节点选择"
       },
       {
@@ -106,7 +106,7 @@
       },
       { // DNS测试
         "domain_suffix": ["browserleaks.com", "browserleaks.org", "browserleaks.net", "dnsleaktest.com"],
-        "server": "Quad9-DNS"
+        "server": "DNS.SB"
       },
       // { // Jav
       //   "type": "logical",
