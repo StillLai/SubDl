@@ -33,25 +33,28 @@
 |--------|------|------|
 | `GH_TOKEN` | ✅ | GitHub Personal Access Token，需要 `gist` 权限 |
 | `GIST_ID` | ✅ | 上一步创建的 Gist ID |
-| `SUB_URL` | ✅ | 主订阅链接，格式为 `名称\|URL` |
-| `SUB_URL_1` ~ `SUB_URL_9` | ❌ | 更多订阅（可选，格式同上） |
+| `SUB_URL` | ✅ | 主订阅链接（纯 URL） |
+| `SUB_URL_1` ~ `SUB_URL_9` | ❌ | 更多常规订阅（可选，纯 URL） |
+| `GIST_URL` / `GIST_URL_1` ~ `GIST_URL_9` | ❌ | Gist 订阅（纯 URL，provider 将指向 Gist 上已转换的 sing-box 文件） |
 
 **订阅链接示例：**
+
+环境变量值为纯 URL，订阅名称由 `providers.jsonc` 中对应 provider 的 `tag` 字段决定。
+
 ```
-SUB_URL = 我的机场|https://example.com/api/sub?token=xxx
-SUB_URL_1 = 备用订阅|https://example2.com/clash/config
-SUB_URL_2 = https://example3.com/sub   # 省略名称时自动从 URL 提取
+SUB_URL = https://example.com/api/sub?token=xxx
+SUB_URL_1 = https://example2.com/clash/config
 ```
 
 **Provider 指向 Gist：**
 
-在订阅名称前加 `*`，可让该订阅在 providers 配置中的 provider `url` 指向 Gist 上已转换的 sing-box 文件（`{名称}-singbox.json`），而非原始订阅地址。
+使用 `GIST_URL`（而非 `SUB_URL`）环境变量，可让该订阅在 providers 配置中的 provider `url` 指向 Gist 上已转换的 sing-box 文件（`{tag}-singbox.json`），而非原始订阅地址。
 
 ```
-SUB_URL = *山海|https://example.com/api/sub?token=xxx
+GIST_URL = https://example.com/api/sub?token=xxx
 ```
 
-生成的 provider URL 格式为：`https://gh-proxy.org/https://gist.github.com/{用户名}/{Gist ID}/raw/{名称}-singbox.json`（通过 `gh-proxy.org` 加速访问）
+生成的 provider URL 格式为：`https://ghfast.top/https://gist.github.com/{用户名}/{Gist ID}/raw/{tag}-singbox.json`（通过 `ghfast.top` 加速访问）
 
 这在 sing-box 客户端无法直接解析 Clash 订阅格式时很有用——provider 会直接拉取已在服务端转换好的 sing-box JSON。
 

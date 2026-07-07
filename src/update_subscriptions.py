@@ -516,7 +516,7 @@ def generate_provider_configs(
                     continue
 
                 if sub.use_gist and gist_owner and gist_id:
-                    provider['url'] = f"https://gh-proxy.org/https://gist.github.com/{gist_owner}/{gist_id}/raw/{sub.name}-singbox.json"
+                    provider['url'] = f"https://ghfast.top/https://gist.github.com/{gist_owner}/{gist_id}/raw/{sub.name}-singbox.json"
                 else:
                     provider['url'] = sub.url
                 filled += 1

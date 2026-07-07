@@ -6,6 +6,15 @@ Vibe Coding 规范：每次代码变更完成后，应在此文件顶部追加�
 
 ---
 
+## 2026-07-07
+
+### Fixed
+- `README.md`：修正订阅链接配置说明——环境变量值为纯 URL（非 `名称|URL` 格式），订阅名称由 `providers.jsonc` 中 `tag` 字段决定；Gist 模式通过 `GIST_URL` 环境变量前缀区分（非名称前加 `*`）；补充 `GIST_URL` / `GIST_URL_N` 环境变量说明
+
+### Changed
+- `.clinerules`：代码变更规范新增第 9 条——涉及 README.md 内容的变更必须同步更新 README.md
+- GitHub 代理前缀统一从 `gh-proxy.org` 更换为 `ghfast.top`（涉及 `update_subscriptions.py` 的 `generate_provider_configs()` 和 `README.md` 文档）
+
 ## 2026-07-05
 
 ### Fixed
