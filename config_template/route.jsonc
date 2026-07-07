@@ -30,6 +30,12 @@
         "update_interval": "3h"
       },
       {
+        "tag": "fakeip-filter",
+        "type": "remote",
+        "url": "https://ghfast.top/https://github.com/DustinWin/ruleset_geodata/raw/refs/heads/sing-box-ruleset/fakeip-filter.srs",
+        "update_interval": "6h"
+      },
+      {
         "tag": "geosite-amazon",
         "type": "remote",
         "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/amazon.srs",
@@ -381,11 +387,11 @@
         ],
         "action": "reject"
       },
-      { // 银行APP（工商/建设/农业/中国/交通/招商）
+      { // fakeip-filter和银行APP（工商/建设/农业/中国/交通/招商）
         "type": "logical",
         "mode": "or",
         "rules": [
-          {"rule_set": ["geosite-icbc", "geosite-ccb", "geosite-abc", "geosite-boc", "BOCOM", "geosite-cmb"]},
+          {"rule_set": ["fakeip-filter", "geosite-icbc", "geosite-ccb", "geosite-abc", "geosite-boc", "BOCOM", "geosite-cmb"]},
           {"package_name": ["com.icbc", "com.chinamworld.main", "com.android.bankabc", "com.chinamworld.bocmbci", "com.bankcomm.Bankcomm", "com.cmbchina.ccd.pluto.cmbActivity", "cmb.pb"]}
         ],
         "outbound": "🎯 全球直连"
