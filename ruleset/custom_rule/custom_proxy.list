@@ -1,0 +1,16 @@
+# 补充代理规则，置于漏网之鱼前面
+DOMAIN,wiki.metacubex.one
+DOMAIN,sing-box.sagernet.org
+DOMAIN,www.v2ex.com
+DOMAIN,linux.do
+DOMAIN,modder.me
+DOMAIN,modded-1.com
+DOMAIN,feiniaoyun.xyz
+DOMAIN,feiniaoyun.top
+DOMAIN,shanhai.me
+DOMAIN-SUFFIX,lsposed.org
+DOMAIN-SUFFIX,nullptr.icu
+DOMAIN-SUFFIX,vercel.app
+DOMAIN-SUFFIX,imgur.com
+DOMAIN-SUFFIX,shein.com
+DOMAIN-SUFFIX,temu.com

@@ -573,7 +573,7 @@
         "outbound": "🎯 全球直连"
       },
       {
-        "domain_keyword": "browserleaks",
+        "domain_suffix": ["browserleaks.com", "browserleaks.org", "browserleaks.net", "dnsleaktest.com"],
         "outbound": "🔍 BrowserLeaks"
       },
       { // 海外网站
