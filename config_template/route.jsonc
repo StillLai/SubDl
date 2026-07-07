@@ -394,6 +394,22 @@
         "rule_set": ["geosite-amazon", "geosite-amazon@ads"],
         "outbound": "🅰️ 亚马逊"
       },
+      { // 加速器
+        "rule_set": ["geosite-category-game-accelerator-cn"],
+        "outbound": "🎯 全球直连"
+      },
+      { // Steam
+        "rule_set": ["geosite-steam"],
+        "outbound": "🎮 Steam"
+      },
+      { // 育碧
+        "rule_set": ["geosite-ubisoft"],
+        "outbound": "🌀 育碧"
+      },
+      { // Epic Games
+        "rule_set": ["geosite-epicgames"],
+        "outbound": "🎁 Epic"
+      },
       { // Jav
         "type": "logical",
         "mode": "or",
@@ -453,22 +469,6 @@
         ],
         "outbound": "🍠 小红书"
       },
-      { // 加速器
-        "rule_set": ["geosite-category-game-accelerator-cn"],
-        "outbound": "🎯 全球直连"
-      },
-      { // Steam
-        "rule_set": ["geosite-steam"],
-        "outbound": "🎮 Steam"
-      },
-      { // 育碧
-        "rule_set": ["geosite-ubisoft"],
-        "outbound": "🌀 育碧"
-      },
-      { // Epic Games
-        "rule_set": ["geosite-epicgames"],
-        "outbound": "🎁 Epic"
-      },
       { // GitHub
         "rule_set": ["geosite-github"],
         "outbound": "🐱 GitHub"
@@ -525,7 +525,7 @@
         "rule_set": ["geosite-discord"],
         "outbound": "💬 Discord"
       },
-      { // ChatGPT/OpenAI
+      { // OpenAI
         "rule_set": ["geosite-openai"],
         "outbound": "🤖 OpenAI"
       },
