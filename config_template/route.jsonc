@@ -1,7 +1,7 @@
 {
   "$schema": "https://ghfast.top/https://github.com/jiang-zhexin/typebox/releases/latest/download/schema.json",
   "route": {
-    "default_domain_resolver": "Tencent-DNS",
+    "default_domain_resolver": "DNS-Resolver",
     "auto_detect_interface": true,
     "find_process": true,
     "rule_set": [
