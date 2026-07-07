@@ -36,7 +36,7 @@
       },
       {
         "tag": "Quad9-DNS",
-        "type": "h3",
+        "type": "tls",
         "server": "dns.quad9.net",
         "detour": "🚀 节点选择"
       },
