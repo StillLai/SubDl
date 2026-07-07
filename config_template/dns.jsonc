@@ -35,6 +35,12 @@
         "detour": "🚀 节点选择"
       },
       {
+        "tag": "Quad9-DNS",
+        "type": "h3",
+        "server": "dns.quad9.net",
+        "detour": "🚀 节点选择"
+      },
+      {
         "tag": "Fakeip",
         "type": "fakeip",
         "inet4_range": "198.18.0.1/16",
@@ -97,6 +103,10 @@
       { // Epic Games
         "rule_set": ["geosite-epicgames"],
         "server": "Cloudflare-DNS"
+      },
+      { // DNS测试
+        "domain_suffix": ["browserleaks.com", "browserleaks.org", "browserleaks.net", "dnsleaktest.com"],
+        "server": "Quad9-DNS"
       },
       // { // Jav
       //   "type": "logical",

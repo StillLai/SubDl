@@ -410,6 +410,10 @@
         "rule_set": ["geosite-epicgames"],
         "outbound": "🎁 Epic"
       },
+      { // DNS测试
+        "domain_suffix": ["browserleaks.com", "browserleaks.org", "browserleaks.net", "dnsleaktest.com"],
+        "outbound": "🔍 DNS测试"
+      },
       { // Jav
         "type": "logical",
         "mode": "or",
@@ -571,10 +575,6 @@
           {"rule_set": "geoip-cn"}
         ],
         "outbound": "🎯 全球直连"
-      },
-      {
-        "domain_suffix": ["browserleaks.com", "browserleaks.org", "browserleaks.net", "dnsleaktest.com"],
-        "outbound": "🔍 BrowserLeaks"
       },
       { // 海外网站
         "rule_set": ["geosite-geolocation-!cn", "custom_proxy"],
