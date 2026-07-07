@@ -237,7 +237,7 @@
       "type": "urltest",
       "tag": "🇬🇧 英国节点",
       "url": "https://cp.cloudflare.com",
-      "include": "英|英国|🇬🇧|伦敦|英格兰|UK|GB|United Kingdom|England|Britain",
+      "include": "英|英国|🇬🇧|伦敦|英格兰|UK|United Kingdom|England|Britain",
       "providers": ["飞鸟云", "雪山"]
     },
     {
@@ -258,7 +258,7 @@
       "type": "urltest",
       "tag": "🇺🇳 其它地区",
       "url": "https://cp.cloudflare.com",
-      "exclude": "港|🇭🇰|HK|hk|Hong Kong|HongKong|hongkong|台|🇹🇼|新北|彰化|TW|Taiwan|新加坡|🇸🇬|坡|狮城|SG|Singapore|日本|🇯🇵|川日|东京|大阪|泉日|埼玉|沪日|深日|[^-每]日|JP|Japan|韩|🇰🇷|韓|首尔|南朝鲜|春川|广韩|KR|KOR|Korea|美|🇺🇸|波特兰|达拉斯|俄勒冈|凤凰城|费利蒙|硅谷|拉斯维加斯|洛杉矶|圣何塞|圣克拉拉|西雅图|芝加哥|US|United States|英|英国|🇬🇧|伦敦|英格兰|UK|GB|United Kingdom|England|Britain|法国|🇫🇷|巴黎|FR|France|德国|🇩🇪|柏林|法兰克福|慕尼黑|DE|Germany|Frankfurt|Munich|俄|俄罗斯|🇷🇺|莫斯科|圣彼得堡|RU|Russia|Moscow|泰|泰国|🇹🇭|曼谷|TH|Thailand|Bangkok|越南|🇻🇳|胡志明|河内|VN|Vietnam|澳门|🇲🇴|澳門|MO|Macau|Macao|剩余|重置|到期|有效期|时间|订阅|账户|客户端|官网|电报群|防失联|重启",
+      "exclude": "港|🇭🇰|HK|hk|Hong Kong|HongKong|hongkong|台|🇹🇼|新北|彰化|TW|Taiwan|新加坡|🇸🇬|坡|狮城|SG|Singapore|日本|🇯🇵|川日|东京|大阪|泉日|埼玉|沪日|深日|[^-每]日|JP|Japan|韩|🇰🇷|韓|首尔|南朝鲜|春川|广韩|KR|KOR|Korea|美|🇺🇸|波特兰|达拉斯|俄勒冈|凤凰城|费利蒙|硅谷|拉斯维加斯|洛杉矶|圣何塞|圣克拉拉|西雅图|芝加哥|US|United States|英|英国|🇬🇧|伦敦|英格兰|UK|United Kingdom|England|Britain|法国|🇫🇷|巴黎|FR|France|德国|🇩🇪|柏林|法兰克福|慕尼黑|DE|Germany|Frankfurt|Munich|俄|俄罗斯|🇷🇺|莫斯科|圣彼得堡|RU|Russia|Moscow|泰|泰国|🇹🇭|曼谷|TH|Thailand|Bangkok|越南|🇻🇳|胡志明|河内|VN|Vietnam|澳门|🇲🇴|澳門|MO|Macau|Macao|剩余|重置|到期|有效期|时间|订阅|账户|客户端|官网|电报群|防失联|重启",
       "providers": ["飞鸟云", "雪山"]
     },
     {
