@@ -12,3 +12,4 @@ https://github.com/blackmatrix7/ios_rule_script/raw/refs/heads/master/rule/Clash
 https://github.com/blackmatrix7/ios_rule_script/raw/refs/heads/master/rule/Clash/BiliBili/BiliBili.list
 https://github.com/blackmatrix7/ios_rule_script/raw/refs/heads/master/rule/Clash/Weibo/Weibo.list
 https://github.com/blackmatrix7/ios_rule_script/raw/refs/heads/master/rule/Clash/XiaoMi/XiaoMi.list
+https://github.com/Accademia/Additional_Rule_For_Clash/raw/refs/heads/main/FakeLocation/FakeLocationBiliBili.yaml
