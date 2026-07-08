@@ -28,7 +28,7 @@ from utils import (
     SubDlError, ConfigError, DownloadError, ConversionError, TemplateError,
     UploadError,
 )
-from merge_config import merge_config
+from merge_config import merge_config, _remove_outbounds_by_tags
 from svg import generate_status_svg, LIGHT_THEME, DARK_THEME
 
 
@@ -459,42 +459,54 @@ def _load_templates() -> list[tuple[str, dict[str, Any]]]:
 def merge_all_templates(
     subs_nodes_dict: dict[str, list[dict[str, Any]]],
     templates: list[tuple[str, dict[str, Any]]],
-) -> dict[str, str]:
-    """遍历所有模板文件并生成合并配置"""
+) -> tuple[dict[str, str], set[str]]:
+    """遍历所有模板文件并生成合并配置
+
+    Returns:
+        (配置文件字典, 被移除的空出站 tag 集合)
+    """
     total_nodes = sum(len(nodes) for nodes in subs_nodes_dict.values())
     results: dict[str, str] = {}
+    removed_tags: set[str] = set()
     failed = 0
-    for base_name, template in templates:
+    for i, (base_name, template) in enumerate(templates):
         config_filename = base_name + '.json'
         log_info(f"  → 处理模板: {base_name}.jsonc")
         try:
-            merged = merge_config(template, subs_nodes_dict)
+            merged, empty_tags = merge_config(template, subs_nodes_dict)
         except Exception as e:
             log_error(f"  合并异常: {e}")
             failed += 1
             continue
+        # 所有模板共享同一份 outbounds 定义，空出站判断结果一致，取首次即可
+        if i == 0:
+            removed_tags = empty_tags
         content = json.dumps(merged, indent=2, ensure_ascii=False)
         log_info(f"    ✓ 生成 {config_filename} ({len(content)} 字节, {total_nodes} 个节点)")
         results[config_filename] = content
     if failed:
         log_warn(f"  ⚠️ {len(results)}/{len(templates)} 个模板成功，{failed} 个失败")
-    return results
+    return results, removed_tags
 
 
 def generate_provider_configs(
     subscriptions: list[Subscription],
     templates: list[tuple[str, dict[str, Any]]],
+    removed_tags: set[str],
     gist_owner: str = '',
     gist_id: str = '',
 ) -> dict[str, str]:
     """生成 providers 版本的配置文件
 
-    将模板中 provider 的 $ENV_VAR 占位符替换为真实 URL。
+    将模板中 provider 的 $ENV_VAR 占位符替换为真实 URL，
+    并移除合并阶段已确认为空的出站。
+
     use_gist 的订阅指向 Gist 上已转换的 sing-box 文件，其余指向原始订阅。
 
     Args:
         subscriptions: 订阅列表（含 env_name、use_gist 等信息）
         templates: 模板列表
+        removed_tags: 合并阶段已确认为空的出站 tag 集合
         gist_owner: Gist 所有者用户名
         gist_id: Gist ID
     """
@@ -505,6 +517,11 @@ def generate_provider_configs(
         try:
             # deep copy 避免原地修改 $ENV_VAR 占位符影响共享 providers 列表
             template_copy = copy.deepcopy(template)
+
+            # 移除合并阶段已确认为空的出站及引用
+            if removed_tags:
+                _remove_outbounds_by_tags(template_copy['outbounds'], removed_tags)
+
             filled = 0
             for provider in template_copy.get('providers', []):
                 url_ref = provider.get('url', '')
@@ -755,12 +772,12 @@ def _generate_and_upload(
     if gist_subs:
         log_info(f"  → {len(gist_subs)} 个订阅的 provider 将指向 Gist: {gist_owner}/{gist_id}")
 
-    merged = merge_all_templates(subs_nodes_dict, templates)
+    merged, removed_tags = merge_all_templates(subs_nodes_dict, templates)
     files.update(merged)
     if merged:
         log_info(f"  ✓ 共生成 {len(merged)} 个配置文件")
 
-    providers = generate_provider_configs(subscriptions, templates, gist_owner, gist_id)
+    providers = generate_provider_configs(subscriptions, templates, removed_tags, gist_owner, gist_id)
     files.update(providers)
     if providers:
         log_info(f"  ✓ 共生成 {len(providers)} 个 providers 配置文件")

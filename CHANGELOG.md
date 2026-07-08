@@ -6,6 +6,15 @@ Vibe Coding 规范：每次代码变更完成后，应在此文件顶部追加�
 
 ---
 
+## 2026-07-08
+
+### Changed
+- **空出站处理逻辑重构**：当带有 include/exclude 的出站实际没有获得节点时，不再添加 Compatible fallback，而是直接删除该出站及所有出站中对它的引用（递归清理）
+- `merge_config()` 返回值从 `dict` 改为 `tuple[dict, set[str]]`，额外返回被移除的空出站 tag 集合
+- `merge_all_templates()` 返回值从 `dict[str, str]` 改为 `tuple[dict[str, str], set[str]]`，透传被移除的空出站 tag
+- `generate_provider_configs()` 新增 `removed_tags` 参数，providers 版本复用合并阶段的空出站判断结果
+- `_fix_empty_outbounds()` → `_remove_outbounds_by_tags()`：从添加 Compatible 转为删除空出站 + 清理引用
+
 ## 2026-07-07
 
 ### Fixed

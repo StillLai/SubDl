@@ -46,7 +46,7 @@ SubDl 是一个自动化订阅管理工具：下载 Clash 订阅 → 转换为 s
 |------|------|------|
 | utils.py | 常量、数据模型、网络、日志、异常类 | 基础模块，不导入其他项目模块 |
 | update_subscriptions.py | 主流程：下载 → 转换 → 合并 → 校验 → 上传 | 入口 main() 在此文件 |
-| merge_config.py | 模板合并逻辑、provider 展开、节点正则筛选 | 依赖 utils |
+| merge_config.py | 模板合并逻辑、provider 展开、节点正则筛选、空出站清理 | 依赖 utils |
 | convert.mjs | Clash → sing-box 批量转换 | Node.js，依赖 deps/proxy-utils.esm.mjs + jsdom |
 | ruleset_convert.py | 规则集下载与转换 | 独立 workflow，生成 JSON + SRS，依赖 pyyaml |
 | svg.py | 状态图生成（浅色/深色主题）+ sing-box 版本展示 | 依赖 utils |

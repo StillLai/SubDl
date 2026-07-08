@@ -7,7 +7,7 @@ Sing-box 配置合并模块
 1. 读取配置模板
 2. 处理 providers 配置（将 providers 数组展开为节点标签）
 3. 根据 include/exclude 正则筛选节点
-4. 处理空 outbound 的兼容性问题
+4. 移除空 outbound 并清理引用
 """
 
 import copy
@@ -102,32 +102,27 @@ def _strip_filter_fields(outbounds: list[Any]) -> None:
             outbound.pop('exclude', None)
 
 
-def _fix_empty_outbounds(outbounds: list[Any]) -> None:
-    """修复 selector/urltest 类型中空 outbounds 的兼容性问题，
-    并确保 Compatible outbound 定义存在"""
-    has_compatible = False
-
+def _remove_outbounds_by_tags(outbounds: list[Any], tags: set[str]) -> None:
+    """删除指定 tag 的出站，并清理其他出站中对它们的引用"""
+    if not tags:
+        return
+    outbounds[:] = [o for o in outbounds if not (isinstance(o, dict) and o.get('tag') in tags)]
     for outbound in outbounds:
-        if not isinstance(outbound, dict):
-            continue
-        if outbound.get('tag') == 'Compatible':
-            has_compatible = True
-        if outbound.get('type') in ('selector', 'urltest'):
-            outbounds_list = outbound.get('outbounds', [])
-            if not isinstance(outbounds_list, list) or not outbounds_list:
-                outbound['outbounds'] = ['Compatible']
-                log_info(f"  {outbound.get('tag')} -> 空 outbound，添加 Compatible")
-
-    if not has_compatible:
-        outbounds.append({"tag": "Compatible", "type": "direct"})
-        log_info("[Merge] 已添加 Compatible outbound 定义")
+        if isinstance(outbound, dict):
+            refs = outbound.get('outbounds', [])
+            if isinstance(refs, list):
+                outbound['outbounds'] = [r for r in refs if r not in tags]
 
 
 def merge_config(
     template_config: dict[str, Any],
     subscriptions_nodes: dict[str, list[dict[str, Any]]],
-) -> dict[str, Any]:
-    """合并配置"""
+) -> tuple[dict[str, Any], set[str]]:
+    """合并配置
+
+    Returns:
+        (合并后的配置, 被移除的空出站 tag 集合)
+    """
     config = copy.deepcopy(template_config)
     outbounds = config.setdefault('outbounds', [])
 
@@ -142,20 +137,28 @@ def merge_config(
             all_nodes.append(node_copy)
     log_info(f"[Merge] 已收集 {len(all_nodes)} 个节点并添加订阅前缀")
 
-    # 步骤 2: 处理 providers 配置
+    # 步骤 2: 处理 providers 配置（展开 providers 引用为节点标签）
     if 'providers' in config:
         process_providers(config, subscriptions_nodes)
         del config['providers']
         log_info("[Merge] 已处理 providers 配置")
 
-    # 步骤 3: 移除 outbounds 中的 include/exclude 字段
+    # 步骤 3: 检测并移除空出站（providers 已展开，可直接检查 outbounds 列表）
+    empty_tags = {
+        o.get('tag', '') for o in outbounds
+        if isinstance(o, dict)
+        and (o.get('include') or o.get('exclude'))
+        and not o.get('outbounds', [])
+    }
+    if empty_tags:
+        _remove_outbounds_by_tags(outbounds, empty_tags)
+        log_info(f"[Merge] 已移除 {len(empty_tags)} 个空出站: {', '.join(empty_tags)}")
+
+    # 步骤 4: 移除 outbounds 中的 include/exclude 字段
     _strip_filter_fields(outbounds)
 
-    # 步骤 4: 将代理节点添加到 outbounds 末尾
+    # 步骤 5: 将代理节点添加到 outbounds 末尾
     outbounds.extend(all_nodes)
     log_info(f"[Merge] 已添加 {len(all_nodes)} 个代理节点到配置")
 
-    # 步骤 5: 修复空 outbound 兼容性 + 确保 Compatible 定义存在
-    _fix_empty_outbounds(outbounds)
-
-    return config
+    return config, empty_tags

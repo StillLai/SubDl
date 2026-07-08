@@ -35,7 +35,7 @@ ruleset_convert.py     (独立入口，由 Ruleset Update workflow 调用)
 |------|------|----------|
 | utils.py | 常量、数据模型、网络、日志、异常类 | `http_get_with_retry`, `load_jsonc`, `log_info/warn/error` |
 | update_subscriptions.py | 主流程：下载 → 转换 → 合并 → 上传 | `main()`, `parse_subscriptions()`, `_download_all()` |
-| merge_config.py | 模板合并逻辑、provider 展开 | `merge_config()`, `process_providers()`, `filter_nodes_by_regex()` |
+| merge_config.py | 模板合并逻辑、provider 展开、空出站清理 | `merge_config()`, `process_providers()`, `filter_nodes_by_regex()`, `_remove_outbounds_by_tags()` |
 | convert.mjs | Clash → sing-box 批量转换 | `batchConvertToSingbox()` (Node.js) |
 | ruleset_convert.py | 规则集下载与转换 | `parse_list_file()`, `_group_by_mapped()` |
 | svg.py | 状态图生成（浅色/深色主题） | `generate_status_svg()` |
