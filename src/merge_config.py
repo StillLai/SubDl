@@ -108,8 +108,8 @@ def _remove_outbounds_by_tags(outbounds: list[Any], tags: set[str]) -> None:
         return
     outbounds[:] = [o for o in outbounds if not (isinstance(o, dict) and o.get('tag') in tags)]
     for outbound in outbounds:
-        if isinstance(outbound, dict):
-            refs = outbound.get('outbounds', [])
+        if isinstance(outbound, dict) and 'outbounds' in outbound:
+            refs = outbound['outbounds']
             if isinstance(refs, list):
                 outbound['outbounds'] = [r for r in refs if r not in tags]
 
