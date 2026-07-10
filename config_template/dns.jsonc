@@ -234,7 +234,7 @@
       //   "mode": "or",
       //   "rules": [
       //     {"rule_set": ["XiaoMi"]},
-      //     {"package_name": ["com.xiaomi.vipaccount"]}
+      //     {"package_name": ["com.xiaomi.smarthome", "com.xiaomi.vipaccount"]}
       //   ],
       //   "server": "Tencent-DNS"
       // },
