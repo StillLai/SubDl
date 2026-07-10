@@ -5,10 +5,12 @@
       "tag": "山海",
       "health_check": {
         "enabled": true,
-        "url": "https://cp.cloudflare.com"
+        "url": "https://www.gstatic.com/generate_204",
+        "interval":"30m",
+        "timeout":"3s"
       },
       "url": "$SUB_URL_2",
-      "user_agent": "ClashMetaForAndroid/2.11.30",
+      "user_agent": "clash.meta/alpha/mihomo",
       "update_interval": "3h"
     },
     {
@@ -16,10 +18,12 @@
       "tag": "雪山",
       "health_check": {
         "enabled": true,
-        "url": "https://cp.cloudflare.com"
+        "url": "https://www.gstatic.com/generate_204",
+        "interval":"30m",
+        "timeout":"3s"
       },
       "url": "$SUB_URL_1",
-      "user_agent": "ClashMetaForAndroid/2.11.30",
+      "user_agent": "clash.meta/alpha/mihomo",
       "update_interval": "3h"
     },
     {
@@ -27,10 +31,12 @@
       "tag": "飞鸟云",
       "health_check": {
         "enabled": true,
-        "url": "https://cp.cloudflare.com"
+        "url": "https://www.gstatic.com/generate_204",
+        "interval":"30m",
+        "timeout":"3s"
       },
       "url": "$SUB_URL",
-      "user_agent": "ClashMetaForAndroid/2.11.30",
+      "user_agent": "clash.meta/alpha/mihomo",
       "download_detour": "🗂️ 备用自动",
       "update_interval": "3h"
     }
