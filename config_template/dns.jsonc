@@ -87,15 +87,30 @@
         "server": "Ali-DNS"
       },
       { // 加速器
-        "rule_set": ["geosite-category-game-accelerator-cn"],
+        "type": "logical",
+        "mode": "or",
+        "rules": [
+          {"rule_set": ["geosite-category-game-accelerator-cn"]},
+          {"process_name": ["Steamcommunity_302.exe"]}
+        ],
         "server": "Tencent-DNS"
       },
       { // 育碧
-        "rule_set": ["geosite-ubisoft"],
+        "type": "logical",
+        "mode": "or",
+        "rules": [
+          {"rule_set": ["geosite-ubisoft"]},
+          {"process_path_regex": ["Ubisoft\\\\Ubisoft Game Launcher(?: Core)?\\\\[^\\\\]+\\.exe"]}
+        ],
         "server": "Cloudflare-DNS"
       },
       { // Steam
-        "rule_set": ["geosite-steam"],
+        "type": "logical",
+        "mode": "or",
+        "rules": [
+          {"rule_set": ["geosite-steam"]},
+          {"process_path_regex": ["Steam\\\\[^\\\\]+\\.exe"]}
+        ],
         "server": "Cloudflare-DNS"
       },
       { // Epic Games
