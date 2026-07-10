@@ -420,7 +420,7 @@
         "mode": "or",
         "rules": [
           {"rule_set": ["geosite-ubisoft", "geosite-steam"]},
-          {"process_path_regex": [".*?(?<!^)\\\\Ubisoft\\\\Ubisoft Game Launcher(?: Core)?(?:\\\\[^\\\\]+)*\\\\[^\\\\]+\\.exe", ".*?(?<!^)\\\\Steam(?:\\\\[^\\\\]+)*\\\\[^\\\\]+\\.exe"]}
+           {"process_path_regex": [".+?\\\\Ubisoft\\\\Ubisoft Game Launcher(?: Core)?(?:\\\\[^\\\\]+)*\\\\[^\\\\]+\\.exe", ".+?\\\\Steam(?:\\\\[^\\\\]+)*\\\\[^\\\\]+\\.exe"]}
         ],
         "outbound": "🎮 游戏加速"
       },
