@@ -29,6 +29,12 @@
         "detour": "🚀 节点选择"
       },
       {
+        "tag": "Games-DNS",
+        "type": "h3",
+        "server": "8.8.8.8",
+        "detour": "🎮 游戏加速"
+      },
+      {
         "tag": "Cloudflare-DNS",
         "type": "h3",
         "server": "1.1.1.1",
@@ -86,36 +92,18 @@
         ],
         "server": "Ali-DNS"
       },
-      { // 加速器
+      { // 游戏加速（育碧、Steam）
         "type": "logical",
         "mode": "or",
         "rules": [
-          {"rule_set": ["geosite-category-game-accelerator-cn"]},
-          {"process_name": ["Steamcommunity_302.exe"]}
+          {"rule_set": ["geosite-ubisoft", "geosite-steam"]},
+          {"process_path_regex": ["Ubisoft\\\\Ubisoft Game Launcher(?: Core)?\\\\[^\\\\]+\\.exe", "Steam\\\\[^\\\\]+\\.exe"]}
         ],
-        "server": "Tencent-DNS"
-      },
-      { // 育碧
-        "type": "logical",
-        "mode": "or",
-        "rules": [
-          {"rule_set": ["geosite-ubisoft"]},
-          {"process_path_regex": ["Ubisoft\\\\Ubisoft Game Launcher(?: Core)?\\\\[^\\\\]+\\.exe"]}
-        ],
-        "server": "Cloudflare-DNS"
-      },
-      { // Steam
-        "type": "logical",
-        "mode": "or",
-        "rules": [
-          {"rule_set": ["geosite-steam"]},
-          {"process_path_regex": ["Steam\\\\[^\\\\]+\\.exe"]}
-        ],
-        "server": "Cloudflare-DNS"
+        "server": "Games-DNS"
       },
       { // Epic Games
         "rule_set": ["geosite-epicgames"],
-        "server": "Cloudflare-DNS"
+        "server": "Tencent-DNS"
       },
       // { // DNS测试
       //   "domain_suffix": ["browserleaks.com", "browserleaks.org", "browserleaks.net", "dnsleaktest.com"],
