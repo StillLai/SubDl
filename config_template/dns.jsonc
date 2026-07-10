@@ -86,9 +86,9 @@
         "type": "logical",
         "mode": "or",
         "rules": [
-          {"domain_suffix": ["yadeaiot.com.cn"]},
           {"rule_set": ["fakeip-filter", "geosite-icbc", "geosite-ccb", "geosite-abc", "geosite-boc", "BOCOM", "geosite-cmb"]},
-          {"package_name": ["com.icbc", "com.chinamworld.main", "com.android.bankabc", "com.chinamworld.bocmbci", "com.bankcomm.Bankcomm", "com.cmbchina.ccd.pluto.cmbActivity", "cmb.pb", "com.yadea.smartmoto"]}
+          {"package_name": ["com.icbc", "com.chinamworld.main", "com.android.bankabc", "com.chinamworld.bocmbci", "com.bankcomm.Bankcomm", "com.cmbchina.ccd.pluto.cmbActivity", "cmb.pb", "com.yadea.smartmoto"]},
+          {"domain_suffix": ["yadeaiot.com.cn"]}
         ],
         "server": "Ali-DNS"
       },
