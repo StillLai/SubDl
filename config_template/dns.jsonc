@@ -76,12 +76,12 @@
         ],
         "action": "reject"
       },
-      { // fakeip-filter和银行APP（工商/建设/农业/中国/交通/招商）
+      { // fakeip-filter、银行APP（工商/建设/农业/中国/交通/招商）、雅迪智行
         "type": "logical",
         "mode": "or",
         "rules": [
           {"rule_set": ["fakeip-filter", "geosite-icbc", "geosite-ccb", "geosite-abc", "geosite-boc", "BOCOM", "geosite-cmb"]},
-          {"package_name": ["com.icbc", "com.chinamworld.main", "com.android.bankabc", "com.chinamworld.bocmbci", "com.bankcomm.Bankcomm", "com.cmbchina.ccd.pluto.cmbActivity", "cmb.pb"]}
+          {"package_name": ["com.icbc", "com.chinamworld.main", "com.android.bankabc", "com.chinamworld.bocmbci", "com.bankcomm.Bankcomm", "com.cmbchina.ccd.pluto.cmbActivity", "cmb.pb", "com.yadea.smartmoto"]}
         ],
         "server": "Ali-DNS"
       },
