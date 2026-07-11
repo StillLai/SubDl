@@ -415,6 +415,23 @@
         ],
         "outbound": "🎯 全球直连"
       },
+      { // Steam-PC版
+        "process_path_regex": [".+?\\\\Steam(?:\\\\[^\\\\]+)*\\\\[^\\\\]*[Ss]team[^\\\\]*\\.exe"],
+        "outbound": "🎯 全球直连"
+      },
+      { // Steam-全平台
+        "type": "logical",
+        "mode": "or",
+        "rules": [
+          {"rule_set": ["geosite-steam"]},
+          {"package_name": ["com.valvesoftware.android.steam.community"]}
+        ],
+        "outbound": "🎮 Steam"
+      },
+      { // Epic Games
+        "rule_set": ["geosite-epicgames"],
+        "outbound": "🎁 Epic"
+      },
       { // 育碧
         "type": "logical",
         "mode": "or",
@@ -423,19 +440,6 @@
           {"process_path_regex": [".+?\\\\Ubisoft\\\\Ubisoft Game Launcher(?: Core)?(?:\\\\[^\\\\]+)*\\\\[^\\\\]+\\.exe"]}
         ],
         "outbound": "🌀 育碧"
-      },
-      { // Steam
-        "type": "logical",
-        "mode": "or",
-        "rules": [
-          {"rule_set": ["geosite-steam"]},
-          {"process_path_regex": [".+?\\\\Steam(?:\\\\[^\\\\]+)*\\\\[^\\\\]*[Ss]team[^\\\\]*\\.exe"]}
-        ],
-        "outbound": "🎮 Steam"
-      },
-      { // Epic Games
-        "rule_set": ["geosite-epicgames"],
-        "outbound": "🎁 Epic"
       },
       { // DNS测试
         "domain_suffix": ["browserleaks.com", "browserleaks.org", "browserleaks.net", "dnsleaktest.com"],

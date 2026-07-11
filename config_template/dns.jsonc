@@ -101,28 +101,32 @@
         ],
         "server": "Ali-DNS"
       },
-      { // 育碧
-        "type": "logical",
-        "mode": "or",
-        "rules": [
-          {"rule_set": ["geosite-ubisoft"]},
-          {"process_path_regex": [".+?\\\\Ubisoft\\\\Ubisoft Game Launcher(?: Core)?(?:\\\\[^\\\\]+)*\\\\[^\\\\]+\\.exe"]}
-        ],
-        "server": "Ubi-DNS"
+      { // Steam-PC版
+        "process_path_regex": [".+?\\\\Steam(?:\\\\[^\\\\]+)*\\\\[^\\\\]*[Ss]team[^\\\\]*\\.exe"],
+        "server": "Tencent-DNS"
       },
-      { // Steam
+      { // Steam-全平台
         "type": "logical",
         "mode": "or",
         "rules": [
           {"rule_set": ["geosite-steam"]},
-          {"process_path_regex": [".+?\\\\Steam(?:\\\\[^\\\\]+)*\\\\[^\\\\]*[Ss]team[^\\\\]*\\.exe"]}
+          {"package_name": ["com.valvesoftware.android.steam.community"]}
         ],
-        "server": "Tencent-DNS"
+        "server": "Google-DNS"
       },
       { // Epic Games
         "rule_set": ["geosite-epicgames"],
         "server": "Tencent-DNS"
       },
+      // { // 育碧
+      //   "type": "logical",
+      //   "mode": "or",
+      //   "rules": [
+      //     {"rule_set": ["geosite-ubisoft"]},
+      //     {"process_path_regex": [".+?\\\\Ubisoft\\\\Ubisoft Game Launcher(?: Core)?(?:\\\\[^\\\\]+)*\\\\[^\\\\]+\\.exe"]}
+      //   ],
+      //   "server": "Ubi-DNS"
+      // },
       // { // DNS测试
       //   "domain_suffix": ["browserleaks.com", "browserleaks.org", "browserleaks.net", "dnsleaktest.com"],
       //   "server": "Local-DNS"
