@@ -6,6 +6,12 @@ Vibe Coding 规范：每次代码变更完成后，应在此文件顶部追加�
 
 ---
 
+## 2026-07-11
+
+### Fixed
+- **Gist fallback URL 编码**：`_fetch_from_gist_fallback()` 和 `generate_provider_configs()` 中包含中文订阅名的 Gist URL 使用 `urllib.parse.quote` 编码，修复 `'ascii' codec can't encode characters` 错误导致 fallback 失败的问题
+- **旧备份文件误删保护**：`_cleanup_old_gist_files()` 新增 `protected_filenames` 参数，保护所有仍在 `providers.jsonc` 中配置的订阅对应的文件（`.yaml` + `-singbox.json`），即使本次下载/转换失败也不会删除 Gist 上的备份
+
 ## 2026-07-08
 
 ### Changed

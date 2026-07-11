@@ -17,6 +17,7 @@ import subprocess
 import sys
 import tempfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from urllib.parse import quote
 from datetime import datetime
 from typing import Any
 
@@ -193,7 +194,8 @@ def _fetch_from_gist_fallback(sub_name: str, gist_id: str, gist_owner: str, env_
 
     地址格式: https://gist.github.com/{gist_owner}/{gist_id}/raw/{sub_name}-singbox.json
     """
-    url = f"https://gist.github.com/{gist_owner}/{gist_id}/raw/{sub_name}-singbox.json"
+    filename = f"{sub_name}-singbox.json"
+    url = f"https://gist.github.com/{gist_owner}/{gist_id}/raw/{quote(filename)}"
     try:
         log_info(f"  → 尝试从 Gist 备份获取: {sub_name}")
         response = http_get_with_retry(url)
@@ -533,7 +535,8 @@ def generate_provider_configs(
                     continue
 
                 if sub.use_gist and gist_owner and gist_id:
-                    provider['url'] = f"https://ghfast.top/https://gist.github.com/{gist_owner}/{gist_id}/raw/{sub.name}-singbox.json"
+                    gist_filename = quote(f"{sub.name}-singbox.json")
+                    provider['url'] = f"https://ghfast.top/https://gist.github.com/{gist_owner}/{gist_id}/raw/{gist_filename}"
                 else:
                     provider['url'] = sub.url
                 filled += 1
@@ -697,8 +700,13 @@ def _cleanup_old_gist_files(
     github_token: str,
     gist_id: str,
     current_files: dict[str, str],
+    protected_filenames: set[str] | None = None,
 ) -> dict[str, None]:
     """获取 Gist 中已有的托管文件，将本次不在上传集合中的旧文件标记为删除
+
+    Args:
+        protected_filenames: 不可删除的文件名集合（如仍在配置中的订阅备份文件）。
+            即使这些文件不在 current_files 中也不会被删除。
 
     Returns:
         需要删除的文件字典 {filename: None}，可直接合并到上传 payload
@@ -708,10 +716,11 @@ def _cleanup_old_gist_files(
         return {}
 
     current_keys = set(current_files.keys())
+    protected = protected_filenames or set()
     to_delete: dict[str, None] = {}
 
     for name in existing_names:
-        if _is_managed_file(name) and name not in current_keys:
+        if _is_managed_file(name) and name not in current_keys and name not in protected:
             to_delete[name] = None
 
     return to_delete
@@ -800,7 +809,12 @@ def _generate_and_upload(
         log_warn(f"⚠️ 已从上传中移除 {failure_count} 个校验失败的配置")
 
     # 清理 Gist 中不再需要的旧文件
-    to_delete = _cleanup_old_gist_files(github_token, gist_id, files)
+    # 保护所有仍在配置中的订阅对应的文件（即使本次下载/转换失败也不删除备份）
+    protected: set[str] = set()
+    for sub in subscriptions:
+        protected.add(sub.filename)               # 飞鸟云.yaml
+        protected.add(f"{sub.name}-singbox.json")  # 飞鸟云-singbox.json
+    to_delete = _cleanup_old_gist_files(github_token, gist_id, files, protected)
     if to_delete:
         log_info(f"→ 清理 {len(to_delete)} 个旧文件: {', '.join(to_delete.keys())}")
 
