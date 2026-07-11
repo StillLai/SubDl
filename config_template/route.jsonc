@@ -415,14 +415,23 @@
         ],
         "outbound": "🎯 全球直连"
       },
-      { // 游戏加速（育碧、Steam）
+      { // 育碧
         "type": "logical",
         "mode": "or",
         "rules": [
-          {"rule_set": ["geosite-ubisoft", "geosite-steam"]},
-           {"process_path_regex": [".+?\\\\Ubisoft\\\\Ubisoft Game Launcher(?: Core)?(?:\\\\[^\\\\]+)*\\\\[^\\\\]+\\.exe", ".+?\\\\Steam(?:\\\\[^\\\\]+)*\\\\[^\\\\]+\\.exe"]}
+          {"rule_set": ["geosite-ubisoft"]},
+          {"process_path_regex": [".+?\\\\Ubisoft\\\\Ubisoft Game Launcher(?: Core)?(?:\\\\[^\\\\]+)*\\\\[^\\\\]+\\.exe"]}
         ],
-        "outbound": "🎮 游戏加速"
+        "outbound": "🌀 育碧"
+      },
+      { // Steam
+        "type": "logical",
+        "mode": "or",
+        "rules": [
+          {"rule_set": ["geosite-steam"]},
+          {"process_path_regex": [".+?\\\\Steam(?:\\\\[^\\\\]+)*\\\\[^\\\\]*[Ss]team[^\\\\]*\\.exe"]}
+        ],
+        "outbound": "🎮 Steam"
       },
       { // Epic Games
         "rule_set": ["geosite-epicgames"],
