@@ -11,7 +11,7 @@
       },
       "url": "$SUB_URL_2",
       "user_agent": "clash.meta/alpha/mihomo",
-      "download_detour": "🗂️ 备用自动",
+      // "download_detour": "🗂️ 备用自动",
       "update_interval": "3h"
     },
     {
