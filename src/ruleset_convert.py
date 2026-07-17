@@ -121,7 +121,9 @@ def _parse_yaml_rows(yaml_data: Any) -> list[dict[str, str | None]]:
             else:
                 pattern = 'DOMAIN'
         else:
-            pattern, address_addr = item.split(',', 1)
+            parts = item.split(',')
+            pattern = parts[0].strip()
+            address_addr = parts[1].strip() if len(parts) >= 2 else ""
         rows.append({'pattern': pattern.strip(), 'address': address_addr.strip(), 'other': None})
     return rows
 

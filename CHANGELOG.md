@@ -6,6 +6,11 @@ Vibe Coding 规范：每次代码变更完成后，应在此文件顶部追加�
 
 ---
 
+## 2026-07-17
+
+### Fixed
+- **YAML 规则解析动作字段残留**：`_parse_yaml_rows()` 使用 `split(',', 1)` 只按第一个逗号分割，导致含三字段的 Clash 规则行（如 `DOMAIN-SUFFIX,tracker.xiaohongshu.com,REJECT-DROP`）将动作字段残留在地址值中。改为 `split(',')` 后取 `parts[0]` 和 `parts[1]`，正确丢弃第三个字段
+
 ## 2026-07-11
 
 ### Fixed
