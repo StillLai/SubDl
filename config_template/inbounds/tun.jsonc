@@ -9,7 +9,7 @@
         "fdfe:dcba:9876::1/126",
         "172.19.0.1/30"
       ],
-      "mtu": 1500,
+      "mtu": 9000,
       "stack": "system",
       "auto_redirect": true,
       "strict_route": true,
