@@ -14,3 +14,7 @@ https://github.com/blackmatrix7/ios_rule_script/raw/refs/heads/master/rule/Clash
 https://github.com/blackmatrix7/ios_rule_script/raw/refs/heads/master/rule/Clash/XiaoMi/XiaoMi.list
 https://github.com/blackmatrix7/ios_rule_script/raw/refs/heads/master/rule/Clash/Hijacking/Hijacking.list
 https://github.com/Accademia/Additional_Rule_For_Clash/raw/refs/heads/main/HijackingPlus/HijackingPlus.yaml
+https://github.com/Accademia/Additional_Rule_For_Clash/raw/refs/heads/main/FakeLocation/FakeLocationBiliBili.yaml
+https://github.com/Accademia/Additional_Rule_For_Clash/raw/refs/heads/main/FakeLocation/FakeLocationWeiBo.yaml
+https://github.com/Accademia/Additional_Rule_For_Clash/raw/refs/heads/main/FakeLocation/FakeLocationXiaoHongShu.yaml
+https://github.com/Accademia/Additional_Rule_For_Clash/raw/refs/heads/main/FakeLocation/FakeLocationXianYu.yaml
