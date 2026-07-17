@@ -10,10 +10,10 @@
         "fdfe:dcba:9876::1/126"
       ],
       "mtu": 9000,
-      "stack": "gvisor",
+      "stack": "system",
       // "auto_redirect": true,
-      "auto_route": true,
-      "strict_route": true
+      // "strict_route": true,
+      "auto_route": true
     },
     {
       "type": "mixed",
