@@ -9,8 +9,8 @@
         "fdfe:dcba:9876::1/126",
         "172.19.0.1/30"
       ],
-      "mtu": 9000,
-      "stack": "gvisor",
+      "mtu": 1500,
+      "stack": "system",
       "auto_redirect": true,
       "auto_route": true,
       "strict_route": true
