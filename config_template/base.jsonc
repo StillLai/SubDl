@@ -1,6 +1,11 @@
 {
   "$schema": "https://ghfast.top/https://github.com/jiang-zhexin/typebox/releases/latest/download/schema.json",
-  "log": {"level": "warn", "timestamp": true},
+  "log": {
+    "disabled": false,
+    "level": "warn",
+    "output": "sing-box.log",
+    "timestamp": true
+  },
   // "services": [
   //   {
   //     "type": "api",
