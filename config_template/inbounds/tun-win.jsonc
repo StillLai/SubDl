@@ -10,7 +10,7 @@
         "fdfe:dcba:9876::1/126"
       ],
       "mtu": 9000,
-      "stack": "system",
+      "stack": "gvisor",
       // "auto_redirect": true,
       "strict_route": true,
       "auto_route": true
