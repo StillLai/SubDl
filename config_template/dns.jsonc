@@ -9,12 +9,12 @@
         "type": "udp",
         "server": "119.29.29.29"
       },
-      {
-        "tag": "Tencent-DNS",
-        "type": "tls",
-        "server": "dot.pub",
-        "domain_resolver": "DNS-Resolver"
-      },
+      // {
+      //   "tag": "Tencent-DNS",
+      //   "type": "tls",
+      //   "server": "dot.pub",
+      //   "domain_resolver": "DNS-Resolver"
+      // },
       {
         "tag": "Ali-DNS",
         "type": "h3",
@@ -61,7 +61,7 @@
     "rules": [
       { // 直连模式
         "clash_mode": "Direct",
-        "server": "Tencent-DNS"
+        "server": "DNS-Resolver"
       },
       { // 全局模式
         "type": "logical",
@@ -89,7 +89,7 @@
           {"rule_set": ["fakeip-filter"]},
           {"domain_suffix": ["steamcontent.com"], "invert": true}
         ],
-        "server": "Tencent-DNS"
+        "server": "DNS-Resolver"
       },
       { // 银行APP（工商/建设/农业/中国/交通/招商）、雅迪智行
         "type": "logical",
@@ -103,7 +103,7 @@
       },
       { // Steam-PC版
         "process_path_regex": [".+?\\\\Steam(?:\\\\[^\\\\]+)*\\\\[^\\\\]*[Ss]team[^\\\\]*\\.exe"],
-        "server": "Tencent-DNS"
+        "server": "DNS-Resolver"
       },
       { // Steam-全平台
         "type": "logical",
@@ -116,7 +116,7 @@
       },
       { // Epic Games
         "rule_set": ["geosite-epicgames"],
-        "server": "Tencent-DNS"
+        "server": "DNS-Resolver"
       },
       // { // 育碧
       //   "type": "logical",
@@ -152,7 +152,7 @@
       //     {"rule_set": ["WeChat"]},
       //     {"package_name": ["com.tencent.mm"]}
       //   ],
-      //   "server": "Tencent-DNS"
+      //   "server": "DNS-Resolver"
       // },
       // { // 支付宝
       //   "type": "logical",
@@ -170,7 +170,7 @@
       //     {"rule_set": ["BiliBili"]},
       //     {"package_name": ["tv.danmaku.bili"]}
       //   ],
-      //   "server": "Tencent-DNS"
+      //   "server": "DNS-Resolver"
       // },
       // { // 抖音
       //   "type": "logical",
@@ -179,7 +179,7 @@
       //     {"rule_set": ["geosite-douyin"]},
       //     {"package_name": ["com.ss.android.ugc.aweme"]}
       //   ],
-      //   "server": "Tencent-DNS"
+      //   "server": "DNS-Resolver"
       // },
       // { // 微博
       //   "rule_set": ["Weibo"],
@@ -192,7 +192,7 @@
       //     {"rule_set": ["geosite-xiaohongshu"]},
       //     {"package_name": ["com.xingin.xhs"]}
       //   ],
-      //   "server": "Tencent-DNS"
+      //   "server": "DNS-Resolver"
       // },
       // { // GitHub
       //   "rule_set": ["geosite-github"],
@@ -261,11 +261,11 @@
       //     {"rule_set": ["XiaoMi"]},
       //     {"package_name": ["com.xiaomi.smarthome", "com.xiaomi.vipaccount"]}
       //   ],
-      //   "server": "Tencent-DNS"
+      //   "server": "DNS-Resolver"
       // },
       // { // Apple
       //   "rule_set": ["Apple"],
-      //   "server": "Tencent-DNS"
+      //   "server": "DNS-Resolver"
       // },
       // { // Microsoft
       //   "rule_set": ["geosite-microsoft"],
@@ -286,7 +286,7 @@
       // },
       // { // 国内网站
       //   "rule_set": ["geosite-geolocation-cn", "custom_direct"],
-      //   "server": "Tencent-DNS"
+      //   "server": "DNS-Resolver"
       // },
       // { // 国内IP（排除海外）
       //   "type": "logical",
@@ -295,7 +295,7 @@
       //     {"rule_set": ["geosite-geolocation-!cn", "custom_proxy"], "invert": true},
       //     {"rule_set": "geoip-cn"}
       //   ],
-      //   "server": "Tencent-DNS"
+      //   "server": "DNS-Resolver"
       // },
       // { // 海外网站
       //   "rule_set": ["geosite-geolocation-!cn", "custom_proxy"],
@@ -303,13 +303,13 @@
       // },
       // { // CN域名/IP
       //   "rule_set": ["geosite-tld-cn", "GeositeCN", "geoip-cn"],
-      //   "server": "Tencent-DNS"
+      //   "server": "DNS-Resolver"
       // },
       {
         "query_type": ["A", "AAAA"],
         "server": "Fakeip"
       }
     ],
-    "final": "Tencent-DNS"
+    "final": "DNS-Resolver"
   }
 }
