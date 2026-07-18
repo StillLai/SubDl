@@ -5,21 +5,27 @@
     "independent_cache": true,
     "servers": [
       {
-        "tag": "Tencent-DNS",
+        "tag": "DNS-Resolver",
         "type": "udp",
         "server": "119.29.29.29"
+      },
+      {
+        "tag": "Tencent-DNS",
+        "type": "tls",
+        "server": "dot.pub",
+        "domain_resolver": "DNS-Resolver"
       },
       {
         "tag": "Ali-DNS",
         "type": "h3",
         "server": "dns.alidns.com",
-        "domain_resolver": "Tencent-DNS"
+        "domain_resolver": "DNS-Resolver"
       },
       {
         "tag": "Google-DNS",
         "type": "h3",
         "server": "dns.google",
-        "domain_resolver": "Tencent-DNS",
+        "domain_resolver": "DNS-Resolver",
         "detour": "🚀 节点选择"
       },
       {
@@ -38,7 +44,7 @@
         "tag": "DNS.SB",
         "type": "tls",
         "server": "dot.sb",
-        "domain_resolver": "Tencent-DNS",
+        "domain_resolver": "DNS-Resolver",
         "detour": "🚀 节点选择"
       },
       {
