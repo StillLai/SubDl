@@ -21,6 +21,7 @@
     },
     "cache_file": {
       "enabled": true,
+      "path": "cache.db",
       "store_fakeip": true,
       "store_rdrc": true
     }
