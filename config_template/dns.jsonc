@@ -9,12 +9,12 @@
         "type": "udp",
         "server": "119.29.29.29"
       },
-      // {
-      //   "tag": "Tencent-DNS",
-      //   "type": "tls",
-      //   "server": "dot.pub",
-      //   "domain_resolver": "DNS-Resolver"
-      // },
+      {
+        "tag": "Tencent-DNS",
+        "type": "tls",
+        "server": "dot.pub",
+        "domain_resolver": "DNS-Resolver"
+      },
       {
         "tag": "Ali-DNS",
         "type": "h3",
