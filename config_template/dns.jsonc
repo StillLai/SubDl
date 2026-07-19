@@ -35,6 +35,12 @@
         "detour": "🌀 育碧"
       },
       {
+        "tag": "Steam-DNS",
+        "type": "h3",
+        "server": "8.8.8.8",
+        "detour": "🎮 Steam"
+      },
+      {
         "tag": "Cloudflare-DNS",
         "type": "h3",
         "server": "1.1.1.1",
@@ -48,7 +54,7 @@
         "detour": "🚀 节点选择"
       },
       {
-        "tag": "Fakeip",
+        "tag": "Fake-DNS",
         "type": "fakeip",
         "inet4_range": "198.18.0.0/15",
         "inet6_range": "fc00::/18"
@@ -112,7 +118,7 @@
           {"rule_set": ["geosite-steam"]},
           {"package_name": ["com.valvesoftware.android.steam.community"]}
         ],
-        "server": "Google-DNS"
+        "server": "Steam-DNS"
       },
       { // Epic Games
         "rule_set": ["geosite-epicgames"],
@@ -307,7 +313,7 @@
       // },
       {
         "query_type": ["A", "AAAA"],
-        "server": "Fakeip"
+        "server": "Fake-DNS"
       }
     ],
     "final": "Tencent-DNS"
