@@ -6,6 +6,14 @@
     "output": "sing-box.log",
     "timestamp": true
   },
+  // "endpoints": [
+  //   {
+  //     "type": "tailscale",
+  //     "tag": "tailscale-ep",
+  //     // "system_interface": true,
+  //     "detour": "🎯 全球直连"
+  //   }
+  // ],
   // "services": [
   //   {
   //     "type": "api",

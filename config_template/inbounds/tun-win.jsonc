@@ -9,6 +9,9 @@
         "172.19.0.1/30",
         "fdfe:dcba:9876::1/126"
       ],
+      // "route_exclude_address": [
+      //   "100.64.0.0/10"  // tailscale
+      // ],
       "mtu": 9000,
       "stack": "system",
       "strict_route": true,
