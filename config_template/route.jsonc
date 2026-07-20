@@ -363,7 +363,7 @@
         ],
         "outbound": "🎯 全球直连"
       },
-      { // 拒绝 DoT/QUIC/STUN
+      { // 拒绝 DoT/STUN/QUIC
         "type": "logical",
         "mode": "or",
         "rules": [
