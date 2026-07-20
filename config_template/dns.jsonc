@@ -134,7 +134,7 @@
       //   "server": "Ubi-DNS"
       // },
       // { // DNS测试
-      //   "domain_suffix": ["browserleaks.com", "browserleaks.org", "browserleaks.net", "dnsleaktest.com"],
+      //   "domain_suffix": ["browserleaks.com", "browserleaks.org", "browserleaks.net", "ipleak.net", "dnsleaktest.com"],
       //   "server": "Local-DNS"
       // },
       // { // 亚马逊

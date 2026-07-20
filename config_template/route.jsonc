@@ -442,7 +442,7 @@
         "outbound": "🌀 育碧"
       },
       { // DNS测试
-        "domain_suffix": ["browserleaks.com", "browserleaks.org", "browserleaks.net", "dnsleaktest.com"],
+        "domain_suffix": ["browserleaks.com", "browserleaks.org", "browserleaks.net", "ipleak.net", "dnsleaktest.com"],
         "outbound": "🔍 DNS测试"
       },
       { // 亚马逊
