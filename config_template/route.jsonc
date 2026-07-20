@@ -345,6 +345,15 @@
         ],
         "action": "hijack-dns"
       },
+      { //tailscale
+        "type": "logical",
+        "mode": "or",
+        "rules": [
+          {"domain_suffix": ["ts.net", "100.in-addr.arpa"]},
+          {"ip_cidr": ["100.64.0.0/10", "fd7a:115c:a1e0::/48"]}
+        ],
+        "outbound": "ts-ep"
+      },
       { // 私有网络直连
         "type": "logical",
         "mode": "or",

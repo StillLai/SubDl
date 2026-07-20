@@ -48,11 +48,20 @@
         "inet6_range": "fc00::/18"
       },
       {
+        "tag": "Tailscale-DNS",
+        "type": "tailscale",
+        "endpoint": "ts-ep"
+      },
+      {
         "tag": "Local-DNS",
         "type": "local"
       }
     ],
     "rules": [
+      { //tailscale
+        "domain_suffix": ["ts.net", "100.in-addr.arpa"],
+        "server": "Tailscale-DNS"
+      },
       { // 直连模式
         "clash_mode": "Direct",
         "server": "Tencent-DNS"
