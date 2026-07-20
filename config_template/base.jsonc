@@ -6,14 +6,15 @@
     "output": "sing-box.log",
     "timestamp": true
   },
-  // "endpoints": [
-  //   {
-  //     "type": "tailscale",
-  //     "tag": "tailscale-ep",
-  //     // "system_interface": true,
-  //     "detour": "🎯 全球直连"
-  //   }
-  // ],
+  "endpoints": [
+    {
+      "type": "tailscale",
+      "tag": "ts-ep",
+      // "system_interface": true,
+      "auth_key": "",
+      "state_directory": "tailscale"
+    }
+  ],
   // "services": [
   //   {
   //     "type": "api",
