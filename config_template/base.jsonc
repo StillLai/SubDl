@@ -12,7 +12,7 @@
       "tag": "ts-ep",
       // "system_interface": true,
       "auth_key": "",
-      "state_directory": "tailscale"
+      "detour": "🎯 全球直连"
     }
   ],
   // "services": [
