@@ -111,19 +111,6 @@
         "process_path_regex": [".+?\\\\Steam(?:\\\\[^\\\\]+)*\\\\[^\\\\]*[Ss]team[^\\\\]*\\.exe"],
         "server": "Tencent-DNS"
       },
-      { // Steam-全平台
-        "type": "logical",
-        "mode": "or",
-        "rules": [
-          {"rule_set": ["geosite-steam"]},
-          {"package_name": ["com.valvesoftware.android.steam.community"]}
-        ],
-        "server": "Steam-DNS"
-      },
-      { // Epic Games
-        "rule_set": ["geosite-epicgames"],
-        "server": "Tencent-DNS"
-      },
       { // FakeIP
         "query_type": ["A", "AAAA"],
         "server": "Fake-DNS"
