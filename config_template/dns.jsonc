@@ -133,6 +133,6 @@
         "action": "reject"
       }
     ],
-    "final": "Local-DNS"
+    "final": "Tencent-DNS"
   }
 }
