@@ -124,7 +124,7 @@
         "rule_set": ["geosite-epicgames"],
         "server": "Tencent-DNS"
       },
-      { // Fakeip
+      { // FakeIP
         "query_type": ["A", "AAAA"],
         "server": "Fake-DNS"
       },
@@ -133,6 +133,6 @@
         "action": "reject"
       }
     ],
-    "final": "Tencent-DNS"
+    "final": "Local-DNS"
   }
 }
