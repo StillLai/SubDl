@@ -76,15 +76,6 @@
         ],
         "action": "reject"
       },
-      { // fakeip-filter
-        "type": "logical",
-        "mode": "and",
-        "rules": [
-          {"rule_set": ["fakeip-filter"]},
-          {"domain_suffix": ["steamcontent.com"], "invert": true}
-        ],
-        "server": "Tencent-DNS"
-      },
       { // 银行APP（工商/建设/农业/中国/交通/招商）、雅迪智行
         "type": "logical",
         "mode": "or",
@@ -94,6 +85,15 @@
           {"domain_suffix": ["yadeaiot.com.cn"]}
         ],
         "server": "Ali-DNS"
+      },
+      { // fakeip-filter
+        "type": "logical",
+        "mode": "and",
+        "rules": [
+          {"rule_set": ["fakeip-filter"]},
+          {"domain_suffix": ["steamcontent.com"], "invert": true}
+        ],
+        "server": "Tencent-DNS"
       },
       { // Steam-PC版
         "process_path_regex": [".+?\\\\Steam(?:\\\\[^\\\\]+)*\\\\[^\\\\]*[Ss]team[^\\\\]*\\.exe"],
