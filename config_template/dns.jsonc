@@ -29,18 +29,6 @@
         "detour": "🚀 节点选择"
       },
       {
-        "tag": "Ubi-DNS",
-        "type": "h3",
-        "server": "8.8.8.8",
-        "detour": "🌀 育碧"
-      },
-      {
-        "tag": "Steam-DNS",
-        "type": "h3",
-        "server": "8.8.8.8",
-        "detour": "🎮 Steam"
-      },
-      {
         "tag": "Cloudflare-DNS",
         "type": "h3",
         "server": "1.1.1.1",
