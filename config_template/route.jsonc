@@ -363,16 +363,16 @@
         ],
         "outbound": "🎯 全球直连"
       },
-      { // 拒绝 DoT/QUIC/STUN
-        "type": "logical",
-        "mode": "or",
-        "rules": [
-          {"port": 853},
-          {"network": "udp", "port": 443},
-          {"protocol": "stun"}
-        ],
-        "action": "reject"
-      },
+      // { // 拒绝 DoT/QUIC/STUN
+      //   "type": "logical",
+      //   "mode": "or",
+      //   "rules": [
+      //     {"port": 853},
+      //     {"network": "udp", "port": 443},
+      //     {"protocol": "stun"}
+      //   ],
+      //   "action": "reject"
+      // },
       { // 直连模式
         "clash_mode": "Direct",
         "outbound": "🎯 全球直连"
