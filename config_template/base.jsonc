@@ -11,7 +11,7 @@
       "type": "tailscale",
       "tag": "ts-ep",
       // "system_interface": true,
-      // "detour": "🎯 全球直连",
+      "detour": "🔗 Tailscale",
       "auth_key": ""
     }
   ],
