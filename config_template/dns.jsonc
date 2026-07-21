@@ -54,7 +54,8 @@
       },
       {
         "tag": "Local-DNS",
-        "type": "local"
+        "type": "dhcp",
+        "detour": "🎯 全球直连"
       }
     ],
     "rules": [
@@ -107,6 +108,10 @@
       { // Steam-PC版
         "process_path_regex": [".+?\\\\Steam(?:\\\\[^\\\\]+)*\\\\[^\\\\]*[Ss]team[^\\\\]*\\.exe"],
         "server": "Tencent-DNS"
+      },
+      { // DNS测试
+        "domain_suffix": ["browserleaks.com", "browserleaks.org", "browserleaks.net", "ipleak.net", "dnsleaktest.com"],
+        "server": "Local-DNS"
       },
       { // FakeIP
         "query_type": ["A", "AAAA"],
