@@ -100,10 +100,11 @@
         ],
         "server": "Ali-DNS"
       },
-      // { // DNS测试
-      //   "domain_suffix": ["browserleaks.com", "browserleaks.org", "browserleaks.net", "ipleak.net", "dnsleaktest.com"],
-      //   "server": "Ali-DNS"
-      // },
+      { // DNS测试
+        "domain_suffix": ["browserleaks.com", "browserleaks.org", "browserleaks.net", "ipleak.net", "dnsleaktest.com"],
+        "server": "Google-DNS",
+        "client_subnet": "183.6.0.0/24"
+      },
       { // FakeIP
         "query_type": ["A", "AAAA"],
         "server": "Fake-DNS"
