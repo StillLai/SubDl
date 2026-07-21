@@ -1,7 +1,7 @@
 {
   "$schema": "https://ghfast.top/https://github.com/jiang-zhexin/typebox/releases/latest/download/schema.json",
   "route": {
-    "default_domain_resolver": "Tencent-DNS",
+    "default_domain_resolver": "Ali-DNS",
     "auto_detect_interface": true,
     "find_process": true,
     "rule_set": [
@@ -430,16 +430,13 @@
         ],
         "outbound": "🎯 全球直连"
       },
-      { // Steam-PC版
-        "process_path_regex": [".+?\\\\Steam(?:\\\\[^\\\\]+)*\\\\[^\\\\]*[Ss]team[^\\\\]*\\.exe"],
-        "outbound": "🎯 全球直连"
-      },
       { // Steam-全平台
         "type": "logical",
         "mode": "or",
         "rules": [
           {"rule_set": ["geosite-steam"]},
-          {"package_name": ["com.valvesoftware.android.steam.community"]}
+          {"package_name": ["com.valvesoftware.android.steam.community"]},
+          {"process_path_regex": [".+?\\\\Steam(?:\\\\[^\\\\]+)*\\\\[^\\\\]*[Ss]team[^\\\\]*\\.exe"]}
         ],
         "outbound": "🎮 Steam"
       },

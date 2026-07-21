@@ -51,10 +51,6 @@
         "tag": "Tailscale-DNS",
         "type": "tailscale",
         "endpoint": "ts-ep"
-      },
-      {
-        "tag": "Local-DNS",
-        "type": "local"
       }
     ],
     "rules": [
@@ -102,12 +98,12 @@
           {"rule_set": ["fakeip-filter"]},
           {"domain_suffix": ["steamcontent.com"], "invert": true}
         ],
-        "server": "Tencent-DNS"
+        "server": "Ali-DNS"
       },
-      { // Steam-PC版
-        "process_path_regex": [".+?\\\\Steam(?:\\\\[^\\\\]+)*\\\\[^\\\\]*[Ss]team[^\\\\]*\\.exe"],
-        "server": "Tencent-DNS"
-      },
+      // { // DNS测试
+      //   "domain_suffix": ["browserleaks.com", "browserleaks.org", "browserleaks.net", "ipleak.net", "dnsleaktest.com"],
+      //   "server": "Ali-DNS"
+      // },
       { // FakeIP
         "query_type": ["A", "AAAA"],
         "server": "Fake-DNS"
