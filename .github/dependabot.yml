@@ -1,0 +1,49 @@
+version: 2
+updates:
+  # npm 依赖（jsdom — Sub-Store proxy-utils 运行时依赖）
+  - package-ecosystem: "npm"
+    directory: "/src"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    groups:
+      minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+    commit-message:
+      prefix: "chore"
+    labels:
+      - "dependencies"
+      - "npm"
+
+  # Python 依赖（json5 / pyyaml）
+  - package-ecosystem: "pip"
+    directory: "/src"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    groups:
+      minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+    commit-message:
+      prefix: "chore"
+    labels:
+      - "dependencies"
+      - "python"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    commit-message:
+      prefix: "ci"
+    labels:
+      - "dependencies"
+      - "github-actions"
