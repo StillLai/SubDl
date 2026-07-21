@@ -54,12 +54,11 @@
       },
       {
         "tag": "Local-DNS",
-        "type": "dhcp",
-        "detour": "🎯 全球直连"
+        "type": "local"
       }
     ],
     "rules": [
-      { //tailscale
+      { // tailscale
         "domain_suffix": ["ts.net", "100.in-addr.arpa"],
         "server": "Tailscale-DNS"
       },
@@ -108,10 +107,6 @@
       { // Steam-PC版
         "process_path_regex": [".+?\\\\Steam(?:\\\\[^\\\\]+)*\\\\[^\\\\]*[Ss]team[^\\\\]*\\.exe"],
         "server": "Tencent-DNS"
-      },
-      { // DNS测试
-        "domain_suffix": ["browserleaks.com", "browserleaks.org", "browserleaks.net", "ipleak.net", "dnsleaktest.com"],
-        "server": "Local-DNS"
       },
       { // FakeIP
         "query_type": ["A", "AAAA"],
