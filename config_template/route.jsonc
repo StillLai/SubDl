@@ -156,6 +156,12 @@
         "update_interval": "6h"
       },
       {
+        "tag": "geosite-tailscale",
+        "type": "remote",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/tailscale.srs",
+        "update_interval": "6h"
+      },
+      {
         "tag": "geosite-github",
         "type": "remote",
         "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/github.srs",
@@ -516,6 +522,10 @@
           {"package_name": ["com.xingin.xhs"]}
         ],
         "outbound": "🍠 小红书"
+      },
+      { // Tailscale
+        "rule_set": ["geosite-tailscale"],
+        "outbound": "🔗 Tailscale"
       },
       { // GitHub
         "rule_set": ["geosite-github"],
