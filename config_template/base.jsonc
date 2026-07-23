@@ -11,9 +11,9 @@
       "type": "tailscale",
       "tag": "ts-ep",
       // "system_interface": true,
+      // "control_url": "https://console.tailscale.com",
       "detour": "🔗 Tailscale",
-      "auth_key": "",
-      "control_url": "https://console.tailscale.com"
+      "auth_key": ""
     }
   ],
   // "services": [
