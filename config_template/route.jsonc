@@ -44,14 +44,14 @@
       {
         "tag": "geosite-amazon@ads",
         "type": "remote",
-        // "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/amazon@ads.srs",
-        "url": "https://anti-ad.net/anti-ad-sing-box.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/amazon@ads.srs",
         "update_interval": "6h"
       },
       {
         "tag": "ads",
         "type": "remote",
-        "url": "https://ghfast.top/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/AWAvenue-Ads-Rule-Singbox.srs",
+        // "url": "https://ghfast.top/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/AWAvenue-Ads-Rule-Singbox.srs",
+        "url": "https://anti-ad.net/anti-ad-sing-box.srs",
         "update_interval": "6h"
       },
       {
