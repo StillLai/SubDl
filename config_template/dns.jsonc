@@ -54,7 +54,7 @@
       }
     ],
     "rules": [
-      { // tailscale
+      { // Tailscale
         "domain_suffix": ["ts.net", "100.in-addr.arpa"],
         "server": "Tailscale-DNS"
       },

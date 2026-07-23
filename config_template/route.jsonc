@@ -44,7 +44,8 @@
       {
         "tag": "geosite-amazon@ads",
         "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/amazon@ads.srs",
+        // "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/amazon@ads.srs",
+        "url": "https://anti-ad.net/anti-ad-sing-box.srs",
         "update_interval": "6h"
       },
       {
@@ -351,7 +352,7 @@
         ],
         "action": "hijack-dns"
       },
-      { // tailscale
+      { // Tailscale
         "type": "logical",
         "mode": "or",
         "rules": [
