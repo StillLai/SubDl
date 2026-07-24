@@ -69,7 +69,7 @@
           {"clash_mode": "Global"},
           {"inbound": "mixed-in-global"}
         ],
-        "server": "Fake-DNS"
+        "server": "Cloudflare-DNS"
       },
       { // 广告拦截
         "type": "logical",
