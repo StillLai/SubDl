@@ -3,8 +3,8 @@
 ## 数据流
 
 ```
-SUB_URL / GIST_URL (env)
-  → parse_subscriptions()        # 从 providers.jsonc 读取 $ENV_VAR 映射，区分 SUB_URL/GIST_URL
+SUB_URL (env)
+  → parse_subscriptions()        # 从 providers.jsonc 读取 $ENV_VAR 映射，区分 $SUB_URL/$SUB_URL_GIST
   → _download_all()              # 并行下载订阅（ThreadPoolExecutor）
   → _try_gist_fallback()         # 失败时从 Gist 备份获取已转换的 sing-box JSON
   → _convert_batch()             # Node.js 批量转换（subprocess，单进程复用）
@@ -69,7 +69,7 @@ ruleset_convert.py     (独立入口，由 Ruleset Update workflow 调用)
 ### Provider 配置与直接合并的区别
 - **直接合并**：所有节点直接写入 outbounds，配置文件较大但自包含
 - **Provider 版本**：outbounds 中的 urltest 指向远程订阅 URL，客户端自行拉取节点
-- Provider 版本中 `GIST_URL*` 环境变量的 provider URL 指向 Gist 上已转换的 sing-box 文件
+- Provider 版本中 `$SUB_URL_GIST*` 标记的 provider URL 指向 Gist 上已转换的 sing-box 文件（实际 URL 从对应 `SUB_URL` 自动获取）
 
 ### 为什么完全运行在 GitHub Actions CI 上？
 - 项目的核心功能（下载订阅、调用 Node.js 转换、调用 sing-box 校验、上传 Gist）依赖 CI 环境中的 Secrets（GH_TOKEN、GIST_ID）和预装的二进制（sing-box）
@@ -121,12 +121,12 @@ SubDlError (基础异常)
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
 | `SUB_URL_1` ~ `_9` | 更多常规订阅（纯 URL） | — |
-| `GIST_URL` / `GIST_URL_1` ~ `_9` | Gist 订阅（纯 URL），provider 指向 Gist 已转换文件 | — |
+| `SUB_URL_GIST` / `SUB_URL_GIST_1` ~ `_9` | 标记 provider 指向 Gist（实际 URL 从对应 `SUB_URL` 获取） | — |
 | `SING_BOX_REF1ND_BIN` | sing-box reF1nd 二进制路径（providers 校验用） | 回退到官方版 |
 | `WORKERS` | 并行下载线程数 | `8` |
 
-### SUB_URL / GIST_URL 约定
-- `providers.jsonc` 中 provider 的 `url` 字段为 `$ENV_VAR` 占位符（如 `$SUB_URL_1`、`$GIST_URL`）
-- `SUB_URL` / `SUB_URL_N` — 常规订阅，provider URL 指向原始订阅地址
-- `GIST_URL` / `GIST_URL_N` — Gist 订阅，provider URL 指向 Gist 上已转换的 sing-box 文件
+### SUB_URL / SUB_URL_GIST 约定
+- `providers.jsonc` 中 provider 的 `url` 字段为 `$ENV_VAR` 占位符（如 `$SUB_URL_1`、`$SUB_URL_GIST`）
+- `$SUB_URL` / `$SUB_URL_N` — 常规订阅，provider URL 指向原始订阅地址
+- `$SUB_URL_GIST` / `$SUB_URL_GIST_N` — 标记订阅的 provider 指向 Gist 上已转换的 sing-box 文件，实际 URL 从对应的 `$SUB_URL` / `$SUB_URL_N` 获取，无需额外配置环境变量
 - 环境变量值为纯 URL，订阅名称由 `providers.jsonc` 中 provider 的 `tag` 字段决定

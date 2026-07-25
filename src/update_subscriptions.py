@@ -115,9 +115,10 @@ def parse_subscriptions() -> list[Subscription]:
     """解析订阅配置 — 从 providers.jsonc 读取配置，环境变量提供纯 URL
 
     providers.jsonc 中的 url 字段为 $ENV_VAR 格式的占位符。
-    环境变量前缀决定订阅模式：
-      - SUB_URL / SUB_URL_N → 常规订阅（provider URL 指向原始订阅）
-      - GIST_URL / GIST_URL_N → Gist 订阅（provider URL 指向 Gist 上已转换的文件）
+    占位符后缀决定订阅模式：
+      - $SUB_URL / $SUB_URL_N → 常规订阅（provider URL 指向原始订阅）
+      - $SUB_URL_GIST / $SUB_URL_GIST_N → Gist 订阅（provider URL 指向 Gist 上已转换的文件，
+        实际 URL 从对应的 $SUB_URL / $SUB_URL_N 获取，无需额外配置环境变量）
     """
     providers_raw = load_jsonc(TEMPLATE_DIR / 'providers.jsonc')
     providers = providers_raw.get('providers', [])
@@ -127,12 +128,19 @@ def parse_subscriptions() -> list[Subscription]:
         url_ref = provider.get('url', '')
         if not url_ref.startswith('$'):
             continue
-        env_name = url_ref[1:]  # 去掉 $ 前缀
-        url = os.environ.get(env_name, '').strip()
+        env_name = url_ref[1:]  # 去掉 $ 前缀（保留原始占位符名，用于 providers 生成时匹配）
+
+        # SUB_URL_GIST / SUB_URL_GIST_N → 标记为 use_gist，URL 从 SUB_URL / SUB_URL_N 获取
+        use_gist = '_GIST' in env_name
+        if use_gist:
+            actual_env_name = env_name.replace('_GIST', '')
+            url = os.environ.get(actual_env_name, '').strip()
+        else:
+            url = os.environ.get(env_name, '').strip()
+
         if not url:
             continue
 
-        use_gist = env_name.startswith('GIST_URL')
         tag = provider.get('tag', '')
         if not tag:
             log_warn(f"  providers.jsonc 中存在无 tag 的 provider，已跳过 (env: {env_name})")
@@ -853,7 +861,7 @@ def main() -> None:
 
         subscriptions = parse_subscriptions()
         if not subscriptions:
-            raise ConfigError("未找到订阅配置（providers.jsonc 中无有效的 $SUB_URL / $GIST_URL 引用）")
+            raise ConfigError("未找到订阅配置（providers.jsonc 中无有效的 $SUB_URL 引用）")
         log_info(f"找到 {len(subscriptions)} 个订阅")
 
         log_info("::group::Download & Convert subscriptions")

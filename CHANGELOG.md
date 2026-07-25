@@ -6,6 +6,13 @@ Vibe Coding 规范：每次代码变更完成后，应在此文件顶部追加�
 
 ---
 
+## 2026-07-25
+
+### Changed
+- **移除 `GIST_URL` 环境变量**：`$SUB_URL_GIST` / `$SUB_URL_GIST_N` 改为纯标记占位符，无需在 Secrets 中配置
+- `parse_subscriptions()` 识别 `_GIST` 后缀后自动从对应的 `$SUB_URL` / `$SUB_URL_N` 获取实际 URL
+- 同步更新 `README.md`、`.clinerules`、`ARCHITECTURE.md` 中的环境变量说明
+
 ## 2026-07-17
 
 ### Fixed

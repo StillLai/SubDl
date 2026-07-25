@@ -35,7 +35,6 @@
 | `GIST_ID` | ✅ | 上一步创建的 Gist ID |
 | `SUB_URL` | ✅ | 主订阅链接（纯 URL） |
 | `SUB_URL_1` ~ `SUB_URL_9` | ❌ | 更多常规订阅（可选，纯 URL） |
-| `GIST_URL` / `GIST_URL_1` ~ `GIST_URL_9` | ❌ | Gist 订阅（纯 URL，provider 将指向 Gist 上已转换的 sing-box 文件） |
 
 **订阅链接示例：**
 
@@ -48,10 +47,13 @@ SUB_URL_1 = https://example2.com/clash/config
 
 **Provider 指向 Gist：**
 
-使用 `GIST_URL`（而非 `SUB_URL`）环境变量，可让该订阅在 providers 配置中的 provider `url` 指向 Gist 上已转换的 sing-box 文件（`{tag}-singbox.json`），而非原始订阅地址。
+在 `providers.jsonc` 中使用 `$SUB_URL_GIST`（而非 `$SUB_URL`）作为占位符，可让该订阅在 providers 配置中的 provider `url` 指向 Gist 上已转换的 sing-box 文件（`{tag}-singbox.json`），而非原始订阅地址。实际的订阅 URL 从对应的 `$SUB_URL` 环境变量获取，无需额外配置。
 
-```
-GIST_URL = https://example.com/api/sub?token=xxx
+```jsonc
+{
+  "url": "$SUB_URL_GIST_1",  // 标记：provider 指向 Gist（实际 URL 从 SUB_URL_1 获取）
+  "tag": "雪山"
+}
 ```
 
 生成的 provider URL 格式为：`https://ghfast.top/https://gist.github.com/{用户名}/{Gist ID}/raw/{tag}-singbox.json`（通过 `ghfast.top` 加速访问）

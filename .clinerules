@@ -30,14 +30,13 @@ SubDl 是一个自动化订阅管理工具：下载 Clash 订阅 → 转换为 s
 | 变量 | 说明 | 默认值 | 使用文件 |
 |------|------|--------|----------|
 | `SUB_URL_1` ~ `SUB_URL_9` | 更多常规订阅（纯 URL） | — | update_subscriptions.py |
-| `GIST_URL` / `GIST_URL_1` ~ `GIST_URL_9` | Gist 订阅（纯 URL） | — | update_subscriptions.py |
 | `SING_BOX_REF1ND_BIN` | sing-box reF1nd 二进制路径（providers 配置校验用） | 回退到官方版 | update_subscriptions.py |
 | `WORKERS` | 并行下载线程数 | `8` | update_subscriptions.py |
 
-### SUB_URL / GIST_URL 环境变量约定
-- `providers.jsonc` 中 provider 的 `url` 字段为 `$ENV_VAR` 占位符（如 `$SUB_URL_1`、`$GIST_URL`）
-- `SUB_URL` / `SUB_URL_N` — 常规订阅，provider URL 指向原始订阅地址
-- `GIST_URL` / `GIST_URL_N` — Gist 订阅，provider URL 指向 Gist 上已转换的 sing-box 文件
+### SUB_URL 环境变量约定
+- `providers.jsonc` 中 provider 的 `url` 字段为 `$ENV_VAR` 占位符（如 `$SUB_URL_1`、`$SUB_URL_GIST`）
+- `$SUB_URL` / `$SUB_URL_N` — 常规订阅，provider URL 指向原始订阅地址
+- `$SUB_URL_GIST` / `$SUB_URL_GIST_N` — 标记订阅的 provider 指向 Gist 上已转换的 sing-box 文件，实际 URL 从对应的 `$SUB_URL` / `$SUB_URL_N` 获取，无需额外配置环境变量
 - 环境变量值为纯 URL，不再包含订阅名称
 - 订阅名称由 `providers.jsonc` 中 provider 的 `tag` 字段决定
 
@@ -64,7 +63,7 @@ SubDl 是一个自动化订阅管理工具：下载 Clash 订阅 → 转换为 s
 关键字段说明：
 - `DownloadResult.is_converted=True` 表示内容来自 Gist 备份（已是 sing-box 格式），跳过转换
 - `SubscriptionInfo.from_backup=True` 表示数据来自 Gist 备份，SVG 中显示 📦 标记
-- `Subscription.use_gist` 由 `GIST_URL*` 环境变量前缀自动决定，控制 provider URL 指向
+- `Subscription.use_gist` 由 `$SUB_URL_GIST*` 占位符后缀自动决定，控制 provider URL 指向
 
 ## 文档分工
 - `.clinerules`：AI 编码行为约束（"不要做什么"、"必须做什么"）
@@ -112,7 +111,7 @@ SubDl 是一个自动化订阅管理工具：下载 Clash 订阅 → 转换为 s
 ## 数据流
 ```
 SUB_URL (env)
-  → parse_subscriptions()        # 解析环境变量（SUB_URL* → 常规, GIST_URL* → Gist）
+  → parse_subscriptions()        # 解析环境变量（$SUB_URL* → 常规, $SUB_URL_GIST* → Gist 标记）
   → _download_all()              # 并行下载订阅
   → _try_gist_fallback()         # 失败时从 Gist 备份获取已转换的 sing-box JSON
   → _convert_batch()             # Node.js 批量转换（跳过 is_converted=True 的）
