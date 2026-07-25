@@ -3,6 +3,7 @@
   "dns": {
     "strategy": "prefer_ipv6",
     "independent_cache": true,
+    "reverse_mapping": true,
     "servers": [
       {
         "tag": "DNS-Resolver",
