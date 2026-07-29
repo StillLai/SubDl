@@ -14,9 +14,11 @@ icon: material/new-box
   "server": "127.0.0.1",
   "server_port": 1080,
   "password": "8JCsPssfgS8tiRwiMlhARg==",
+  "client_name": "",
   "idle_session_check_interval": "30s",
   "idle_session_timeout": "30s",
   "min_idle_session": 5,
+  "disable_reuse": false,
   "tls": {},
 
   ... // 拨号字段
@@ -43,6 +45,14 @@ icon: material/new-box
 
 AnyTLS 密码。
 
+#### client_name
+
+在 AnyTLS 设置中报告的客户端名称和版本。
+
+留空时使用当前 sing-anytls 版本。
+
+除非你知道自己在做什么，否则不要配置此选项。
+
 #### idle_session_check_interval
 
 检查空闲会话的时间间隔。默认值：30秒。
@@ -54,6 +64,10 @@ AnyTLS 密码。
 #### min_idle_session
 
 在检查中，至少前 `n` 个空闲会话保持打开状态。默认值：`n`=0
+
+#### disable_reuse
+
+禁用 TLS 连接复用。默认值：false。
 
 #### tls
 

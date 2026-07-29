@@ -141,7 +141,6 @@ nav:
           - SOCKS: configuration/inbound/socks.md
           - HTTP: configuration/inbound/http.md
           - Shadowsocks: configuration/inbound/shadowsocks.md
-          - Snell: configuration/inbound/snell.md
           - VMess: configuration/inbound/vmess.md
           - Trojan: configuration/inbound/trojan.md
           - Naive: configuration/inbound/naive.md
@@ -151,6 +150,7 @@ nav:
           - TUIC: configuration/inbound/tuic.md
           - Hysteria2: configuration/inbound/hysteria2.md
           - AnyTLS: configuration/inbound/anytls.md
+          - Snell: configuration/inbound/snell.md
           - Tun: configuration/inbound/tun.md
           - Redirect: configuration/inbound/redirect.md
           - TProxy: configuration/inbound/tproxy.md
@@ -161,7 +161,6 @@ nav:
           - SOCKS: configuration/outbound/socks.md
           - HTTP: configuration/outbound/http.md
           - Shadowsocks: configuration/outbound/shadowsocks.md
-          - Snell: configuration/outbound/snell.md
           - VMess: configuration/outbound/vmess.md
           - Trojan: configuration/outbound/trojan.md
           - Naive: configuration/outbound/naive.md
@@ -172,6 +171,7 @@ nav:
           - TUIC: configuration/outbound/tuic.md
           - Hysteria2: configuration/outbound/hysteria2.md
           - AnyTLS: configuration/outbound/anytls.md
+          - Snell: configuration/outbound/snell.md
           - Tor: configuration/outbound/tor.md
           - SSH: configuration/outbound/ssh.md
           - DNS: configuration/outbound/dns.md

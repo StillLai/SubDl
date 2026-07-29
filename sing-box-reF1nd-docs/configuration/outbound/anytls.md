@@ -14,9 +14,11 @@ icon: material/new-box
   "server": "127.0.0.1",
   "server_port": 1080,
   "password": "8JCsPssfgS8tiRwiMlhARg==",
+  "client_name": "",
   "idle_session_check_interval": "30s",
   "idle_session_timeout": "30s",
   "min_idle_session": 5,
+  "disable_reuse": false,
   "tls": {},
 
   ... // Dial Fields
@@ -43,6 +45,14 @@ The server port.
 
 The AnyTLS password.
 
+#### client_name
+
+The client name and version reported in the AnyTLS settings.
+
+If empty, the current sing-anytls version is used.
+
+Do not configure this option unless you know what you are doing.
+
 #### idle_session_check_interval
 
 Interval checking for idle sessions. Default: 30s.
@@ -54,6 +64,10 @@ In the check, close sessions that have been idle for longer than this. Default: 
 #### min_idle_session
 
 In the check, at least the first `n` idle sessions are kept open. Default value: `n`=0
+
+#### disable_reuse
+
+Disable TLS connection reuse. Default: false.
 
 #### tls
 
