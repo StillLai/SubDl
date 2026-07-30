@@ -6,6 +6,11 @@ Vibe Coding 规范：每次代码变更完成后，应在此文件顶部追加�
 
 ---
 
+## 2026-07-30
+
+### Fixed
+- **docs-sync 推送后 Docs Deploy 未自动触发**：`github-actions[bot]` 使用 `GITHUB_TOKEN` 推送的 commit 不会触发其他 workflow（GitHub 安全限制）。改为在 `docs-sync.yml` 推送成功后显式调用 `workflow_dispatch` 触发 `docs-deploy.yml`，无变更时不触发
+
 ## 2026-07-25
 
 ### Changed
