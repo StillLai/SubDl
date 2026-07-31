@@ -111,7 +111,7 @@
         "server": "Fake-DNS"
       },
       { // 防止Firefox DNS泄露（HTTPS查询绕过FakeIP），也可以network.dns.use_https_rr_as_altsvc设置为false
-        "query_type": ["HTTPS"],
+        // "query_type": ["HTTPS"],
         // "action": "reject"
         "server": "Google-DNS",
         "client_subnet": "183.6.0.0/24"
