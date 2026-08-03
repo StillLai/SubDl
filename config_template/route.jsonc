@@ -50,8 +50,8 @@
       {
         "tag": "ads",
         "type": "remote",
-        // "url": "https://ghfast.top/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/AWAvenue-Ads-Rule-Singbox.srs",
-        "url": "https://anti-ad.net/anti-ad-sing-box.srs",
+        "url": "https://ghfast.top/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/AWAvenue-Ads-Rule-Singbox.srs",
+        // "url": "https://anti-ad.net/anti-ad-sing-box.srs",
         "update_interval": "6h"
       },
       {
