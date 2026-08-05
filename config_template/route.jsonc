@@ -391,7 +391,7 @@
           {"clash_mode": "Global"},
           {"inbound": "mixed-in-global"}
         ],
-        "outbound": "Global"
+        "outbound": "GLOBAL"
       },
       { // 广告拦截
         "type": "logical",
