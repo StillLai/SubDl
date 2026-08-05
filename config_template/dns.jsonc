@@ -70,7 +70,7 @@
           {"clash_mode": "Global"},
           {"inbound": "mixed-in-global"}
         ],
-        "server": "Cloudflare-DNS"
+        "server": "Fake-DNS"
       },
       { // 广告拦截
         "type": "logical",
