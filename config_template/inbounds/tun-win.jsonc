@@ -12,7 +12,7 @@
       // "route_exclude_address": [
       //   "100.64.0.0/10"  // tailscale
       // ],
-      "mtu": 9000,
+      "mtu": 1500,
       "stack": "system",
       "strict_route": true,
       "auto_route": true
