@@ -12,7 +12,7 @@
       "tag": "ts-ep",
       // "system_interface": true,
       // "control_url": "https://console.tailscale.com",
-      "detour": "🔗 Tailscale",
+      "detour": "🎈 自动选择",
       "auth_key": ""
     }
   ],
