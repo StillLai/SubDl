@@ -366,7 +366,8 @@
         "mode": "or",
         "rules": [
           {"ip_is_private": true},
-          {"rule_set": ["geosite-private", "geoip-private"]}
+          {"rule_set": ["geosite-private", "geoip-private"]},
+          {"port": 3389}
         ],
         "outbound": "🎯 全球直连"
       },
