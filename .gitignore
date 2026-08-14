@@ -63,3 +63,6 @@ status-dark.svg
 
 # sing-box 二进制缓存（CI 中使用）
 .cache/
+
+# ThinCoder 临时审查日志
+.thincoder/tmp/

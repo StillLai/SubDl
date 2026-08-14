@@ -66,10 +66,10 @@ SubDl 是一个自动化订阅管理工具：下载 Clash 订阅 → 转换为 s
 - `Subscription.use_gist` 由 `$SUB_URL_GIST*` 占位符后缀自动决定，控制 provider URL 指向
 
 ## 文档分工
-- `.clinerules`：AI 编码行为约束（"不要做什么"、"必须做什么"）
+- `AGENTS.md`：AI 编码行为约束（"不要做什么"、"必须做什么"）
 - `ARCHITECTURE.md`：项目架构、设计决策及理由（"为什么这样做"）
 - 需要记录设计决策/理由时 → 更新 `ARCHITECTURE.md`
-- 需要更新编码规范/约束时 → 更新 `.clinerules`
+- 需要更新编码规范/约束时 → 更新 `AGENTS.md`
 
 ## 特殊目录
 
@@ -191,7 +191,7 @@ ruleset_convert.py     (独立入口，由 Ruleset Update workflow 调用)
 7. 如果涉及设计决策/理由 → 更新 `ARCHITECTURE.md` "关键设计决策"章节
 8. 涉及代码或架构变更时 → 更新 `CHANGELOG.md` 顶部追加记录（纯模板文件变更、纯 ruleset 文件变更除外）
 9. 如果变更涉及 README.md 中描述的内容（环境变量、配置格式、输出文件、快速配置步骤、项目结构等） → 同步更新 README.md
-10. **在调用 `attempt_completion` 之前，必须逐条对照以上 1~9 条，确认所有需要的更新已实际执行（不是"想到"而是"已写入文件"）。此为硬性前置检查，未通过不得提交结果。**
+10. **在调用 `verify` 之前，必须逐条对照以上 1~9 条，确认所有需要的更新已实际执行（不是"想到"而是"已写入文件"）。此为硬性前置检查，未通过不得提交结果。**
 
 ## 命名规范
 - 文件名：snake_case（Python）、camelCase（Node.js）
@@ -200,3 +200,23 @@ ruleset_convert.py     (独立入口，由 Ruleset Update workflow 调用)
 - 异常类：PascalCase
 - 数据类：PascalCase，使用 @dataclass 装饰器
 - 私有函数/变量：_single_underscore 前缀
+
+## 开发工作流
+
+### 编码后
+- 每次写入/编辑后运行 `lint`（快速语法检查）
+- 完成任务前运行 `lint full=true`（完整语言感知检查）
+
+### 完成前
+- 运行 `verify` 检查语法、显示 diff、运行自检清单
+- 重新阅读用户原始需求，确认交付物完全匹配
+
+### 代码审查
+- 使用 `advisor` 工具进行独立代码审查
+- 传入 `paths=[...]` 指定审查范围
+- 审查后必须生成回应表并逐项处理
+
+### 探索代码时的顺序
+1. `doc_search` — 先读设计文档理解意图
+2. `code_search` — 再搜索具体实现
+3. 读 `ARCHITECTURE.md` 了解设计决策
