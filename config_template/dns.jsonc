@@ -92,6 +92,15 @@
         ],
         "server": "Ali-DNS"
       },
+      { // Github SSH
+        "type": "logical",
+        "mode": "and",
+        "rules": [
+          {"port": 22},
+          {"domain_suffix": ["github.com"]}
+        ],
+        "server": "Cloudflare-DNS"
+      },
       { // fakeip-filter
         "type": "logical",
         "mode": "and",
