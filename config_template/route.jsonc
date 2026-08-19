@@ -156,12 +156,12 @@
         "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/epicgames.srs",
         "update_interval": "6h"
       },
-      // {
-      //   "tag": "geosite-tailscale",
-      //   "type": "remote",
-      //   "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/tailscale.srs",
-      //   "update_interval": "6h"
-      // },
+      {
+        "tag": "geosite-tailscale",
+        "type": "remote",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/tailscale.srs",
+        "update_interval": "6h"
+      },
       {
         "tag": "geosite-github",
         "type": "remote",
