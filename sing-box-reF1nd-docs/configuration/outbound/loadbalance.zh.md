@@ -21,8 +21,7 @@
   "interval": "",
   "idle_timeout": "",
   "ttl": "10m",
-  "use_all_providers": false,
-  "interrupt_exist_connections": false
+  "use_all_providers": false
 }
 ```
 
@@ -80,9 +79,3 @@
 #### use_all_providers
 
 是否使用所有提供者。默认使用 `false`。
-
-#### interrupt_exist_connections
-
-当选定的出站发生更改时，中断现有连接。
-
-仅入站连接受此设置影响，内部连接将始终被中断。
