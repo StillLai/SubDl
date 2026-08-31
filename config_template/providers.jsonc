@@ -10,7 +10,11 @@
         "timeout":"3s"
       },
       "url": "$SUB_URL_2",
-      "user_agent": "clash.meta/alpha/mihomo",
+      "http_client": {
+        "headers": {
+          "User-Agent": "clash.meta/alpha/mihomo"
+        }
+      },
       "update_interval": "3h"
     },
     {
@@ -23,7 +27,11 @@
         "timeout":"3s"
       },
       "url": "$SUB_URL_1",
-      "user_agent": "clash.meta/alpha/mihomo",
+      "http_client": {
+        "headers": {
+          "User-Agent": "clash.meta/alpha/mihomo"
+        }
+      },
       "update_interval": "3h"
     },
     {
@@ -36,8 +44,12 @@
         "timeout":"3s"
       },
       "url": "$SUB_URL",
-      "http_client": "走代理下载",
-      "user_agent": "clash.meta/alpha/mihomo",
+      "http_client": {
+        "detour": "🎈 自动选择",
+        "headers": {
+          "User-Agent": "clash.meta/alpha/mihomo"
+        }
+      },
       "update_interval": "3h"
     }
   ]

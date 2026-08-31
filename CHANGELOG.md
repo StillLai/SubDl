@@ -6,6 +6,11 @@ Vibe Coding 规范：每次代码变更完成后，应在此文件顶部追加�
 
 ---
 
+## 2026-09-01
+
+### Fixed
+- **providers 配置校验失败**：新版 sing-box reF1nd 中 `user_agent` 与 `http_client` 字段冲突，导致所有 `-providers` 配置校验失败。将 `providers.jsonc` 中所有 provider 的 `user_agent` 替换为通过 `http_client.headers` 设置 User-Agent，保持原有代理/直连路由行为不变
+
 ## 2026-07-30
 
 ### Fixed
