@@ -2,7 +2,6 @@
   "$schema": "https://ghfast.top/https://github.com/jiang-zhexin/typebox/releases/latest/download/schema.json",
   "dns": {
     "strategy": "prefer_ipv6",
-    "independent_cache": true,
     "reverse_mapping": true,
     "servers": [
       {

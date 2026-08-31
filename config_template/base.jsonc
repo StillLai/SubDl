@@ -16,29 +16,32 @@
       "auth_key": ""
     }
   ],
-  // "services": [
-  //   {
-  //     "type": "api",
-  //     "listen": "::",
-  //     "listen_port": 9999,
-  //     "secret": "lyb0330",
-  //     "dashboard": true
-  //   }
-  // ],
+  "services": [
+    {
+      "type": "api",
+      "listen": "127.0.0.1",
+      "listen_port": 9999,
+      // "secret": "lyb0330",
+      "dashboard": {
+        "enabled": true,
+        "path": "dashboard",
+        "download_url": "https://ghfast.top/https://github.com/SagerNet/sing-box-dashboard/archive/refs/heads/gh-pages.zip"
+      }
+    }
+  ],
   "experimental": {
-    "clash_api": {
-      "default_mode": "Rule",
-      "external_controller": "127.0.0.1:9090",
-      "external_ui": "ui",
-      "external_ui_download_url": "https://ghfast.top/https://github.com/MetaCubeX/yacd/archive/gh-pages.zip",
-      // "external_ui_download_detour": "🎈 自动选择",
-      "secret": ""
-    },
+    // "clash_api": {
+    //   "default_mode": "Rule",
+    //   "external_controller": "127.0.0.1:9090",
+    //   "external_ui": "ui",
+    //   "external_ui_download_url": "https://ghfast.top/https://github.com/MetaCubeX/yacd/archive/gh-pages.zip",
+    //   "secret": ""
+    // },
     "cache_file": {
       "enabled": true,
       // "path": "cache.db",
       "store_fakeip": true,
-      "store_rdrc": true
+      "store_dns": true
     }
   }
 }
