@@ -1,5 +1,11 @@
 # 订阅
 
+!!! quote "sing-box 1.14.0 中的更改"
+
+    :material-plus: [http_client](#http_client)
+
+    :material-delete-clock: [download_detour](#download_detour)
+
 ### 结构
 
 订阅源列表。
@@ -42,14 +48,19 @@
             "timeout": "",
           },
           "url": "",
+          "path": "",
           "exclude": "",
           "include": "",
           "user_agent": "",
-          "download_detour": "",
+          "http_client": "", // or {}
           "update_interval": "",
           "override_dialer": {},
           "override_tls": {},
-          "override_anytls": {}
+          "override_anytls": {},
+
+          // Deprecated
+
+          "download_detour": ""
         }
       ]
     }
@@ -125,6 +136,22 @@
 
 订阅源的 URL。
 
+#### path
+
+用于存储已下载订阅源的路径。
+
+缓存元数据存储于 `cache.db`。
+
+与 `initial_path` 冲突。
+
+#### initial_path
+
+初始订阅源内容的路径。
+
+仅在启用 `cache.db` 订阅缓存且不存在可用缓存时读取。该路径不会作为持久缓存路径使用。
+
+与 `path` 冲突。
+
 #### exclude
 
 排除节点的正则表达式。
@@ -137,12 +164,24 @@
 
 用于下载订阅内容的 User-Agent。
 
+#### http_client
+
+!!! question "自 sing-box 1.14.0 起"
+
+用于下载订阅内容的 HTTP 客户端。
+
+参阅 [HTTP 客户端字段](/zh/configuration/shared/http-client/) 了解详情。
+
+如果为空，将使用默认传输。
+
 #### download_detour
+
+!!! failure "已在 sing-box 1.14.0 废弃"
+
+    `download_detour` 已在 sing-box 1.14.0 废弃且将在 sing-box 1.16.0 中被移除，请使用 `http_client` 代替。
 
 用于下载订阅内容的出站的标签。
 
-如果为空，将使用默认出站。
-
 #### update_interval
 
-更新订阅的时间间隔。最小为 `1m`，默认为 `24h`。
+更新订阅的时间间隔。最小为 `1h`，默认为 `24h`。

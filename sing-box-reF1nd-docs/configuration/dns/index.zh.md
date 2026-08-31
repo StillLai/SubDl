@@ -2,6 +2,12 @@
 icon: material/alert-decagram
 ---
 
+!!! quote "sing-box 1.14.0 中的更改"
+
+    :material-delete-clock: [independent_cache](#independent_cache)  
+    :material-plus: [optimistic](#optimistic)  
+    :material-plus: [timeout](#timeout)
+
 !!! quote "sing-box 1.12.0 中的更改"
 
     :material-decagram: [servers](#servers)
@@ -25,11 +31,11 @@ icon: material/alert-decagram
     "disable_expire": false,
     "independent_cache": false,
     "round_robin_cache": false,
-    "lazy_cache_ttl": 0,
     "cache_capacity": 0,
-    "cache_client_subnet": false,
     "min_cache_ttl": 0,
     "max_cache_ttl": 0,
+    "optimistic": false, // or {}
+    "timeout": "",
     "reverse_mapping": false,
     "client_subnet": "",
     "fakeip": {}
@@ -61,21 +67,25 @@ icon: material/alert-decagram
 
 禁用 DNS 缓存。
 
+与 `optimistic` 冲突。
+
 #### disable_expire
 
 禁用 DNS 缓存过期。
 
+与 `optimistic` 冲突。
+
 #### independent_cache
+
+!!! failure "已在 sing-box 1.14.0 废弃"
+
+    `independent_cache` 已在 sing-box 1.14.0 废弃，且将在 sing-box 1.16.0 中被移除，参阅[迁移指南](/zh/migration/#迁移-independent-dns-cache)。
 
 使每个 DNS 服务器的缓存独立，以满足特殊目的。如果启用，将轻微降低性能。
 
 #### round_robin_cache
 
 响应缓存时轮转缓存地址的顺序。
-
-#### lazy_cache_ttl
-
-设置额外的 TTL 值用于响应已过期的缓存，并在后台尝试刷新。
 
 #### cache_capacity
 
@@ -85,23 +95,63 @@ LRU 缓存容量。
 
 小于 1024 的值将被忽略。
 
-#### cache_client_subnet
-
-!!! question "自 sing-box 1.12.25-reF1nd.2 / 1.13.15-reF1nd / 1.14.0-alpha.38-reF1nd 起"
-
-允许存储从客户端收到的、包含 EDNS0 Client Subnet（ECS）选项的 DNS 查询响应。如果上游响应包含 ECS 选项，则会在缓存响应中保留该选项。拒绝 DNS 响应缓存（RDRC）条目也遵循相同策略。
-
-默认关闭。关闭时仍可使用匹配的现有 ECS 缓存，但缓存未命中时不会写入，过期缓存也不会触发刷新。此选项不影响由 sing-box 自身配置的 `client_subnet`；后者始终将配置的前缀作为缓存键的一部分来缓存响应。
-
-每个不同的 ECS 前缀都会创建独立的缓存条目。启用此选项会显著增加内存 DNS 缓存占用；启用 `store_rdrc` 时，也会增加持久化 RDRC 数据库大小。除非已严格控制缓存容量和监听器暴露范围，否则不要为不受信任客户端可访问的 DNS 监听器启用此选项。
-
 #### min_cache_ttl
 
-缓存时将低于此设置的 TTL 值延长到指定时间。
+DNS 缓存的最小 TTL，单位为秒。
+
+缓存并返回 DNS 响应前，低于此值的 TTL 将被延长。
+
+设为 `0` 时不限制最小 TTL。
 
 #### max_cache_ttl
 
-缓存时将高于此设置的 TTL 值缩短到指定时间。
+DNS 缓存的最大 TTL，单位为秒。
+
+缓存并返回 DNS 响应前，高于此值的 TTL 将被缩短。
+
+设为 `0` 时不限制最大 TTL。两个选项均未设置时，将保留从 DNS 响应中计算出的 TTL。
+
+当 `min_cache_ttl` 大于非零的 `max_cache_ttl` 时，将使用 `min_cache_ttl` 作为两者的有效值。
+
+规则级 `rewrite_ttl` 动作在这些限制之后应用，并拥有更高优先级。
+
+#### optimistic
+
+!!! question "自 sing-box 1.14.0 起"
+
+启用乐观 DNS 缓存。当缓存的 DNS 条目已过期但仍在超时窗口内时，
+立即返回过期的响应，同时在后台触发刷新。
+
+与 `disable_cache` 和 `disable_expire` 冲突。
+
+接受布尔值或对象。当设置为 `true` 时，使用默认超时 `3d`。
+
+```json
+{
+  "enabled": true,
+  "timeout": "3d"
+}
+```
+
+##### enabled
+
+启用乐观 DNS 缓存。
+
+##### timeout
+
+过期缓存条目可被乐观提供的最长时间。
+
+默认使用 `3d`。
+
+#### timeout
+
+!!! question "自 sing-box 1.14.0 起"
+
+每次 DNS 查询的默认超时时间。
+
+默认使用 `10s`。
+
+可被 `rules.[].timeout`（DNS 规则动作）或 `domain_resolver.timeout` 覆盖。
 
 #### reverse_mapping
 
@@ -119,6 +169,6 @@ LRU 缓存容量。
 
 可以被 `servers.[].client_subnet` 或 `rules.[].client_subnet` 覆盖。
 
-#### fakeip
+#### fakeip :material-note-remove:
 
 [FakeIP](./fakeip/) 设置。
