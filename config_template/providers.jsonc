@@ -11,7 +11,6 @@
       },
       "url": "$SUB_URL_2",
       "user_agent": "clash.meta/alpha/mihomo",
-      // "download_detour": "🔄 订阅更新",
       "update_interval": "3h"
     },
     {
@@ -25,7 +24,6 @@
       },
       "url": "$SUB_URL_1",
       "user_agent": "clash.meta/alpha/mihomo",
-      "download_detour": "🔄 订阅更新",
       "update_interval": "3h"
     },
     {
@@ -39,7 +37,6 @@
       },
       "url": "$SUB_URL",
       "user_agent": "clash.meta/alpha/mihomo",
-      "download_detour": "🔄 订阅更新",
       "update_interval": "3h"
     }
   ]
