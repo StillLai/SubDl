@@ -36,6 +36,7 @@
         "timeout":"3s"
       },
       "url": "$SUB_URL",
+      "http_client": "走代理下载",
       "user_agent": "clash.meta/alpha/mihomo",
       "update_interval": "3h"
     }
