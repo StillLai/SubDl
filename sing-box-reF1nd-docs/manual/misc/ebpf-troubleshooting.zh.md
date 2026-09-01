@@ -1,48 +1,65 @@
-# eBPF 入站问题排查
+# eBPF 入站问题反馈与排查指南
 
-问题报告应覆盖进程启动、一次完整复现和停止过程。只有启动日志通常无法解释间歇性
-丢包、attachment 变化或资源持续增长。
+本文是 eBPF 入站测试阶段的临时材料收集指南。请尽量提供能够完整复现问题的最小
+报告。对于间歇性拦截失效、资源持续增长或设备重启，只有启动日志通常不足以定位。
 
 ## 最低限度材料
 
-请提供：
+请同时提供以下内容：
 
 1. 准确的 sing-box commit、完整 `sing-box version` 输出和编译 tags。
-2. eBPF 入站配置及相关 route rules。可以删除凭据，但应保留 mode、接口、UID 或
-   来源策略、DNS/IPv6 设置、TC priority 和绕过策略。
-3. 设备型号、系统版本、完整内核版本；Android 还需 build fingerprint。
-4. 从启动、复现到正常停止的 Debug 级别日志。
-5. 复现步骤、预期和实际行为、受影响协议、影响本机还是下游流量，以及重启
-   sing-box 后是否变化。
-6. 与预期路径一致的能力探测结果：
+2. eBPF 入站配置及相关路由规则。可以删除密码、私钥、token 和无关节点凭据，但
+   不要删除 eBPF mode、接口、UID 范围、DNS mode、IPv6 开关和绕过策略。
+3. 设备型号、系统版本和完整内核版本。Android 还需提供 build fingerprint，
+   OpenWrt 还需提供 `/etc/openwrt_release`。
+4. 从进程启动、完成一次复现到正常关闭的 Debug 级别日志，并注明故障发生的
+   实际时间。无法正常关闭时请保留日志末尾。
+   对于长时间运行后出现的 local UDP 故障，还应保留启动日志中包含
+   `udp_state_cleanup` 的行。使用 `ebpf_debug` 构建时，同时保留全部 `eBPF debug
+   snapshot` 行及其附近的详细 Debug 日志。
+5. 准确复现步骤、预期结果、实际结果、受影响协议、影响本机还是下游流量，以及
+   重启 sing-box 后是否暂时恢复。
+6. 与配置路径对应的内核能力探测 JSON：
 
 ```sh
 sing-box tools ebpf status --mode local --network tcp,udp --json
-sing-box tools ebpf status --mode shared --interface br-lan --json
+sing-box tools ebpf status --mode shared-network --interface br-lan --json
 ```
 
-如果入站配置禁用了 IPv6，请添加 `--ipv6=false`。必需能力缺失或无法验证时，命令会以非零状态退出。
+hybrid 模式请分别探测两条路径，或使用带下游接口的 `--mode all`。
 
-hybrid 模式请分别运行两种探测，或使用带下游接口的 `--mode all`。探测权限应与
-服务实际运行权限一致。
-
-常用系统信息：
+通用系统信息：
 
 ```sh
 uname -a
 cat /proc/version
 cat /proc/meminfo
-ip -details link show
-tc -details qdisc show
-tc -statistics -details filter show
+cat /proc/self/mountinfo
 ```
 
-Android 还应提供 `getprop ro.build.fingerprint` 和完整 `logcat -b all -d`；OpenWrt
-还应提供 `/etc/openwrt_release` 和 `ubus call system board`。
+Android：
+
+```sh
+getprop ro.product.model
+getprop ro.build.fingerprint
+getprop ro.build.version.release
+logcat -b all -d > logcat-all.txt
+```
+
+OpenWrt：
+
+```sh
+cat /etc/openwrt_release
+ubus call system board
+ip -details link show
+tc -details qdisc show
+tc -details filter show
+```
 
 ## 内核崩溃或设备重启
 
-重启后应在下一次崩溃覆盖内容前复制 `/sys/fs/pstore`：
+设备重启后，应在下一次崩溃覆盖内容前复制 `/sys/fs/pstore` 下的全部文件。存在时
+重点提供 `console-ramoops-*`、`dmesg-ramoops-*` 和 `pmsg-ramoops-*`：
 
 ```sh
 ls -la /sys/fs/pstore
@@ -50,25 +67,44 @@ cp -a /sys/fs/pstore ./pstore-copy
 dmesg -T > dmesg-after-reboot.txt
 ```
 
-存在时请提供 `console-ramoops-*`、`dmesg-ramoops-*` 和 `pmsg-ramoops-*`，并说明
-是 local、shared，还是只有网络接口变化时触发。内核记录通常比故障前提前中断的
-用户态日志更有价值。
+同时说明是 local、shared，还是只有开启热点时才会重启。内核故障发生时用户态
+日志可能提前中断，因此 pstore 是此类问题的主要证据。
 
-## 日志与运行状态
+## 调试构建
 
-Debug 日志级别下，启动成功后会输出一条 `eBPF TC active` 摘要，其中包括 mode、
-network、local/shared IPv6 设置、默认接口、内部监听器、delivery 接口，以及每个
-attachment 的 local/shared 角色和 `l2`/`l3` 帧格式。网络事件仅在 attachment 或受管
-网络状态发生变化时输出 Debug 日志，修复失败会输出限频的 Warn 日志。用户态 handoff
-异常会输出限频后的 Warn 或 Error 日志；BPF 报文返回路径不输出逐包日志，实现也不会
-周期扫描 map 或定期输出状态。
+在正常编译 tags 中加入 `ebpf_debug`。Android arm64 和 NDK r29 示例：
 
-如果日志报告 assignment 或 UDP 原目标读取失败，请保留首次错误前后的完整日志，
-并同时采集下文的 TC attachment 信息。
+```sh
+TAGS=with_gvisor,with_quic,with_dhcp,with_utls,with_clash_api,badlinkname,tfogo_checklinkname0,with_provider,with_ebpf,ebpf_debug \
+CGO_ENABLED=1 \
+CC="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android35-clang" \
+GOARCH=arm64 GOOS=android make build
+```
+
+配置中还需将日志级别设为 `debug`。调试构建会在启动完成后、关闭前，以及有效的
+local 或 shared TCP token 丢失重定向状态时输出 `eBPF debug snapshot` JSON，其中
+包含 map 类型、key/value 大小、容量、当前条目数、内核 memlock、map/program ID，
+以及每个 program 的运行次数、内核累计耗时、平均 ns/run 和 recursion miss。
+此外还会记录详细启动配置、绕过策略变更和 janitor 成功删除结果。采集只由事件
+触发，不启动周期 reporter，也不会在转发热路径加入诊断计数。普通 `with_ebpf`
+构建即使启用 Debug 日志也不会遍历 map 或启用 program runtime 统计。
+
+`ebpf_debug` 构建会在至少一个 eBPF inbound 运行期间临时启用内核
+`BPF_STATS_RUN_TIME`。这是衡量 BPF 数据面开销最直接的指标，但属于全系统内核
+统计并有可测量的额外开销，因此只应用于排障，不应用于日常 release 构建。低于
+5.8 的内核或拒绝该能力的 vendor 内核会继续启动，只是不提供 program runtime
+统计；读取失败原因会记录在 program 的 `error` 字段。
+
+排查 local UDP 时，对比 `cgroup_udp_redirect`、`cgroup_udp_token`、
+`cgroup_udp_peer`、`cgroup_udp_flow` 的条目数和容量。启动日志中的
+`udp_state_cleanup=socket_release` 表示启用了精确的 `cgroup/sock_release` 清理；
+`lru_fallback` 则使用有界 LRU 状态。排查 shared 容量压力时，检查
+`shared_flow_by_original` 与 `shared_flow_by_token`，两个方向的占用应大致接近。
 
 ## CPU 和内存 profile
 
-在 loopback 开启标准 debug endpoint 即可使用 Go pprof：
+Go pprof 由 sing-box 自身提供，不要求 `ebpf_debug`。在配置中开启统一的 debug
+HTTP 入口：
 
 ```json
 {
@@ -80,7 +116,13 @@ attachment 的 local/shared 角色和 `l2`/`l3` 帧格式。网络事件仅在 a
 }
 ```
 
-围绕复现过程采集 CPU、heap 和 goroutine：
+应只监听 `127.0.0.1`。Android 可转发到电脑：
+
+```sh
+adb forward tcp:6060 tcp:6060
+```
+
+在 30 秒 CPU 采样期间复现问题，然后采集 heap 和 goroutine：
 
 ```sh
 curl -o cpu.pprof 'http://127.0.0.1:6060/debug/pprof/profile?seconds=30'
@@ -90,40 +132,26 @@ go tool pprof -top cpu.pprof
 go tool pprof -top heap.pprof
 ```
 
-pprof 只测量 Go 用户态 CPU 和内存，不包含 BPF 执行和内核 map 内存。内核侧应结合
-TC 状态、`dmesg` 和目标系统可用的 BPF 检查工具判断。
+排查内存持续增长时，分别在启动稳定后和增长明显后采集 heap，并同时提供两次
+采样对应的 eBPF debug 快照以及 `/proc/<pid>/status`。采集结束后停止调试版。
 
-## attachment 和接口检查
+pprof 只能测量 Go 用户态 CPU 和 heap，不能测量内核执行 BPF 程序的时间或内核
+map 内存。后者需要结合 debug 快照中的 `memlock_bytes`、program ID、启动时的
+挂载模式和内核日志判断。只有在内核具备相应 perf/BPF 权限且维护者提出要求时，
+再采集 `bpftool prog profile id <id>`；不要自行开启全局 BPF kernel statistics，
+它会影响整个系统。
 
-local 模式跟随当前默认接口。shared 模式跟随配置的下游接口，并会重试启动时不存在
-的接口。配置的 shared 接口成为当前默认上游时会停止接管，重新成为下游后恢复。网络
-事件也会检查受管 TC filter、策略路由和 delivery 链路。如果接口事件前后接管行为发生
-变化，请分别保存以下输出：
+## 运行期维护
 
-```sh
-ip -details link show
-ip route show table all
-ip -6 route show table all
-tc -details qdisc show
-tc -statistics -details filter show
-```
+shared flow 清理、attachment 自愈和 local TCP 清理用于保证长期运行正确性，
+在普通构建中也会启用。大部分工作由事件或 deadline 驱动；对于没有
+可靠用户态事件的内核状态，仅保留低频 watchdog。如果 CPU 占用呈周期性，请
+同时提供 `ebpf_debug` 快照和 CPU profile，不要直接关闭这些任务；否则
+可能造成 map 耗尽、redirect 过期或接口脱挂。
 
-同时保留启动时的 `eBPF TC active` 摘要。sing-box 运行期间不要手动删除内部 veth
-或其管理的 TC filter。
+## 隐私和打包
 
-排查 local 接管时，可对比默认接口 egress filter 和日志所示 delivery 接口 ingress
-filter 的报文计数：
-
-```sh
-tc -statistics filter show dev wlan0 egress
-tc -statistics filter show dev sbdXXXXXXXX ingress
-```
-
-请将两个接口名替换为启动日志中的实际值。如果 local filter 计数增长而 delivery
-filter 不增长，请同时保留两条 filter 输出和对应的 `ip -details link show` 输出。
-
-## 隐私
-
-日志和 profile 可能包含目的地址、域名、接口名、包名、文件路径和配置片段。公开
-前可以删除凭据及无关个人信息，但应保留时间戳、错误号、program/map ID、UID
-范围、内核调用栈和事件顺序。
+日志和 profile 可能包含目的地址、域名、接口名、包名、文件路径和部分配置。
+公开前请删除凭据和无关个人信息，但应保留时间戳、errno、program/map ID、UID
+范围、内核调用栈和故障前后的事件顺序。建议将配置、日志、能力探测 JSON、profile
+和 pstore 与一份简短时间线一起打包。

@@ -1,34 +1,40 @@
-# eBPF inbound troubleshooting
+# eBPF inbound troubleshooting guide
 
-Provide a complete report from startup through one reproduction and shutdown.
-Startup-only logs rarely explain intermittent packet loss, attachment changes,
-or resource growth.
+This is a temporary collection guide for testing the eBPF inbound. Attach the
+smallest complete report that reproduces the problem. A startup-only log is
+usually insufficient for intermittent interception, resource growth, or a
+kernel restart.
 
 ## Minimum report
 
-Include:
+Include all of the following:
 
-1. The exact sing-box commit or full `sing-box version` output and build tags.
-2. The eBPF inbound configuration and relevant route rules. Remove credentials,
-   but retain mode, interfaces, UID or source policy, DNS and IPv6 settings, TC
-   priority, and bypass policy.
-3. Device model, operating-system release, complete kernel release, and, on
-   Android, the build fingerprint.
-4. Debug-level logs from startup through reproduction and graceful shutdown.
-5. Reproduction steps, expected and actual behavior, affected protocol, local
-   or downstream scope, and whether restarting sing-box changes the result.
-6. A capability report matching the intended path:
+1. The exact sing-box commit or full `sing-box version` output and the build
+   tags used.
+2. The eBPF inbound configuration and relevant route rules. Remove passwords,
+   private keys, tokens, and unrelated server credentials, but do not remove
+   eBPF mode, interfaces, UID ranges, DNS mode, IPv6 flags, or
+   bypass policy.
+3. Device model, operating system release, and complete kernel release. On
+   Android also include the build fingerprint; on OpenWrt include
+   `/etc/openwrt_release`.
+4. A Debug-level log from process startup, through one reproduction, to a
+   graceful shutdown when possible. Record the wall-clock time of the failure.
+   For a long-running local UDP failure, preserve the startup line containing
+   `udp_state_cleanup`. When using an `ebpf_debug` build, also preserve all
+   `eBPF debug snapshot` lines and the nearby detailed Debug logs.
+5. Exact reproduction steps, expected result, actual result, affected protocol,
+   whether local or downstream traffic is affected, and whether restarting
+   sing-box temporarily fixes it.
+6. The matching kernel capability report:
 
 ```sh
 sing-box tools ebpf status --mode local --network tcp,udp --json
-sing-box tools ebpf status --mode shared --interface br-lan --json
+sing-box tools ebpf status --mode shared-network --interface br-lan --json
 ```
 
-Add `--ipv6=false` when the inbound configuration disables IPv6. The command
-exits non-zero when a required capability is missing or cannot be verified.
-
-For hybrid mode, run both probes or use `--mode all` with the downstream
-interface. Run probes with the same privileges as the service.
+Use the command that matches the configured path. For hybrid mode, run both or
+use `--mode all` with the downstream interface.
 
 Useful platform information:
 
@@ -36,18 +42,33 @@ Useful platform information:
 uname -a
 cat /proc/version
 cat /proc/meminfo
-ip -details link show
-tc -details qdisc show
-tc -statistics -details filter show
+cat /proc/self/mountinfo
 ```
 
-Android reports should also include `getprop ro.build.fingerprint` and a full
-`logcat -b all -d`. OpenWrt reports should include `/etc/openwrt_release` and
-`ubus call system board`.
+Android:
+
+```sh
+getprop ro.product.model
+getprop ro.build.fingerprint
+getprop ro.build.version.release
+logcat -b all -d > logcat-all.txt
+```
+
+OpenWrt:
+
+```sh
+cat /etc/openwrt_release
+ubus call system board
+ip -details link show
+tc -details qdisc show
+tc -details filter show
+```
 
 ## Kernel panic or device restart
 
-After restart, copy `/sys/fs/pstore` before another crash overwrites it:
+After the device restarts, copy every file from `/sys/fs/pstore` before another
+crash overwrites it. In particular, provide `console-ramoops-*`,
+`dmesg-ramoops-*`, and `pmsg-ramoops-*` when present:
 
 ```sh
 ls -la /sys/fs/pstore
@@ -55,30 +76,51 @@ cp -a /sys/fs/pstore ./pstore-copy
 dmesg -T > dmesg-after-reboot.txt
 ```
 
-Include `console-ramoops-*`, `dmesg-ramoops-*`, and `pmsg-ramoops-*` files when
-present. State whether local mode, shared mode, or only a network-interface
-change triggers the restart. The kernel record is more useful than a userspace
-log that stops before the fault.
+Also state whether local mode, shared mode, or only hotspot activation triggers
+the restart. A userspace log may end before the kernel records the fault, so
+pstore is the primary artifact for this class of failure.
 
-## Logs and runtime state
+## Diagnostic build
 
-At Debug log level, a successful startup emits one `eBPF TC active` summary
-containing the mode, network, local/shared IPv6 settings, default interface,
-attachments, internal listeners, and delivery interface. Each attachment
-includes its local/shared role and `l2` or `l3` framing. A network event emits a
-Debug entry only when attachments or managed network state are changed; repair
-failures produce rate-limited warnings. Userspace handoff failures produce
-rate-limited Warn or Error entries. BPF packet return paths do not emit
-per-packet logs, and the implementation does not periodically scan maps or emit
-status records.
+Add `ebpf_debug` to the normal build tags. For Android arm64 with NDK r29:
 
-If the log reports an assignment or UDP original-destination failure, retain
-the complete log around the first error and collect the TC attachment state
-described below.
+```sh
+TAGS=with_gvisor,with_quic,with_dhcp,with_utls,with_clash_api,badlinkname,tfogo_checklinkname0,with_provider,with_ebpf,ebpf_debug \
+CGO_ENABLED=1 \
+CC="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android35-clang" \
+GOARCH=arm64 GOOS=android make build
+```
+
+Set the sing-box log level to `debug`. The diagnostic build emits an `eBPF
+debug snapshot` JSON object after startup, immediately before shutdown, and
+when a valid local or shared TCP token has lost its redirect state. It contains
+map type, key/value sizes, capacity, current entry count, kernel memlock,
+map/program IDs, and per-program run count, cumulative kernel runtime, average
+nanoseconds per run, and recursion misses. It also logs detailed startup
+configuration, bypass-policy changes, and successful janitor removals.
+Collection is event driven; there is no periodic reporter and no diagnostic
+counter in the forwarding hot path. A normal `with_ebpf` build does not walk
+maps or enable program runtime statistics even when Debug logging is active.
+
+An `ebpf_debug` build temporarily enables the kernel's
+`BPF_STATS_RUN_TIME` facility while at least one eBPF inbound is active. This
+is the most direct measurement of BPF data-plane cost, but it is a system-wide
+kernel statistic with measurable overhead. Use it for diagnosis rather than a
+normal release build. Kernels older than 5.8 and vendor kernels that reject the
+facility continue without program runtime statistics. The snapshot's program
+`error` field records the read failure when available.
+
+For local UDP, compare `cgroup_udp_redirect`, `cgroup_udp_token`,
+`cgroup_udp_peer`, and `cgroup_udp_flow` entry counts with their capacities.
+The startup log's `udp_state_cleanup=socket_release` means an exact
+`cgroup/sock_release` cleanup program is active; `lru_fallback` uses bounded LRU
+state instead. For shared pressure, inspect `shared_flow_by_original` and
+`shared_flow_by_token`; both directions should remain close in occupancy.
 
 ## CPU and memory profiles
 
-Enable the standard debug endpoint on loopback to use Go pprof:
+Go pprof is provided by sing-box itself and does not require `ebpf_debug`.
+Enable the shared debug HTTP endpoint in the configuration:
 
 ```json
 {
@@ -90,7 +132,13 @@ Enable the standard debug endpoint on loopback to use Go pprof:
 }
 ```
 
-Then collect CPU, heap, and goroutine profiles around the reproduction:
+Keep this listener on loopback. On Android, forward it to the host:
+
+```sh
+adb forward tcp:6060 tcp:6060
+```
+
+Capture CPU while reproducing the issue, then capture heap and goroutines:
 
 ```sh
 curl -o cpu.pprof 'http://127.0.0.1:6060/debug/pprof/profile?seconds=30'
@@ -100,46 +148,33 @@ go tool pprof -top cpu.pprof
 go tool pprof -top heap.pprof
 ```
 
-pprof measures Go userspace CPU and memory, not BPF execution or kernel map
-memory. Use TC state, `dmesg`, and BPF inspection tools available on the target
-system for the kernel side.
+For memory growth, capture heap once after startup and again after the growth
+is visible. Include both profiles, the eBPF debug snapshots, and
+`/proc/<pid>/status`. Stop the diagnostic build after collection.
 
-## Attachment and interface checks
+pprof measures Go userspace CPU and heap. It does not measure time executing
+inside kernel BPF programs or kernel map memory. Use the debug snapshot's
+`memlock_bytes`, program IDs, startup attachment mode, and kernel logs for the latter.
+On a kernel with suitable perf/BPF permissions, a maintainer may request a
+separate `bpftool prog profile id <id>` capture; do not enable global kernel
+BPF statistics unless specifically requested because they affect the whole
+system.
 
-Local mode follows the current default interface. Shared mode follows the
-configured downstream interfaces and retries interfaces that were absent at
-startup. A configured shared interface is detached while it is the current default
-upstream and restored when it becomes downstream again. Network events also
-validate the managed TC filters, policy routing, and delivery link. When
-interception changes after an interface event, capture before and after output
-from:
+## Runtime maintenance
 
-```sh
-ip -details link show
-ip route show table all
-ip -6 route show table all
-tc -details qdisc show
-tc -statistics -details filter show
-```
+Shared flow cleanup, attachment reconciliation, and local TCP cleanup are
+correctness work and remain enabled in normal builds. Most
+work is event or deadline driven, with low-frequency watchdogs for kernel state
+that has no reliable userspace event. If CPU usage appears periodic, include an
+`ebpf_debug` snapshot and a CPU profile instead of disabling these
+tasks; doing so can cause map exhaustion, stale redirects, or detached
+interfaces.
 
-Also retain the startup `eBPF TC active` summary. Do not manually remove the
-internal veth or managed TC filters while sing-box is running.
+## Privacy and packaging
 
-For local interception, compare the packet counts on the default-interface
-egress filter and the logged delivery-interface ingress filter:
-
-```sh
-tc -statistics filter show dev wlan0 egress
-tc -statistics filter show dev sbdXXXXXXXX ingress
-```
-
-Replace both interface names with those from the startup log. If the local
-filter count increases while the delivery filter does not, retain both filter
-outputs and the corresponding `ip -details link show` output.
-
-## Privacy
-
-Logs and profiles can contain destination addresses, domains, interface and
+Logs and profiles can contain destination addresses, domains, interface names,
 package names, file paths, and configuration fragments. Remove credentials and
-unrelated personal data, while preserving timestamps, error numbers, program
-and map IDs, UID ranges, kernel stack traces, and event order.
+unrelated personal data before publishing, but preserve timestamps, errno
+values, program/map IDs, UID ranges, kernel stack traces, and the sequence
+around the failure. Package the configuration, logs, capability JSON, profiles,
+and pstore files together with a short timeline.
