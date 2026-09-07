@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="633" viewBox="0 0 960 633">
+  <rect width="960" height="633" rx="12" fill="#f0f2f5"/>
+  <defs>
+    <linearGradient id="headerGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#f0f4fa"/>
+      <stop offset="50%" stop-color="#f8fafc"/>
+      <stop offset="100%" stop-color="#eef2f7"/>
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#10b981"/>
+    </linearGradient>
+    <linearGradient id="barGreenGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#34d399"/>
+      <stop offset="100%" stop-color="#10b981"/>
+    </linearGradient>
+    <linearGradient id="barOrangeGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+    <linearGradient id="barRedGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#f87171"/>
+      <stop offset="100%" stop-color="#ef4444"/>
+    </linearGradient>
+    <filter id="cardShadow" x="-2%" y="-2%" width="104%" height="104%">
+      <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000000" flood-opacity="0.06"/>
+    </filter>
+  </defs>
+  <rect x="30" y="30" width="900" height="105" rx="8" fill="url(#headerGrad)" filter="url(#cardShadow)"/>
+  <rect x="30" y="30" width="6" height="105" rx="3" fill="url(#accentGrad)"/>
+  <line x1="30" y1="134" x2="930" y2="134" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="60" y="78" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="27" font-weight="bold" fill="#1e293b">SubDl</text>
+  <text x="150" y="78" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="27" fill="#64748b">订阅状态</text>
+  <text x="900" y="78" text-anchor="end" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="16" fill="#64748b">2026-09-07 09:51:56 CST</text>
+  <text x="60" y="114" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="18" fill="#64748b">共 3 个订阅 · 160 个节点</text>
+  <text x="54" y="176" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="16" font-weight="600" fill="#64748b" letter-spacing="0.5">订阅</text>
+  <text x="204" y="176" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="16" font-weight="600" fill="#64748b" letter-spacing="0.5">流量使用</text>
+  <text x="667" y="176" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="16" font-weight="600" fill="#64748b" letter-spacing="0.5">到期时间</text>
+  <text x="787" y="176" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="16" font-weight="600" fill="#64748b" letter-spacing="0.5">状态</text>
+  <text x="885" y="176" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="16" font-weight="600" fill="#64748b" letter-spacing="0.5">节点</text>
+  <line x1="30" y1="197" x2="930" y2="197" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="54" y="224" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="15" fill="#64748b">SUB_URL_2</text>
+  <text x="54" y="254" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="19" font-weight="600" fill="#1e293b">山海</text>
+  <rect x="204" y="215" width="372" height="12" rx="6" fill="#e2e8f0"/>
+  <rect x="204" y="215" width="245.32347529233084" height="12" rx="6" fill="url(#barGreenGrad)"/>
+  <text x="204" y="251" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="16" fill="#64748b">168.82 GB / 256.00 GB  (66%)  剩余: 87.18 GB</text>
+  <text x="667" y="244" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="18" fill="#64748b">无</text>
+  <text x="787" y="244" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="19" fill="#10b981">✅ 正常</text>
+  <text x="885" y="244" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="19" font-weight="600" fill="#3b82f6">33</text>
+  <rect x="30" y="281" width="900" height="84" fill="#f8fafd"/>
+  <line x1="54" y1="281" x2="906" y2="281" stroke="#e2e8f0" stroke-width="0.5"/>
+  <text x="54" y="308" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="15" fill="#64748b">SUB_URL_1</text>
+  <text x="54" y="338" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="19" font-weight="600" fill="#1e293b">雪山</text>
+  <rect x="204" y="299" width="372" height="12" rx="6" fill="#e2e8f0"/>
+  <rect x="204" y="299" width="0.0038618356968872537" height="12" rx="6" fill="url(#barGreenGrad)"/>
+  <text x="204" y="335" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="16" fill="#64748b">10.14 TB / 976562.50 TB  (0%)  剩余: 976552.36 TB</text>
+  <text x="667" y="328" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="18" fill="#64748b">无</text>
+  <text x="787" y="328" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="19" fill="#10b981">✅ 正常</text>
+  <text x="885" y="328" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="19" font-weight="600" fill="#3b82f6">80</text>
+  <line x1="54" y1="365" x2="906" y2="365" stroke="#e2e8f0" stroke-width="0.5"/>
+  <text x="54" y="392" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="15" fill="#64748b">SUB_URL</text>
+  <text x="54" y="422" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="19" font-weight="600" fill="#1e293b">飞鸟云</text>
+  <rect x="204" y="383" width="372" height="12" rx="6" fill="#e2e8f0"/>
+  <rect x="204" y="383" width="1.7500917553156614" height="12" rx="6" fill="url(#barGreenGrad)"/>
+  <text x="204" y="419" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="16" fill="#64748b">481.75 MB / 100.00 GB  (0%)  剩余: 99.53 GB</text>
+  <text x="667" y="412" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="18" fill="#64748b">2026-11-14</text>
+  <text x="787" y="412" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="19" fill="#10b981">✅ 正常</text>
+  <text x="885" y="412" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="19" font-weight="600" fill="#3b82f6">47</text>
+  <line x1="30" y1="457" x2="930" y2="457" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="480" y="505" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="19" fill="#64748b">合计: <tspan font-weight="700" fill="#3b82f6">160</tspan> 个节点</text>
+  <line x1="30" y1="541" x2="930" y2="541" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="60" y="574" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="18" font-weight="600" fill="#64748b">sing-box 版本</text>
+  <text x="60" y="601" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="16" fill="#64748b">官方版: <a href="https://github.com/SagerNet/sing-box/releases/tag/v1.14.0" target="_blank"><tspan font-weight="600" fill="#1e293b">v1.14.0</tspan></a>　|　reF1nd 分支: <a href="https://github.com/reF1nd/sing-box-releases/releases/tag/v1.14.0-reF1nd.1" target="_blank"><tspan font-weight="600" fill="#1e293b">v1.14.0-reF1nd.1</tspan></a></text>
+</svg>
