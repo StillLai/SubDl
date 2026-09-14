@@ -2,7 +2,7 @@
 
 本文件由开发者维护，记录每次重要的代码变更。
 Vibe Coding 规范：每次代码变更完成后，应在此文件顶部追加一条记录。
-**同步检查：变更是否需要更新 `.clinerules` 或 `ARCHITECTURE.md`？（见 `.clinerules` "代码变更规范"）**
+**同步检查：变更是否需要更新 `AGENTS.md` 或 `ARCHITECTURE.md`？（见 `AGENTS.md` "代码变更规范"）**
 
 ---
 
@@ -10,16 +10,14 @@ Vibe Coding 规范：每次代码变更完成后，应在此文件顶部追加�
 
 ### Changed
 - **Dashboard 源切换到 reF1nd**：`base.jsonc` 中 sing-box API dashboard 的 `download_url` 从 `SagerNet/sing-box-dashboard` 改为 `reF1nd/sing-box-dashboard`（`gh-pages` 分支）
-
-
-## 2026-09-14（续）
-
-### Changed
 - **统一使用 reF1nd alpha 版本进行配置校验**：移除 official sing-box 二进制，所有配置校验统一使用 reF1nd alpha 最新版本
 - `setup-sing-box` action 新增 `pre-release` 输入参数（默认 `true`），支持获取预发布版本
 - 移除 `SING_BOX_REF1ND_BIN` 环境变量，统一使用 `SING_BOX_BIN`
 - `subscriptions-update.yml` 从双二进制（official + reF1nd）简化为单二进制（reF1nd alpha）
 - `ruleset-update.yml` 从 official 切换到 reF1nd alpha
+
+### Fixed
+- **eBPF 配置校验失败被误删**：eBPF 配置需要内核权限（MEMLOCK），CI 环境无法满足。改为匹配 `eBPF`/`MEMLOCK` 错误时跳过移除，仍正常上传
 
 
 ## 2026-09-14
