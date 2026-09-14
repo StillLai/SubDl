@@ -572,11 +572,32 @@ def _fetch_version(repo: str, headers: dict[str, str]) -> str:
         return '获取失败'
 
 
+def _fetch_alpha_version(repo: str, headers: dict[str, str]) -> str:
+    """获取单个仓库的最新 alpha release 版本（/releases，筛选 tag 含 "alpha"）"""
+    try:
+        resp = http_get_with_retry(
+            f"https://api.github.com/repos/{repo}/releases",
+            headers=headers,
+        )
+        releases = json.loads(resp.text)
+        for release in releases:
+            tag = release.get('tag_name', '')
+            if 'alpha' in tag:
+                return tag
+        return ''
+    except Exception:
+        return ''
+
+
 def fetch_latest_versions() -> dict[str, str]:
-    """通过 GitHub API 并行获取 sing-box 官方版和 reF1nd 分支的最新 release 版本"""
-    repos = {
+    """通过 GitHub API 并行获取 sing-box 官方版和 reF1nd 分支的最新 release 版本（含 alpha）"""
+    stable_repos = {
         'official': 'SagerNet/sing-box',
         'reF1nd': 'reF1nd/sing-box-releases',
+    }
+    alpha_repos = {
+        'official_alpha': 'SagerNet/sing-box',
+        'reF1nd_alpha': 'reF1nd/sing-box-releases',
     }
     headers: dict[str, str] = {"Accept": "application/vnd.github.v3+json"}
     gh_token = os.environ.get("GH_TOKEN")
@@ -584,8 +605,9 @@ def fetch_latest_versions() -> dict[str, str]:
         headers["Authorization"] = f"token {gh_token}"
 
     versions: dict[str, str] = {}
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        futures = {executor.submit(_fetch_version, repo, headers): key for key, repo in repos.items()}
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures = {executor.submit(_fetch_version, repo, headers): key for key, repo in stable_repos.items()}
+        futures.update({executor.submit(_fetch_alpha_version, repo, headers): key for key, repo in alpha_repos.items()})
         for future in as_completed(futures):
             versions[futures[future]] = future.result()
     return versions

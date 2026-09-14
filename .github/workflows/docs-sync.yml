@@ -26,7 +26,7 @@ jobs:
     - name: Sync documentation
       run: |
         set -Eeuo pipefail
-        git clone --depth 1 --filter=blob:none --sparse --branch reF1nd-stable https://github.com/reF1nd/sing-box.git /tmp/sing-box-reF1nd
+        git clone --depth 1 --filter=blob:none --sparse --branch reF1nd-testing https://github.com/reF1nd/sing-box.git /tmp/sing-box-reF1nd
         cd /tmp/sing-box-reF1nd
         git sparse-checkout set docs
         rm -rf "$GITHUB_WORKSPACE/sing-box-reF1nd-docs"

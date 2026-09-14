@@ -6,6 +6,16 @@ Vibe Coding 规范：每次代码变更完成后，应在此文件顶部追加�
 
 ---
 
+## 2026-09-14
+
+### Added
+- **SVG 显示 alpha 版本**：状态图底部新增官方 Alpha 和 reF1nd Alpha 版本显示，版本信息从单行改为双行布局
+- 新增 `_fetch_alpha_version()` 函数，通过 GitHub API `/releases` 端点获取 tag 含 "alpha" 的最新版本
+
+### Changed
+- `fetch_latest_versions()` 返回4个版本键（official/reF1nd/official_alpha/reF1nd_alpha），并行获取 max_workers 2→4
+- docs-sync.yml 同步分支从 `reF1nd-stable` 改为 `reF1nd-testing`
+
 ## 2026-09-01
 
 ### Fixed

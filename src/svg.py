@@ -334,6 +334,8 @@ def _build_svg_footer(
         parts.append(f'  <line x1="{p}" y1="{ver_y}" x2="{p + content_w}" y2="{ver_y}" stroke="{theme.border}" stroke-width="1"/>')
         official_ver = _svg_esc(versions.get('official', '—'))
         ref1nd_ver = _svg_esc(versions.get('reF1nd', '—'))
+        official_alpha = versions.get('official_alpha', '')
+        ref1nd_alpha = versions.get('reF1nd_alpha', '')
         parts.append(
             f'  <text x="{p + 30}" y="{ver_y + 33}" font-family="{_FONT}" font-size="18" font-weight="600" fill="{theme.text_sec}">sing-box 版本</text>'
         )
@@ -345,10 +347,32 @@ def _build_svg_footer(
             f'<a href="https://github.com/reF1nd/sing-box-releases/releases/tag/{ref1nd_ver}" target="_blank">'
             f'<tspan font-weight="600" fill="{theme.text_pri}">{ref1nd_ver}</tspan></a>'
         ) if ref1nd_ver != '—' else f'<tspan font-weight="600" fill="{theme.text_pri}">{ref1nd_ver}</tspan>'
+        # 行1：官方版 + 官方 Alpha
+        row1 = f'官方版: {official_link}'
+        if official_alpha:
+            official_alpha_esc = _svg_esc(official_alpha)
+            official_alpha_link = (
+                f'<a href="https://github.com/SagerNet/sing-box/releases/tag/{official_alpha_esc}" target="_blank">'
+                f'<tspan font-weight="600" fill="{theme.text_pri}">{official_alpha_esc}</tspan></a>'
+            )
+            row1 += f'　|　官方 Alpha: {official_alpha_link}'
         parts.append(
-            f'  <text x="{p + 30}" y="{ver_y + 60}" font-family="{_FONT}" font-size="16" fill="{theme.text_sec}">'
-            f'官方版: {official_link}'
-            f'　|　reF1nd 分支: {ref1nd_link}'
+            f'  <text x="{p + 30}" y="{ver_y + 58}" font-family="{_FONT}" font-size="16" fill="{theme.text_sec}">'
+            f'{row1}'
+            f'</text>'
+        )
+        # 行2：reF1nd 分支 + reF1nd Alpha
+        row2 = f'reF1nd 分支: {ref1nd_link}'
+        if ref1nd_alpha:
+            ref1nd_alpha_esc = _svg_esc(ref1nd_alpha)
+            ref1nd_alpha_link = (
+                f'<a href="https://github.com/reF1nd/sing-box-releases/releases/tag/{ref1nd_alpha_esc}" target="_blank">'
+                f'<tspan font-weight="600" fill="{theme.text_pri}">{ref1nd_alpha_esc}</tspan></a>'
+            )
+            row2 += f'　|　reF1nd Alpha: {ref1nd_alpha_link}'
+        parts.append(
+            f'  <text x="{p + 30}" y="{ver_y + 82}" font-family="{_FONT}" font-size="16" fill="{theme.text_sec}">'
+            f'{row2}'
             f'</text>'
         )
 
@@ -371,7 +395,7 @@ def generate_status_svg(
     content_w = svg_w - _SVG_PAD * 2
     rows_data, total_nodes = _build_svg_rows_data(subscription_info, theme)
     rows_total_h = len(subscription_info) * _SVG_ROW_H
-    version_h = 78 if versions else 0
+    version_h = 100 if versions else 0
     svg_h = _SVG_TITLE_H + _SVG_COL_HEADER_H + rows_total_h + 84 + version_h + _SVG_PAD * 2
 
     table_y = _SVG_PAD + _SVG_TITLE_H + 8
