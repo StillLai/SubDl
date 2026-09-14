@@ -10,9 +10,7 @@
         "ipv6": true
       },
       "shared": {
-        "enabled": false,
-        "ipv6": true,
-        "interface": ["wlan2"]
+        "enabled": false
       }
     },
     {
