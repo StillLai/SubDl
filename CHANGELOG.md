@@ -9,6 +9,12 @@ Vibe Coding 规范：每次代码变更完成后，应在此文件顶部追加�
 ## 2026-09-14（续）
 
 ### Changed
+- **Dashboard 源切换到 reF1nd**：`base.jsonc` 中 sing-box API dashboard 的 `download_url` 从 `SagerNet/sing-box-dashboard` 改为 `reF1nd/sing-box-dashboard`（`gh-pages` 分支）
+
+
+## 2026-09-14（续）
+
+### Changed
 - **统一使用 reF1nd alpha 版本进行配置校验**：移除 official sing-box 二进制，所有配置校验统一使用 reF1nd alpha 最新版本
 - `setup-sing-box` action 新增 `pre-release` 输入参数（默认 `true`），支持获取预发布版本
 - 移除 `SING_BOX_REF1ND_BIN` 环境变量，统一使用 `SING_BOX_BIN`

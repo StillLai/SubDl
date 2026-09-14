@@ -25,7 +25,7 @@
       "dashboard": {
         "enabled": true,
         "path": "dashboard",
-        "download_url": "https://ghfast.top/https://github.com/SagerNet/sing-box-dashboard/archive/refs/heads/gh-pages.zip",
+        "download_url": "https://ghfast.top/https://github.com/reF1nd/sing-box-dashboard/archive/refs/heads/gh-pages.zip",
         "http_client": "走直连下载"
       }
     }
