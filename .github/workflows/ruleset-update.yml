@@ -32,11 +32,12 @@ jobs:
     - name: Install Python dependencies
       run: pip install -r src/requirements.txt
 
-    - name: Setup sing-box
+    - name: Setup sing-box (reF1nd alpha)
       id: setup-singbox
       uses: ./.github/actions/setup-sing-box
       with:
-        repo: SagerNet/sing-box
+        repo: reF1nd/sing-box-releases
+        pre-release: true
         output-path: .cache/sing-box
         token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -62,8 +63,8 @@ jobs:
       run: |
         set -Eeuo pipefail
 
-        # 获取 sing-box 版本（正则匹配版本号，兼容不同输出格式）
-        SINGBOX_VERSION=$("$SING_BOX_BIN" version 2>/dev/null | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown")
+        # 获取 sing-box 版本（保留 alpha/beta 等预发布标识）
+        SINGBOX_VERSION=$("$SING_BOX_BIN" version 2>/dev/null | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?' | head -1 || echo "unknown")
 
         # 获取构建时间（北京时间）
         BUILD_TIME=$(TZ='Asia/Shanghai' date +"%Y-%m-%d %H:%M:%S UTC%:z")

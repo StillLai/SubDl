@@ -12,7 +12,7 @@ SUB_URL (env)
   → _load_templates()            # 加载模块化模板（base/dns/route/outbounds + inbounds 变体）
   → merge_all_templates()        # 将节点合并到各变体模板
   → generate_provider_configs()  # 生成 providers 版本（use_gist 的 provider 指向 Gist）
-  → _validate_configs()          # sing-box check 校验（official + reF1nd 双二进制）
+  → _validate_configs()          # sing-box check 校验（reF1nd alpha）
   → upload_to_gist()             # 清理旧文件 + 上传新文件到 Gist
 ```
 
@@ -115,14 +115,13 @@ SubDlError (基础异常)
 | `GH_TOKEN` | GitHub Personal Access Token（gist 权限） |
 | `GIST_ID` | 目标 Gist ID |
 | `SUB_URL` | 主订阅链接（纯 URL） |
-| `SING_BOX_BIN` | sing-box 官方二进制路径（校验用） |
+| `SING_BOX_BIN` | sing-box reF1nd alpha 二进制路径（校验用） |
 
 ### 可选
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
 | `SUB_URL_1` ~ `_9` | 更多常规订阅（纯 URL） | — |
 | `SUB_URL_GIST` / `SUB_URL_GIST_1` ~ `_9` | 标记 provider 指向 Gist（实际 URL 从对应 `SUB_URL` 获取） | — |
-| `SING_BOX_REF1ND_BIN` | sing-box reF1nd 二进制路径（providers 校验用） | 回退到官方版 |
 | `WORKERS` | 并行下载线程数 | `8` |
 
 ### SUB_URL / SUB_URL_GIST 约定

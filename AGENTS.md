@@ -24,13 +24,12 @@ SubDl 是一个自动化订阅管理工具：下载 Clash 订阅 → 转换为 s
 | `GH_TOKEN` | GitHub Personal Access Token（gist 权限） | update_subscriptions.py |
 | `GIST_ID` | 目标 Gist ID | update_subscriptions.py |
 | `SUB_URL` | 主订阅链接（纯 URL） | update_subscriptions.py |
-| `SING_BOX_BIN` | sing-box 官方二进制路径（配置校验用） | update_subscriptions.py |
+| `SING_BOX_BIN` | sing-box reF1nd alpha 二进制路径（配置校验用） | update_subscriptions.py |
 
 ### 可选
 | 变量 | 说明 | 默认值 | 使用文件 |
 |------|------|--------|----------|
 | `SUB_URL_1` ~ `SUB_URL_9` | 更多常规订阅（纯 URL） | — | update_subscriptions.py |
-| `SING_BOX_REF1ND_BIN` | sing-box reF1nd 二进制路径（providers 配置校验用） | 回退到官方版 | update_subscriptions.py |
 | `WORKERS` | 并行下载线程数 | `8` | update_subscriptions.py |
 
 ### SUB_URL 环境变量约定
@@ -119,7 +118,7 @@ SUB_URL (env)
   → _load_templates()            # 加载模块化模板
   → merge_all_templates()        # 合并节点到模板
   → generate_provider_configs()  # 生成 providers 版本（use_gist 的 provider 指向 Gist）
-  → _validate_configs()          # sing-box check 校验（official + reF1nd 双二进制）
+  → _validate_configs()          # sing-box check 校验（reF1nd alpha）
   → upload_to_gist()             # 清理旧文件 + 上传到 Gist
 ```
 

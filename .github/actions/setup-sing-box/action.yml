@@ -11,6 +11,9 @@ inputs:
   token:
     description: 'GitHub token for API access'
     required: true
+  pre-release:
+    description: 'Use latest pre-release instead of latest stable release'
+    default: 'true'
 
 outputs:
   cache-hit:
@@ -34,16 +37,26 @@ runs:
       run: |
         set -Eeuo pipefail
         REPO="${{ inputs.repo }}"
-        VERSION=$(gh api "repos/${REPO}/releases/latest" --jq '.tag_name')
+        if [ "${{ inputs.pre-release }}" = "true" ]; then
+          # 获取最新的预发布版本（alpha/beta/rc 等）
+          VERSION=$(gh api "repos/${REPO}/releases" --jq '[.[] | select(.prerelease)][0].tag_name')
+          if [ -z "$VERSION" ] || [ "$VERSION" = "null" ]; then
+            echo "::error::No pre-release found for ${REPO}"
+            exit 1
+          fi
+          echo "✓ ${REPO} latest pre-release: $VERSION"
+        else
+          VERSION=$(gh api "repos/${REPO}/releases/latest" --jq '.tag_name')
+          echo "✓ ${REPO} latest: $VERSION"
+        fi
         echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-        echo "✓ ${REPO} latest: $VERSION"
 
     - name: Cache binary
       id: cache
       uses: actions/cache@v6
       with:
         path: ${{ inputs.output-path }}
-        key: sing-box-${{ inputs.repo }}-${{ steps.get-version.outputs.version }}
+        key: sing-box-${{ inputs.repo }}-${{ inputs.pre-release }}-${{ steps.get-version.outputs.version }}
 
     - name: Download binary
       shell: bash

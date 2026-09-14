@@ -618,25 +618,23 @@ def fetch_latest_versions() -> dict[str, str]:
 def _validate_configs(files: dict[str, str]) -> dict[str, str]:
     """用 sing-box check 校验配置文件
 
-    非 providers 配置用 SING_BOX_BIN（官方版），providers 配置用 SING_BOX_REF1ND_BIN。
     校验失败的文件不上传到 Gist。
 
     Returns:
         校验失败的文件字典 {filename: error_msg}，空 dict 表示全部通过。
     """
-    official_bin = os.environ.get('SING_BOX_BIN', '')
-    ref1nd_bin = os.environ.get('SING_BOX_REF1ND_BIN', '')
-    if not official_bin:
+    bin_path = os.environ.get('SING_BOX_BIN', '')
+    if not bin_path:
         raise ConfigError(
             "SING_BOX_BIN 未设置，无法进行配置校验",
             context={"env": "SING_BOX_BIN"},
         )
 
     # 检查二进制文件是否存在
-    if not os.path.isfile(official_bin):
+    if not os.path.isfile(bin_path):
         raise ConfigError(
-            f"SING_BOX_BIN ({official_bin}) 不存在，无法进行配置校验",
-            context={"path": official_bin},
+            f"SING_BOX_BIN ({bin_path}) 不存在，无法进行配置校验",
+            context={"path": bin_path},
         )
 
     failures: dict[str, str] = {}
@@ -644,9 +642,6 @@ def _validate_configs(files: dict[str, str]) -> dict[str, str]:
     for filename, content in files.items():
         if not filename.startswith('sing-box') or not filename.endswith('.json'):
             continue
-
-        is_providers = '-providers.json' in filename
-        bin_path = ref1nd_bin if is_providers and ref1nd_bin and os.path.isfile(ref1nd_bin) else official_bin
 
         tmp_file: str | None = None
         try:

@@ -35,26 +35,18 @@ jobs:
       run: npm ci
 
     # --- sing-box 二进制缓存（用于配置校验） ---
-    - name: Setup sing-box (official)
-      id: setup-official
-      uses: ./.github/actions/setup-sing-box
-      with:
-        repo: SagerNet/sing-box
-        output-path: .cache/sing-box
-        token: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Setup sing-box (reF1nd)
-      id: setup-ref1nd
+    - name: Setup sing-box (reF1nd alpha)
+      id: setup-singbox
       uses: ./.github/actions/setup-sing-box
       with:
         repo: reF1nd/sing-box-releases
-        output-path: .cache/sing-box-ref1nd
+        pre-release: true
+        output-path: .cache/sing-box
         token: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Export sing-box paths
+    - name: Export sing-box path
       run: |
-        echo "SING_BOX_BIN=${{ steps.setup-official.outputs.bin-path }}" >> "$GITHUB_ENV"
-        echo "SING_BOX_REF1ND_BIN=${{ steps.setup-ref1nd.outputs.bin-path }}" >> "$GITHUB_ENV"
+        echo "SING_BOX_BIN=${{ steps.setup-singbox.outputs.bin-path }}" >> "$GITHUB_ENV"
 
     # 预下载 Sub-Store proxy-utils.esm.mjs（convert.mjs 直接 import，无自动下载能力）
     - name: Pre-download Sub-Store dependency
