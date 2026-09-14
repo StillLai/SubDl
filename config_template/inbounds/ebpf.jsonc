@@ -8,9 +8,6 @@
       "local": {
         "enabled": true,
         "ipv6": true
-      },
-      "shared": {
-        "enabled": false
       }
     },
     {
