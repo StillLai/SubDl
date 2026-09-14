@@ -1,5 +1,5 @@
 {
-  "$schema": "https://ghfast.top/https://github.com/jiang-zhexin/typebox/releases/latest/download/schema.json",
+  "$schema": "https://ghfast.top/https://github.com/StillLai/SubDl/raw/refs/heads/main/sing-box-reF1nd-docs/schema.json",
   "inbounds": [
     {
       "type": "ebpf",
