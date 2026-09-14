@@ -1,0 +1,31 @@
+{
+  "$schema": "https://ghfast.top/https://github.com/jiang-zhexin/typebox/releases/latest/download/schema.json",
+  "inbounds": [
+    {
+      "type": "ebpf",
+      "tag": "ebpf-in",
+      "network": ["tcp", "udp"],
+      "local": {
+        "enabled": true,
+        "ipv6": true
+      },
+      "shared": {
+        "enabled": false,
+        "ipv6": true,
+        "interface": ["wlan2"]
+      }
+    },
+    {
+      "type": "mixed",
+      "tag": "mixed-in",
+      "listen": "127.0.0.1",
+      "listen_port": 5297
+    },
+    {
+      "type": "mixed",
+      "tag": "mixed-in-global",
+      "listen": "127.0.0.1",
+      "listen_port": 43210
+    }
+  ]
+}
