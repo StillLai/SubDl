@@ -14,7 +14,7 @@
       //   "fd7a:115c:a1e0:abba::/48"  // Tailscale IPv6
       // ],
       "mtu": 1500,
-      "stack": "system",
+      // "stack": "system",
       "strict_route": true,
       "auto_route": true
     },
