@@ -2,6 +2,10 @@
 icon: material/new-box
 ---
 
+!!! quote "sing-box 1.15.0 中的更改"
+
+    :material-plus: [on_demand](#on_demand)
+
 !!! quote "sing-box 1.14.0 中的更改"
 
     :material-plus: [listen_port](#listen_port)  
@@ -46,6 +50,7 @@ icon: material/new-box
   "udp_timeout": "5m",
   "ssh_server": false,
   "taildrop_directory": "",
+  "on_demand": false,
   "inner_domain_resolver": "", // 或 {}
 
   ... // 拨号字段
@@ -234,15 +239,21 @@ UDP NAT 过期时间。
 
 默认使用 `Taildrop`。
 
+#### on_demand
+
+!!! question "自 sing-box 1.15.0 起"
+
+允许该 endpoint 在需要时断开连接。
+
 #### inner_domain_resolver
 
-设置用于解析通过 Tailscale 隊道的连接的域名解析器。
+设置用于解析通过 Tailscale 隧道的连接的域名解析器。
 
 当此端点被选中用于 L3 转发时，它也用于解析尚未解析的域名目标。
 
 此选项与 [domain_resolver](/zh/configuration/shared/dial/#domain_resolver) 格式相同。
 
-未设置时使用默认DNS。
+未设置时使用默认 DNS。
 
 ### 拨号字段
 

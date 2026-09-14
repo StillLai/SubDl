@@ -1,3 +1,7 @@
+!!! quote "sing-box 1.15.0 中的更改"
+
+    :material-plus: [on_demand](#on_demand)
+
 !!! quote "sing-box 1.14.0 中的更改"
 
     :material-plus: [udp_mapping](/zh/configuration/shared/udp-nat/#udp_mapping)  
@@ -35,6 +39,7 @@
   ... // UDP NAT 字段
 
   "workers": 0,
+  "on_demand": false,
   "inner_domain_resolver": "", // 或 {}
 
   ... // 拨号字段
@@ -140,19 +145,25 @@ WireGuard worker 数量。
 
 默认使用 CPU 数量。
 
-### UDP NAT 字段
+#### on_demand
 
-参阅 [UDP NAT 字段](/zh/configuration/shared/udp-nat/)。
+!!! question "自 sing-box 1.15.0 起"
+
+允许该 endpoint 在需要时断开连接。
 
 #### inner_domain_resolver
 
-设置用于解析通过 WireGuard 隊道的连接的域名解析器。
+设置用于解析通过 WireGuard 隧道的连接的域名解析器。
 
 当此端点被选中用于 L3 转发时，它也用于解析尚未解析的域名目标。
 
 此选项与 [domain_resolver](/zh/configuration/shared/dial/#domain_resolver) 格式相同。
 
-未设置时使用默认DNS。
+未设置时使用默认 DNS。
+
+### UDP NAT 字段
+
+参阅 [UDP NAT 字段](/zh/configuration/shared/udp-nat/)。
 
 ### 拨号字段
 

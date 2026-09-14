@@ -2,6 +2,10 @@
 icon: material/new-box
 ---
 
+!!! quote "Changes in sing-box 1.15.0"
+
+    :material-plus: [on_demand](#on_demand)
+
 !!! quote "Changes in sing-box 1.14.0"
 
     :material-plus: [listen_port](#listen_port)  
@@ -46,6 +50,7 @@ icon: material/new-box
   "udp_timeout": "5m",
   "ssh_server": false,
   "taildrop_directory": "",
+  "on_demand": false,
   "inner_domain_resolver": "", // or {}
 
   ... // Dial Fields
@@ -235,6 +240,12 @@ Relative paths are resolved against the working directory, as [state_directory](
 is.
 
 `Taildrop` is used by default.
+
+#### on_demand
+
+!!! question "Since sing-box 1.15.0"
+
+Allow the endpoint to be disconnected when necessary.
 
 #### inner_domain_resolver
 

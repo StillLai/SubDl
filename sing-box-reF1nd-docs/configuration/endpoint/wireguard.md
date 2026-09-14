@@ -1,3 +1,7 @@
+!!! quote "Changes in sing-box 1.15.0"
+
+    :material-plus: [on_demand](#on_demand)
+
 !!! quote "Changes in sing-box 1.14.0"
 
     :material-plus: [udp_mapping](/configuration/shared/udp-nat/#udp_mapping)  
@@ -35,6 +39,7 @@
   ... // UDP NAT Fields
 
   "workers": 0,
+  "on_demand": false,
   "inner_domain_resolver": "", // or {}
  
   ... // Dial Fields
@@ -138,9 +143,11 @@ WireGuard worker count.
 
 CPU count is used by default.
 
-### UDP NAT Fields
+#### on_demand
 
-See [UDP NAT Fields](/configuration/shared/udp-nat/) for details.
+!!! question "Since sing-box 1.15.0"
+
+Allow the endpoint to be disconnected when necessary.
 
 #### inner_domain_resolver
 
@@ -151,6 +158,10 @@ It is also used to resolve unresolved domain destinations when this endpoint is 
 This option uses the same format as [domain_resolver](/configuration/shared/dial/#domain_resolver).
 
 When not set, the default DNS is used.
+
+### UDP NAT Fields
+
+See [UDP NAT Fields](/configuration/shared/udp-nat/) for details.
 
 ### Dial Fields
 

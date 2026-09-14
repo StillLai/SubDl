@@ -1,140 +1,185 @@
-# eBPF 入站内核要求
+---
+icon: material/linux
+---
 
-本文是 eBPF 入站的部署检查清单。[配置参考](/zh/configuration/inbound/ebpf/)
-负责配置语义，[排障指南](/zh/manual/misc/ebpf-troubleshooting/) 负责问题报告
-和诊断材料。
+# eBPF 内核要求
 
-## 能力级别
+eBPF 入站的 local 接管默认使用 cgroup v2 socket-address 数据面，shared 接管默认
+使用 TC `packet_rewrite`。local 可显式选择 TC，shared 也可显式选择保留 tuple 的
+`socket_assign`。是否支持由实际 map、程序加载、helper 与挂载结果决定，
+不使用最低 Linux 版本号判断。供应商内核可能回移、禁用或限制单项能力。下述 LPM
+trie 安全检查是例外：受影响内核可能在探测动作本身执行时出错，因此需要保守地检查
+版本范围。若 TCX link 能力可用则优先使用，否则回退兼容的 `clsact` 挂载。
 
-sing-box 启动时会直接探测实际使用的能力。厂商内核可能回移某项能力而不匹配
-上游版本，因此探测结果比版本号更可靠。
+## 内核配置
 
-| 能力 | 对应 eBPF 入站功能 | 级别 |
-|---|---|---|
-| `CONFIG_BPF_SYSCALL` | BPF map、程序加载、helper 和 link | 所有模式必需 |
-| `CONFIG_CGROUPS`、`CONFIG_CGROUP_BPF` | local 的 cgroup v2 socket-address 拦截 | `local`、`hybrid` 必需 |
-| `CONFIG_INET` | IPv4 TCP/UDP 及 IPv4 BPF helper | TCP/UDP 必需 |
-| `CONFIG_IPV6` | 原生 IPv6 拦截和 IPv6 报文解析 | 启用原生 IPv6 时必需 |
-| `CONFIG_NET_SCHED`、`CONFIG_NET_CLS_ACT`、`CONFIG_NET_CLS_BPF`、`CONFIG_NET_SCH_INGRESS` | TC ingress/egress classifier 和 clsact 回退 | `shared`、`hybrid` 必需 |
-| `CONFIG_BPF_JIT`、架构能力 `CONFIG_HAVE_EBPF_JIT` | 将 BPF 程序编译为原生指令执行 | 性能优化 |
+必须启用以下选项或供应商内核中的等价能力：
 
-`CONFIG_BPF` 由 `CONFIG_NET` 选择。以下符号通常由依赖自动选择：
-`CONFIG_SOCK_CGROUP_DATA`、`CONFIG_NET_XGRESS`、`CONFIG_NET_INGRESS`、
-`CONFIG_NET_EGRESS` 和 `CONFIG_NET_CLS`。在内建配置中，它们也应能在
-`/proc/config.gz` 中看到启用状态。
+| 选项 | 用途 |
+| --- | --- |
+| `CONFIG_BPF` | BPF 核心支持。 |
+| `CONFIG_BPF_SYSCALL` | 加载 map 和程序。 |
+| `CONFIG_NET_CLS_BPF` | 在 TC hook 运行 BPF 分类器。 |
+| `CONFIG_NET_SCH_INGRESS` | 提供 `clsact` ingress/egress hook。 |
+| `CONFIG_NET_CLS_ACT` | 支持 direct-action 分类结果。 |
+| `CONFIG_VETH` | local TC 的 delivery 链路。 |
+| `CONFIG_INET` | IPv4 TCP/UDP 和透明 socket。 |
+| `CONFIG_IPV6` | 启用 local 或 shared IPv6 接管时必需。 |
 
-本入站使用的 Hash、Array、LRUHash、LPMTrie、PerCPUArray 没有分别的可选
-Kconfig 开关，均由 `CONFIG_BPF_SYSCALL` 提供。
-`tools ebpf status` 报告的 map/helper 也一样。
+强烈建议启用 `CONFIG_BPF_JIT`，否则报文路径性能可能明显下降。
 
-本入站不使用 `CONFIG_BPF_STREAM_PARSER`。该选项用于为 SOCKMAP/SOCKHASH 挂载
-SK_SKB stream parser/verdict；当前实现已经删除 TCP splice 路径。旧版检查结果中
-该能力失败，只影响已经移除的实验优化，不影响当前 local 或 shared 拦截。
-`CONFIG_BPF_LSM`、`CONFIG_BPF_EVENTS`、`CONFIG_BPF_KPROBE_OVERRIDE`、
-`CONFIG_DEBUG_INFO_BTF` 和 CO-RE 同样不是必需项。
+默认的 local `cgroup` 数据面需要 `CONFIG_CGROUP_BPF` 和 cgroup v2 挂载。sing-box
+默认挂载到当前可见的 cgroup v2 根层级；可使用 `cgroup_path` 将
+接管范围限制到指定子树。仅使用 cgroup local 的入站不要求 `CONFIG_VETH`、TC
+qdisc、TC socket lookup 或 `bpf_sk_assign`；shared `packet_rewrite` 也不要求这些
+delivery 能力，只使用配置接口和 token local route。
 
-## 推荐配置片段
+## 必需的 BPF 能力
 
-要同时支持 local TCP/UDP 和 shared 模式，至少使用：
+任一 TC 数据面都必须支持：
 
-```text
-CONFIG_NET=y
-CONFIG_INET=y
-CONFIG_IPV6=y
-CONFIG_BPF=y
-CONFIG_BPF_SYSCALL=y
-CONFIG_CGROUPS=y
-CONFIG_CGROUP_BPF=y
-CONFIG_NET_SCHED=y
-CONFIG_NET_CLS_ACT=y
-CONFIG_NET_CLS_BPF=y
-CONFIG_NET_SCH_INGRESS=y
-CONFIG_BPF_JIT=y
-```
+- TC ingress 和 egress 上的 `SCHED_CLS` 程序；
+- `ARRAY`、`HASH`、`LRU_HASH` 和 `LPM_TRIE`；
+- `bpf_map_lookup_elem`、`bpf_map_update_elem` 和 `bpf_map_delete_elem`。
 
-若需要通过 `/proc/config.gz` 查看配置，可额外启用：
+shared `packet_rewrite` 另外使用 `SCHED_CLS` 中的 `bpf_ktime_get_ns`、`bpf_csum_diff`、
+  `bpf_skb_store_bytes`、`bpf_l3_csum_replace`、`bpf_l4_csum_replace` 和
+  `bpf_skb_pull_data`。
 
-```text
-CONFIG_IKCONFIG=y
-CONFIG_IKCONFIG_PROC=y
-```
+shared `socket_assign` 和 local TC 则需要 `SCHED_CLS` 中的
+`bpf_skc_lookup_tcp`、`bpf_sk_lookup_udp`、`bpf_sk_assign` 和 `bpf_sk_release`。
+实际要求会随启用协议收敛，例如 UDP-only 不要求 TCP lookup helper。
 
-这两个选项只提供诊断可见性，不增加 eBPF 运行能力。
+只有 local TC 还使用 `bpf_get_socket_uid`、`bpf_get_socket_cookie`、
+`bpf_redirect`、`bpf_skb_store_bytes`，以及 raw-IP 链路所需的
+`bpf_skb_change_head`。shared-only `socket_assign` 不要求这些本机选择和 delivery helper。
 
-在标准 Linux 中，`CONFIG_NET_CLS_BPF` 和 `CONFIG_NET_SCH_INGRESS` 可以编译为
-模块，但模块必须安装并在 shared 挂载 TC filter 前加载。Android 或固件内核建议
-直接编译为 `y`。
+local cgroup 数据面改为加载 `CGROUP_SOCK_ADDR` 的
+connect4/connect6 和 UDP sendmsg/recvmsg 程序，并使用 `bpf_get_socket_cookie`、
+map lookup/update/delete 与 current-UID helper。若 UDP socket-release hook 不可用，
+sing-box 会加载不引用该 hook 的有界 LRU 清理变体。所选对象会在开始接管前实际加载，
+因此缺少 helper 或程序类型会直接导致启动失败，而不依赖内核版本字符串。
 
-## 版本和运行时前提
+TCP listener 的 SOCKMAP 是可选能力。内核能够创建 `BPF_MAP_TYPE_SOCKMAP`
+且现代 TC section 能通过 verifier 时，优先使用它处理 wildcard listener；
+否则加载不引用 SOCKMAP 的 legacy TC section，直接调用
+`bpf_skc_lookup_tcp`。路径选择依据实际 map 创建和程序加载结果，不依据内核
+版本字符串。旧内核通常需要 `CONFIG_BPF_STREAM_PARSER` 才能提供 SOCKMAP。
 
-- shared 和仅启用 TCP 的 local 最低兼容目标为 Linux 4.19。
-- local UDP 需要上游 Linux 5.2 加入的 cgroup UDP4/UDP6 `recvmsg` hook，或厂商
-  回移。版本号较新并不能单独证明 hook 已启用。
-- local 需要已挂载的 cgroup v2 文件系统，以及该挂载点下可写的路径。sing-box
-  不会替你挂载或创建 cgroup 层级。
-- 进程需要 root 或等效的 BPF、系统管理和网络管理权限。新内核通常对应
-  `CAP_BPF`，以及内核要求时的 `CAP_SYS_ADMIN`、`CAP_NET_ADMIN`。
-- shared 需要真正的 Ethernet-like 下游接口、TC 支持，以及可写的
-  `/proc/sys/net/ipv4/conf/<interface>/route_localnet`。它不会提供转发、NAT、
-  DHCP、热点服务或 IPv6 RA。
-- 本入站不要求 `CONFIG_DEBUG_INFO_BTF`、CO-RE、`CONFIG_BPF_LSM`、tracing、
-  kprobe 或 bpffs pinning。
-- shared ingress 会绕过真实 IPv4 分片和非原子 IPv6 分片；shared egress 若发现
-  其源地址为内部 token 地址则会丢弃，避免该地址泄漏到下游网络。IPv6 atomic
-  fragment 正常解析，不需要任何分片跟踪内核能力。
+local TC 数据面还要求 `SCHED_CLS` 中的 `bpf_get_socket_cookie`，用于自身绕过的
+socket-cookie map。`CGROUP_SOCK` 的 `inet_sock_create` 和 `inet_sock_release` hook
+以及同一 helper 是可选优化：在进程 cgroup 独占时由内核自动写入和删除 cookie。
+如果 cgroup 共享或 hook 无法挂载，sing-box 会在自己创建的 socket 上通过 control
+回调登记 cookie。
+`CONFIG_CGROUP_BPF`（或供应商内核中的等价能力）只在启用这个可选优化时需要。
 
-检查实际内核配置：
+启用 local 进程匹配时，sing-box 还会尝试使用 `CGROUP_SOCK_ADDR` 的 connect/sendmsg
+hook 以及 `bpf_get_socket_cookie`、`bpf_get_current_uid_gid`。它们将 socket cookie、PID
+和 UID 写入有界 map，用户态随后只读取对应的 `/proc/<pid>/exe`，不再扫描所有进程的
+文件描述符。该优化挂载失败时回退现有进程搜索，不会阻止入站启动。
+
+对象不依赖 BTF 或 CO-RE，同时生成 BPF 大端和小端版本，并避免使用有界循环，
+以降低供应商 verifier 差异。
+
+## 已知 LPM trie 安全问题
+
+Linux 6.6.0 至 6.6.46 包含一个上游 `LPM_TRIE` key 布局缺陷。在启用相关 UBSAN
+检查的内核上，更新 LPM trie 可能报告越界访问，甚至导致内核 panic。上游修复提交
+`bpf: Replace bpf_lpm_trie_key 0-length array with flexible array` 已包含在 Linux
+6.6.47，也可能由厂商回移植。
+
+这是 LPM 更新路径缺陷，不是 map 类型缺失。通用的 `HaveMapType(LPM_TRIE)` 探测无法
+安全发现它。对于确实需要写入 LPM 项的策略，sing-box 会先检查运行内核版本，并在
+BTF 中确认存在修复后的 `bpf_lpm_trie_key_u8` 布局。若内核处于受影响范围且无法
+确认修复，sing-box 会在执行任何 LPM 更新前拒绝该策略。其他版本继续执行常规的
+运行时 map 和更新能力检查。
+
+只有 UID、应用、源 CIDR 或目标 bypass 策略实际包含条目时才需要这项检查。TC 对象
+仍会创建空的策略 map，但不会写入。精确主机地址策略使用 `HASH` map，不受此问题
+影响。后续动态更新 bypass 策略时也会重复执行同一保护。
+
+## 权限
+
+启动时需要足够权限执行以下操作：
+
+- 加载 BPF map 和程序；
+- 在 local 或 hybrid 模式创建和删除 veth；
+- 添加和删除 `clsact` qdisc 与 BPF filter；
+- 添加和删除策略路由规则与 local route；
+- 修改内部 delivery 对端的 `rp_filter` 和 `accept_local`；
+- 启用 `IP_TRANSPARENT` 或 `IPV6_TRANSPARENT`；
+- local 自身绕过可用时挂载 cgroup socket hook；否则读取每个 sing-box socket 的
+  `SO_COOKIE` 并更新 cookie map；
+
+以 root 运行兼容性最好。仅使用 capability 时会受内核版本、发行版策略、LSM
+规则和 Android SELinux 策略影响，通常需要 `CAP_NET_ADMIN`、`CAP_BPF`，旧内核
+还可能需要 `CAP_SYS_ADMIN`。
+
+运行时不依赖 `bpftool`、`tc` 或 `ip` 命令，sing-box 直接使用 BPF syscall 和
+netlink。
+
+## 接口要求
+
+local TC 模式挂载到网络管理器当前的默认接口；shared 模式挂载到配置的下游接口。
+默认的 `packet_rewrite` 要求接口使用以太网帧；`socket_assign` 支持 Ethernet/IPoE
+以及仅含 L3 的 raw-IP、PPP、SLIP 和 IPIP/SIT/GRE 隧道链路。来源 MAC 策略同样要求以太网帧。不支持
+loopback 和无法识别的链路封装。
+
+local attachment 会跟随默认接口变化。配置的 shared 接口存在时会自动挂载，但该接口
+作为当前默认上游期间会停止 shared 接管。链路和路由事件会触发受管 attachment 与网络
+状态的检查和修复；低频漂移检查还会修复未产生相应 netlink 通知的内核状态漂移。
+
+同一时间一个接口只能由一个 sing-box eBPF 入站管理。已有的无关 `clsact` filter
+会保留，但 sing-box filter handle 或接口锁冲突会阻止启动。
+
+本机 delivery veth 需要 `/proc/sys/net/ipv4/conf` 下对应接口的 sysctl 可写，清理
+时会恢复原值。
+
+## 运行时策略更新
+
+`bypass_rule_set` 更新会跨已启用数据面事务式应用。更新失败时回滚已经更新的后端，
+只要后端状态仍可用，就通过有上限的指数退避重试。若内部回滚也失败，后端会禁用自身
+并标记为需要重建，此时停止无效重试，运行时诊断报告 `needs_attention`；需要重启入站
+以创建新后端。这不是流量策略意义上的“fail-closed”，而是避免继续运行 map 与控制
+状态已经不一致的数据面。
+
+## 探测
+
+使用与计划配置相同的数据面、协议和 IPv6 设置运行内置内核探测。通过
+`--local-data-plane=tc|cgroup` 和
+`--shared-data-plane=socket_assign|packet_rewrite` 选择具体路径；未指定对应参数表示
+禁用该路径。shared 模式应传入一个当前存在的下游接口，以检查链路类型。
 
 ```sh
-zcat /proc/config.gz | grep -E \
-'CONFIG_(NET|INET|IPV6|BPF|CGROUP|NET_SCHED|NET_CLS|NET_SCH|NET_XGRESS|SOCK_CGROUP_DATA)'
+sing-box tools ebpf status --local-data-plane tc --network tcp,udp --json
+sing-box tools ebpf status --shared-data-plane packet_rewrite --interface br-lan --json
+sing-box tools ebpf status --local-data-plane tc --shared-data-plane socket_assign --interface wlan1 --json
 ```
 
-只有同时启用 `CONFIG_IKCONFIG` 和 `CONFIG_IKCONFIG_PROC` 时才会提供
-`/proc/config.gz`；它们是诊断选项，不是 eBPF 运行时能力。
+`--mode local|shared|all` 分别选择默认的 local `cgroup`、shared
+`packet_rewrite` 以及两者同时启用；可使用显式 data-plane 参数探测可选的 TC 或
+`socket_assign` 路径。
 
-## 标准 Linux 软件包
+探测会针对所选协议、地址族、数据面和 shared 接口。local TC 模式会报告必需的 TC socket-cookie
+helper 以及可选的 cgroup socket-cookie hook。添加 `--process-tracking` 可检查可选的
+socket-address 进程追踪和 socket-release 清理能力。启动时会判断进程 cgroup 是否独占，能挂载时使用内核登记，否则启用用户态
+cookie 登记路径。命令还会加载并立即关闭这些选项实际选择的 eBPF 对象，在不挂载程序的
+前提下验证真实 map ABI 和 verifier 可见的程序变体。明确缺少
+能力会报告 `FAIL`，安全策略
+拒绝探测等无法判断的情况会报告 `UNKNOWN`；必需检查出现任一状态时命令都会以非零
+状态退出。请用实际运行 sing-box 的权限重新探测。非变更型探测不会挂载 TC filter 或
+cgroup hook、创建 veth、安装路由或修改 sysctl；这些操作会在启动时实际检查，失败则启动退出。
+如果目标配置禁用了 IPv6，请使用 `--ipv6=false`。
 
-标准 Linux 上，sing-box 不需要系统的 libbpf 或 cilium 软件包。eBPF 对象已经
-随二进制发布，使用 `with_ebpf` 构建时运行时是纯 Go。
+## 报文限制
 
-建议安装 `iproute2`，用于 `ip`、`tc` 命令以及接口、qdisc、filter、路由和策略
-规则检查。只有需要底层检查或 profiling 时才安装 `bpftool`；它不是 sing-box
-运行时依赖。不同发行版可能拆分为 `iproute2`、`iproute2-tc` 或
-`linux-tools-common`/`linux-tools-<version>`。
-
-## OpenWrt 软件包
-
-shared 模式需要安装与当前 OpenWrt 内核匹配的模块包：
-
-```sh
-opkg update
-opkg install kmod-sched-core kmod-sched-bpf ip-full tc-bpf
-```
-
-`kmod-sched-core` 提供 scheduler/clsact 组件，`kmod-sched-bpf` 提供 BPF TC
-classifier。`ip-full` 提供完整的 `ip` 工具，`tc-bpf` 提供带 BPF 支持的 `tc`
-工具，用于设置和诊断；sing-box 不会链接它们。部分 OpenWrt 版本会把这些模块直接编入内核，或采用不同的包拆分，
-应使用 `opkg list` 和 `lsmod` 确认。若它们是模块，加载：
-
-```sh
-modprobe sch_ingress
-modprobe cls_bpf
-```
-
-OpenWrt 仍需满足上面的内核配置和 cgroup v2 挂载要求。安装软件包不能补上缺失
-的 `CONFIG_CGROUP_BPF`、TC 支持或其他被裁剪的内核能力；这些必须重新编译内核。
-部分镜像提供 `cgroupfs-mount` 便捷包来挂载 cgroup v2；若 init 系统已经完成挂载，
-则不需要该包。
-
-## 验证
-
-使用与配置路径对应的探测命令：
-
-```sh
-sing-box tools ebpf status --mode local --network tcp,udp --json
-sing-box tools ebpf status --mode shared-network --interface br-lan --json
-```
-
-`required` 下的 `FAIL` 表示所选路径无法提供正常正确性保证；`performance` 下的
-`FAIL` 表示优化不可用，将使用文档说明的回退路径。
+- 已分片的 IPv4 数据报和非 atomic IPv6 分片直接绕过；IPv6 atomic fragment
+  正常处理。
+- IPv6 最多解析四个 hop-by-hop、routing、destination-options 或 authentication
+  扩展头，然后必须到达 TCP/UDP。
+- 使用以太网帧的链路最多解析两层 VLAN 头。
+- DHCP 和 DHCPv6 服务流量绕过。
+- 转发流量通过 TC ingress interface 元数据绕过 local egress 路径。
+- sing-box 进程通过 socket-cookie map 绕过 local 接管。进程 cgroup 可在内核 hook 中
+  维护该 map；否则默认 dialer 与透明 UDP 回复 socket 只在创建时登记一次 cookie。
+  纯 shared 模式不会启用自身绕过机制。

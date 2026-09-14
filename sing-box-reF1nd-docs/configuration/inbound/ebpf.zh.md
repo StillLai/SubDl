@@ -1,24 +1,18 @@
 ---
-icon: material/new-box
+icon: material/lan-connect
 ---
 
-!!! question "自 sing-box 1.14.0 起"
+# eBPF
 
-eBPF 入站透明拦截本机或下游网络的 TCP/UDP 流量。`local` 数据路径使用
-cgroup socket-address 程序拦截本机 socket，`shared` 数据路径使用 TC
-拦截热点、路由器或其他下游接口的转发流量。
+!!! quote "sing-box 1.14.0 中的更改"
 
-该入站只在使用 `with_ebpf` 构建标签的 Android 和 Linux 版本中可用。
-运行时不需要 cgo，但需要 root 或等效的 BPF、cgroup 和网络管理权限。
+    eBPF 入站仍为实验功能，仅在带有 `with_ebpf` 编译标签的 Linux 和 Android
+    构建中可用。
 
-!!! warning "Linux 6.6 LPM trie 兼容性"
+eBPF 入站透明接管选中的本机或下游 TCP/UDP 流量，被接管的连接仍进入 sing-box
+常规路由流程。所需的系统网络状态由 sing-box 自动创建并清理。
 
-    Linux 6.6.0 至 6.6.46 在更新 BPF LPM trie 时可能因 UBSAN 触发内核
-    panic。默认 `shared_network` 的本机地址策略使用精确匹配 HASH map，
-    不受影响。本机 UID/包名筛选、`bypass_rule_set` 和 shared 来源 CIDR
-    筛选会写入 LPM trie，需要 Linux 6.6.47，或包含上游修复
-    `896880ff30866f386ebed14ab81ce1ad3710cfc4` 的厂商内核。对于已知未修复
-    的内核，sing-box 会拒绝这些策略，而不是冒险触发内核崩溃。
+eBPF 入站不使用[监听字段](/zh/configuration/shared/listen/)。
 
 ### 结构
 
@@ -26,13 +20,15 @@ cgroup socket-address 程序拦截本机 socket，`shared` 数据路径使用 TC
 {
   "type": "ebpf",
   "tag": "ebpf-in",
-  "mode": "local",
   "network": ["tcp", "udp"],
   "udp_timeout": "5m",
-  "bypass_rule_set": ["geoip-cn"],
+  "tc_priority": 1,
+  "fakeip_icmp": "off",
+  "bypass_rule_set": [],
   "local": {
+    "enabled": true,
+    "data_plane": "cgroup",
     "dns_mode": "respect_policy",
-    "cgroup_path": "",
     "ipv6": true,
     "bypass_private_address": true,
     "include_uid": [],
@@ -41,109 +37,155 @@ cgroup socket-address 程序拦截本机 socket，`shared` 数据路径使用 TC
     "exclude_uid_range": [],
     "include_android_user": [],
     "include_package": [],
-    "exclude_package": []
+    "exclude_package": [],
+    "bypass_port": [],
+    "bypass_port_range": []
   },
   "shared": {
+    "enabled": true,
+    "data_plane": "packet_rewrite",
     "dns_mode": "respect_policy",
-    "interface": [],
+    "interface": ["wlan1"],
     "ipv6": true,
     "bypass_private_address": true,
     "include_source_cidr": [],
     "exclude_source_cidr": [],
     "include_mac_address": [],
     "exclude_mac_address": [],
-    "advanced": {
-      "tc_priority": 1
-    }
+    "bypass_port": [],
+    "bypass_port_range": []
   }
 }
 ```
 
-eBPF 入站不使用[监听字段](/zh/configuration/shared/listen/)。内部监听端口和
-重定向地址前缀由 sing-box 自动分配并检查冲突。
+### 字段
 
-### mode
+#### network
 
-| 值 | 数据路径 |
-|----|----------|
-| `local` | 仅拦截本机 cgroup 流量。 |
-| `shared` | 仅拦截所选下游接口的转发流量。 |
-| `hybrid` | 同时启用两条数据路径；共享规则集绕过，私网绕过则分别配置。 |
+启用的传输协议，可选 `tcp` 和/或 `udp`，默认同时启用。
 
-默认值为 `local`。`local` 字段只能用于 `local` 或 `hybrid`，`shared` 字段
-只能用于 `shared` 或 `hybrid`。
+#### udp_timeout
 
-### network
+UDP 会话超时，默认 `5m`。
 
-启用的网络协议，可选值为 `tcp` 和 `udp`，默认同时启用。
+#### tc_priority
 
-### udp_timeout
+TC filter 优先级，范围为 1 至 65535，默认 `1`。仅在需要与相同接口上的其他 TC
+filter 协调顺序时修改。
+保持默认值时，支持 TCX 的内核会优先使用 TCX link；配置自定义优先级时继续使用
+传统 `clsact` 挂载，以保持数值排序语义。
 
-UDP 会话超时，默认值为 `5m`。
+#### bypass_rule_set
 
+匹配这些规则集中目标 IP CIDR 的流量绕过此入站，非 IP 规则会被忽略。运行时更新只会
+在所有已启用数据面均接受新策略后生效；此前继续保留上一份已确认策略。
 
-### bypass_rule_set
+#### fakeip_icmp
 
-目的 IP CIDR 需要绕过 eBPF 入站的规则集。只提取 CIDR；域名、端口、进程和
-其他条件不会在内核中求值。规则集更新时会刷新 map，已有流在过期前保持原决定。
+| 值 | 行为 |
+| --- | --- |
+| `off` | 不响应发往 FakeIP 地址池的 ICMP Echo Request，默认值。 |
+| `reply` | 为发往已配置 FakeIP 地址池的 ICMP Echo Request 合成本地 Echo Reply。 |
 
-配置 FakeIP DNS 服务器时，其 IPv4/IPv6 分配范围会在私网和规则集绕过之前强制
-进入代理。UID、包名、shared 来源、协议、自身防回环和本机真实地址的精确匹配
-仍然优先。FakeIP 与规则集 CIDR 重叠会在启动时告警；
-若它与未指定地址、回环、多播或内部重定向范围冲突，启动会直接拒绝该配置。
+`reply` 从不代理 ICMP：它只识别发往 FakeIP 地址池的 ICMP Echo Request，并立即
+在本地原地合成 Echo Reply 作为响应，不会联系该请求 DNS 映射的真实目标。这使得
+FakeIP 地址能够响应 `ping`，部分客户端以此判断目标是否可达。回复的源地址、
+标识符、序列号和负载均与请求保持一致，且回复长度不会超过请求。因此该响应
+反映的不是被代理目标的可达性或往返延迟，而只是本机自身的本地响应时间。
+
+启用 `reply` 要求至少配置一个 FakeIP 前缀（IPv4 或 IPv6），并且至少存在下表中
+一种可用的接管路径。若配置了 `reply` 但没有可用路径，将在启动时报错并指明不受
+支持的组合，而不是静默失效。
+
+`reply` 仅响应目标 ICMP 报文中可验证的安全子集：无选项且未分片的 IPv4，以及
+前面没有扩展头的 IPv6 Echo。其余情况——包括分片报文、非 Echo 的 ICMP，或本对象
+无法完整安全解析的报文——均原样放行。
+
+##### 支持矩阵
+
+| 数据面 | `fakeip_icmp: reply` |
+| --- | --- |
+| `local.data_plane: tc` | 支持 |
+| `local.data_plane: cgroup` | 不支持本机流量 |
+| `shared.data_plane: socket_assign` | 支持 shared 客户端 |
+| `shared.data_plane: packet_rewrite` | 支持 shared 客户端 |
+
+`local.data_plane: cgroup` 通过在报文构造之前改写 socket 目标地址来实现接管，
+不挂载在任何网络接口上，因此没有可用来响应的位置——这是唯一被直接拒绝的组合。
+两种 shared 数据面都会在各自的接口上挂载同一个 responder 程序（分别通过各自的
+后端——`socket_assign` 用 `TCBackend`，`packet_rewrite` 用
+`SharedNetworkBackend`），因此任意一种都能单独响应 shared 客户端。
+
+只有当启用组合中仍包含 `local.data_plane: cgroup` 时，支持能力才按路径分别
+计算：
+
+- `local: cgroup` + 任一 shared 路径可以启动，但只响应 shared 客户端；本机
+  cgroup 内进程产生的流量不会收到 FakeIP ICMP 回复。
+
+本机流量需要使用 `local.data_plane: tc`。两种 shared 数据面都能响应 shared
+客户端；将 `local: tc` 与任一 shared 数据面组合即可覆盖两条路径。
+
+即使路径本身受支持，客户端仍需可用的源地址，以及能够将请求送到 responder 的路由。
+在 Android 上，移动数据和 Wi-Fi 之间的上游切换可能使热点撤销全局 IPv6 前缀和
+默认路由。IPv6 是否继续可用取决于设备和新的上游网络，不能仅凭连接了 Wi-Fi 就
+判断 IPv6 必然失效。
+
+`local.data_plane: tc` 在另一个方向上有对应的前提：`local_reply` 只能看到系统
+路由已经将 FakeIP IPv6 前缀内的目标发送到本机 TC 接口。匹配该前缀的路由或经过
+该接口的默认路由均可；没有可用路由时 sing-box 会记录警告。
 
 ### local
 
-#### local.dns_mode
+#### local.enabled
 
-控制 local 数据路径对目标端口 53 的拦截顺序：
+启用本机产生流量的接管。只要任一路径使用了新的 `enabled` 字段，另一路径省略
+`enabled` 时即视为 `false`。至少需要启用一条路径。
 
-| 值 | 行为 |
-|----|------|
-| `hijack` | 在 local UID/包名和目的地址绕过策略之前拦截。 |
-| `respect_policy` | 遵守 local UID/包名筛选；对选中主体的 DNS 忽略目的地址绕过并拦截。 |
-| `off` | 在 local 用户策略之前直接放行目标端口 53。 |
+默认的 cgroup 数据面接管当前可见 cgroup v2 层级中的 socket，不依赖网络接口。
+可选的 TC 数据面跟随系统当前默认网络接口；默认网络变化时会自动切换，没有可用默认
+接口时会保留旧 attachment，待新接口准备好后切换。
 
-默认值为 `respect_policy`。它遵守 UID/包名筛选，但选中主体的 DNS 不再受
-本机地址、私网和 `bypass_rule_set` 影响。显式配置 `hijack` 还会忽略 UID/包名
-筛选，对所有可见的 53 端口流量强制拦截。
-自身与内部重定向防回环、协议选择、DHCP 安全放行、报文有效性以及
-`local.ipv6: false` 在所有模式下仍是优先级更高的正确性门控。只处理
-`network` 已启用协议的 TCP/UDP 53，因此可使用仅 TCP 或仅 UDP 的配置。
-该选项不能识别 DoH/DoT，也不等同于路由规则中的 `hijack-dns` 动作。
+#### local.data_plane
+
+选择本机接管的数据面。默认值 `cgroup` 接管当前可见 cgroup v2 层级中的 socket；
+如需在当前默认接口接管流量，应显式配置 `tc`。
 
 #### local.cgroup_path
 
-要拦截的 cgroup v2 绝对路径。留空时自动使用 cgroup v2 根目录。
-每个 sing-box 进程只支持一个 `local` 或 `hybrid` eBPF 入站。所属 Box 会把
-sing-box 自身创建的 socket cookie 注册到 local 绕过 map。保护范围限定在该
-Box，不再使用进程全局回调；但同一 Box 中的第二个 local 后端仍会被拒绝。
+将 `data_plane: cgroup` 的接管范围限制到指定的绝对 cgroup v2 子树。省略时接管
+当前可见的 cgroup v2 根层级及其所有子 cgroup。它不是 sing-box 服务自身 cgroup
+的配置项，除非用户确实只希望接管该服务子树。
+
+#### local.dns_mode
+
+| 值 | 行为 |
+| --- | --- |
+| `hijack` | 接管已启用 TCP/UDP 协议的目标端口 53 流量。 |
+| `respect_policy` | 先应用本机 UID 与包名选择，再接管目标端口 53。 |
+| `off` | 不接管目标端口 53。 |
+
+默认值为 `respect_policy`。该设置仅应用于已启用的 TCP/UDP 协议，不识别 DoH 或
+DoT 流量。
 
 #### local.ipv6
 
-是否在 local cgroup 数据路径拦截原生 IPv6，默认值为 `true`。主机需要让原生
-IPv6 绕过本入站时设为 `false`。该值在入站生命周期内保持不变，sing-box 不会
-根据当前默认路由自动推断。IPv4-mapped IPv6 socket 仍按 IPv4 处理。该选项不
-影响 shared 数据路径的 IPv6；shared 使用独立的 `shared.ipv6`。
+启用本机 IPv6 接管，默认 `true`。禁用后，本机 IPv6 流量绕过此入站。
 
 #### local.bypass_private_address
 
-是否在 local 数据路径绕过内建私网、运营商级 NAT 和链路本地目的地址，默认值
-为 `true`。设置为 `false` 不会关闭普通非 DNS 流量对未指定地址、回环、多播和
-本机真实地址精确匹配等安全绕过。如 `local.dns_mode` 所述，`hijack` 会在所有
-目的地址绕过之前处理 53 端口。
+绕过私有和特殊用途目标地址，默认 `true`。
 
 #### local.include_uid
 
-需要拦截的 UID。配置任意 include UID、范围或包名后，其他 UID 默认绕过。
+需要接管的 UID。只要配置了 include UID、UID 范围或包名，其他 UID 默认绕过。
 
 #### local.include_uid_range
 
-需要拦截的 UID 范围，格式为 `start:end`。
+需要接管的 UID 范围，格式为 `start:end`。
 
 #### local.exclude_uid
 
-需要绕过的 UID；exclude 优先于 include。
+需要绕过的 UID。exclude 策略优先于 include 策略。
 
 #### local.exclude_uid_range
 
@@ -151,132 +193,130 @@ IPv6 绕过本入站时设为 `false`。该值在入站生命周期内保持不�
 
 #### local.include_android_user
 
-需要拦截的 Android 用户 ID，仅支持 Android。
+需要接管的 Android 用户 ID，仅 Android。
 
 #### local.include_package
 
-需要拦截的 Android 包名。包名在启动时转换为 UID。
+需要接管的 Android 包名，仅 Android。
 
 #### local.exclude_package
 
-需要绕过的 Android 包名。共享同一 UID 的包无法由 eBPF 区分。
+需要绕过的 Android 包名，仅 Android。无法区分共用同一 UID 的包。
 
-包名策略只保证直接由目标 UID 创建的 socket。系统 DNS resolver、
-`DownloadManager`、isolated process、SDK sandbox 等代应用创建的流量可能使用
-其他 UID。启动日志会输出最终 include/exclude UID ranges，用于确认实际策略。
+#### local.bypass_port
+
+绕过本机接管的目标端口。local `tc` 和 `cgroup` 两种数据面均支持；启用的
+`network` 协议（TCP 和/或 UDP）分别适用。该选项只匹配目标端口。FakeIP 始终强制
+接管。DNS 处理也优先于此设置：`hijack` 始终接管 53 端口，`respect_policy` 先应用
+UID 策略再处理 DNS，`off` 已经绕过 DNS。配置 53 端口时 sing-box 会在启动时告警。
+
+#### local.bypass_port_range
+
+需要绕过的目标端口范围，格式为 `start:end`，范围包含两端端口。
 
 ### shared
 
-shared 模式不会创建热点、DHCP、NAT、IPv6 RA 或 IP 转发，这些仍由系统负责。
+#### shared.enabled
+
+启用从配置的下游接口进入流量的接管。
+
+#### shared.data_plane
+
+| 值 | 行为 |
+| --- | --- |
+| `socket_assign` | 将选中的流量直接分配给内部透明监听器。 |
+| `packet_rewrite` | 将选中的流量改写到内部 token 地址，并在下游接口恢复回复报文。默认值。 |
+
+`packet_rewrite` 要求下游接口使用以太网帧，不使用 `socket_assign` 所需的策略路由。
+两种 shared 数据面均不会创建 local TC 使用的 delivery veth。local 与 shared 数据面
+可以独立选择。
 
 #### shared.dns_mode
 
-控制 shared 数据路径对目标端口 53 的拦截顺序：
-
-| 值 | 行为 |
-|----|------|
-| `hijack` | 在 shared 客户端和目的地址绕过策略之前拦截。 |
-| `respect_policy` | 遵守 shared 来源 CIDR/MAC 筛选；对选中客户端的 DNS 忽略目的地址绕过并拦截。 |
-| `off` | 在 shared 用户策略之前直接放行目标端口 53。 |
-
-默认值为 `respect_policy`。它遵守来源 CIDR/MAC 筛选，但选中客户端的 DNS
-不再受本机地址、私网和 `bypass_rule_set` 影响。显式配置 `hijack` 还会忽略
-来源筛选，对所有可见的 53 端口流量强制拦截。
-协议选择、DHCP 安全放行、报文有效性以及 `shared.ipv6: false` 在所有
-模式下仍是优先级更高的正确性门控。只处理 `network` 已启用协议的 TCP/UDP
-53；仅启用 TCP 时，shared DNS 拦截不再强制要求 UDP。该选项不能识别
-DoH/DoT，也不等同于路由规则中的 `hijack-dns` 动作。
+取值与 `local.dns_mode` 相同。`respect_policy` 模式会先应用来源 CIDR 与 MAC
+选择，再接管目标端口 53。
 
 #### shared.interface
 
-==shared 或 hybrid 模式必填==
+==启用 shared 接管时必填==
 
-客户端报文进入 TC ingress 的下游接口。接口可在启动后出现或消失，sing-box
-会自动挂载和卸载。shared eBPF 程序和 map 只在首个已配置接口出现时加载；
-接口暂时消失后仍保留 backend，避免重复执行 verifier 和 map 初始化。不要选择
-`lo`、上游接口或仅支持三层报文的接口。热点与
-Wi-Fi 上游共用接口名时，应使用源 CIDR 或 MAC 筛选客户端流量。
+客户端流量进入本机的下游接口。默认的 `packet_rewrite` 数据面要求接口使用以太网
+帧；Ethernet/IPoE、raw-IP（包括 Android rmnet）、PPP/PPPoE 或 IPIP/SIT/GRE 隧道接口应显式配置
+`socket_assign`。也可同时配置多个接口。暂时不存在的接口会在网络更新后重试，
+当某个接口成为当前默认上游时，会停止其 shared 接管；该接口重新作为下游后自动
+恢复。不接受 loopback。
 
 #### shared.ipv6
 
-是否拦截所选下游接口的 IPv6 流量，默认值为 `true`。设为 `false` 不会阻断
-IPv6；系统能够转发 IPv6 时，这些流量会绕过 sing-box。该值在入站生命周期内
-保持不变。shared 不会根据主机默认 IPv6 路由推断下游 IPv6 或代理出口是否可用。
+启用 shared IPv6 接管，默认 `true`。禁用后，shared 接口上的 IPv6 流量绕过此入站。
 
-shared 对分片流量采用 best-effort 语义。ingress 上的所有真实 IPv4 分片（包括
-设置 More Fragments 的首片）和所有非原子 IPv6 分片都会原样绕过，避免同一
-数据报的一部分进入代理、另一部分直连。egress 上若真实分片的源地址属于 sing-box
-内部 token 前缀，则会直接丢弃，避免把 token 地址泄漏到下游网络。IPv6 atomic
-fragment 不属于真实分片，会继续按普通报文解析。
+在 Android 上，`shared.ipv6: true` 只启用接管，不会为热点客户端分配 IPv6 地址
+或发送路由器通告。普通客户端使用 shared IPv6，依赖 Android 实际向客户端提供
+可用的 IPv6 地址和路由。若上游切换撤销了热点的全局前缀和默认路由，客户端的普通
+IPv6 连通性可能丢失，而 link-local 通信仍可能可用。启用 `shared.ipv6` 或
+`fakeip_icmp` 无法恢复这些已撤销的网络配置。
+
+已报告的移动数据上游实测支持 shared IPv4 和 IPv6。Wi-Fi 上游下能否双栈工作，
+仍取决于热点是否保留有效的 IPv6 配置和可用的交付路径，不能由上述 link-local
+诊断测试推导为已验证。仅撤销 IPv6 前缀或路由不会影响 shared IPv4。
 
 #### shared.bypass_private_address
 
-是否在 shared 数据路径绕过内建私网、运营商级 NAT 和链路本地目的地址，默认值
-为 `true`，与 `local.bypass_private_address` 相互独立。设置为 `false` 后，普通
-非 DNS 流量仍会绕过 IPv4 未指定地址范围（`0.0.0.0/8`）、完整 IPv4 回环范围
-（`127.0.0.0/8`）、IPv6 未指定地址和回环地址、IPv4/IPv6 多播目的地址以及本机
-精确地址。如 `shared.dns_mode` 所述，`hijack` 会在所有目的地址绕过之前处理
-53 端口。
+绕过私有和特殊用途目标地址，默认 `true`。
 
 #### shared.include_source_cidr
 
-允许进入代理路径的客户端源 CIDR。非空时，未匹配流量绕过。
+需要接管的客户端来源 CIDR。列表非空时，不匹配的来源绕过。
 
 #### shared.exclude_source_cidr
 
-需要绕过的客户端源 CIDR，优先于 include。
+需要绕过的客户端来源 CIDR。exclude 策略优先于 include 策略。
 
 #### shared.include_mac_address
 
-允许进入代理路径的 48-bit 客户端源 MAC。
+需要接管的 48 位客户端来源 MAC 地址。
+
+仅适用于使用以太网帧的 shared 接口。
 
 #### shared.exclude_mac_address
 
-需要绕过的客户端源 MAC，优先于 include。
+需要绕过的 48 位客户端来源 MAC 地址。exclude 策略优先于 include 策略。
 
-#### shared.advanced.tc_priority
+仅适用于使用以太网帧的 shared 接口。
 
-TC filter 优先级，有效范围为 1 到 65535，默认值为 `1`。仅在与现有 OpenWrt、
-Android tethering 或其他 TC 程序协调时修改。无论优先级是否相同，一个接口只能
-由一个 eBPF 入站管理。
-使用默认优先级时，sing-box 会在内核支持时采用 TCX，否则自动回退到 clsact。
-非默认优先级会固定使用 clsact，以确保配置的排序语义仍然有效。
+#### shared.bypass_port
 
-### 内核兼容性
+绕过 shared 接管的目标端口。`socket_assign` 和 `packet_rewrite` 两种 shared 数据面
+均支持；启用的 `network` 协议（TCP 和/或 UDP）分别适用。该选项只匹配目标端口；
+FakeIP 和 DNS 的优先级与 `local.bypass_port` 相同，配置 53 端口时会在启动时告警。
 
-完整的 Kconfig、运行时和 Linux/OpenWrt 软件包清单请参阅
-[eBPF 入站内核要求](/zh/manual/misc/ebpf-kernel-requirements/)。
+#### shared.bypass_port_range
 
-shared 模式和仅启用 TCP 的 local 模式最低兼容目标为 Linux 4.19。local UDP
-还需要上游 Linux 5.2 加入的 cgroup UDP4/UDP6 recvmsg hook，因此默认同时启用
-TCP/UDP 的 local 或 hybrid 配置需要 Linux 5.2，或包含相应回移的厂商内核。
-Android 的主要验证目标仍为 GKI 5.10 及以上。
+需要绕过的目标端口范围，格式为 `start:end`，范围包含两端端口。
 
-生成的程序使用 BPF ISA v1，不要求 BTF 或 CO-RE。sing-box 会直接探测所需的
-map、program、helper 和挂载能力，而不是只根据内核版本选择路径；新内核挂载与
-batch 操作不可用时会自动回退。启动日志会以
-`udp_state_cleanup=socket_release` 或 `udp_state_cleanup=lru_fallback` 报告最终
-采用的 local UDP 清理路径。shared 模式始终在 ingress 使用 TC 目标 token 改写，
-并在 egress 恢复源地址。
+!!! note
 
-即使能力探测成功，本页开头的 Linux 6.6 LPM trie 警告仍然适用。
+    shared 模式不会启用 IP 转发，也不提供 NAT、DHCP、IPv6 路由器通告或热点管理。
+    请在 Android、Linux 或路由器系统中配置这些功能。可以同时配置 Wi-Fi、USB
+    网络共享等多个下游接口。
 
 ### 诊断
 
-请以 root 使用与配置一致的模式和协议运行无侵入的纯 Go 探测器：
+- `sing-box tools ebpf status` 探测当前内核所需的 eBPF 能力，不检查运行中的入站。
+- 启用 Clash API 且至少存在一个 eBPF 入站后，`GET /ebpf` 可查看运行中的
+  eBPF 入站、attachment、恢复状态、资源使用量与失败计数：
 
-```sh
-sing-box tools ebpf status --mode local --network tcp,udp
-sing-box tools ebpf status --mode shared-network --interface br-lan
-sing-box tools ebpf status --mode all --interface br-lan --json
-```
+  ```
+  curl -H "Authorization: Bearer $SECRET" http://127.0.0.1:9090/ebpf
+  ```
 
-该命令只创建并立即关闭临时探测对象，不会挂载程序，也不会修改 cgroup、qdisc、
-路由、sysctl 或流量状态。使用 `--json` 可生成适合附加到问题报告的结果。
+### 限制
 
-普通构建会在启动日志中报告所选清理和挂载模式，不会遍历 map 或启用全局内核
-统计。临时使用 `ebpf_debug` tag 构建时，会输出详细的启动、策略和清理日志，
-并按事件生成快照，其中包含 map 占用，以及内核支持时的逐程序 BPF 运行统计。
-采集材料时请参阅
-[eBPF 排障指南](/zh/manual/misc/ebpf-troubleshooting/)；`ebpf_debug` 不适合日常
-release 构建。
+- 一个 sing-box 实例中只能有一个启用 local 接管的 eBPF 入站；其他 eBPF 入站必须
+  仅启用 shared 接管。
+- 已分片的 IPv4 和 IPv6 数据报绕过接管；IPv6 atomic fragment 作为普通 IPv6
+  报文处理。
+- 网络变化后会自动恢复接管状态。
+
+在供应商内核或 Android 内核上启用前，请阅读
+[eBPF 内核要求](/zh/manual/misc/ebpf-kernel-requirements/)。

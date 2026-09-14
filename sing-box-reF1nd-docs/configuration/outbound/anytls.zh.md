@@ -63,7 +63,7 @@ AnyTLS 密码。
 
 参阅 [AnyTLS 客户端元数据](/zh/manual/misc/anytls-client-metadata/)。
 
-未配置时使用内置客户端元数据。显式配置为空字符串时发送空客户端元数据。
+未配置时，为兼容性发送 `sing-anytls/0.0.13 sing-box/<version>`。这是沿用的旧客户端标识，不代表重写后库的版本。显式配置为空字符串时发送空的 `client=` 字段，不包含客户端身份信息。
 
 #### disable_reuse
 
@@ -78,3 +78,5 @@ TLS 配置, 参阅 [TLS](/zh/configuration/shared/tls/#出站)。
 ### 拨号字段
 
 参阅 [拨号字段](/zh/configuration/shared/dial/)。
+
+支持 `tcp_fast_open`。
