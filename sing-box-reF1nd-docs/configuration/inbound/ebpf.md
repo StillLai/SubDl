@@ -4,7 +4,7 @@ icon: material/lan-connect
 
 # eBPF
 
-!!! quote "Changes in sing-box 1.14.0"
+!!! quote "Changes in sing-box 1.15.0"
 
     eBPF inbound is experimental and only available in Linux and Android builds
     with the `with_ebpf` build tag.
@@ -80,7 +80,9 @@ keeps the traditional `clsact` attachment so its numeric ordering remains effect
 
 Traffic to destination IP CIDRs contained in these rule sets bypasses this
 inbound. Non-IP rules are ignored. Runtime updates keep the last confirmed
-policy until every active data plane accepts the replacement.
+policy until every active data plane accepts the replacement. If both an update
+and its compensating rollback fail, `GET /ebpf` reports `needs_attention`; restart
+the inbound to rebuild all data planes from one policy.
 
 #### fakeip_icmp
 
@@ -147,6 +149,15 @@ ordinary routing must select the local TC interface for an address in the
 FakeIP IPv6 prefix. A matching route or a default route through that interface
 is sufficient. sing-box logs a warning when no such route is available.
 
+### Policy order
+
+Protocol selection, fragments, DHCP/service traffic, self-bypass, and mandatory
+safety-address bypasses are applied first. FakeIP destinations are then forced
+into the proxy before DNS, UID/source, port, host, private-address, and rule-set
+bypass policy. For other destinations, DNS `off` bypasses and DNS `hijack`
+intercepts before UID or shared source policy. DNS `respect_policy` applies
+UID/source policy first, then intercepts before port and destination bypasses.
+
 ### local
 
 #### local.enabled
@@ -173,6 +184,11 @@ Limits `data_plane: cgroup` interception to the specified absolute cgroup v2
 subtree. When omitted, the visible cgroup v2 root and all its descendants are
 intercepted. This is not the path of the sing-box service unless only that
 service subtree should be intercepted.
+
+On Android, netd may use exclusive socket hooks on the root cgroup. sing-box
+uses multi-program attachment and never replaces an existing exclusive program,
+but a later exclusive netd reattachment can still be rejected after sing-box
+has attached first. On affected devices, use `local.data_plane: tc`.
 
 #### local.dns_mode
 
@@ -229,7 +245,8 @@ be distinguished.
 Destination ports to bypass local interception. This option is supported by
 both local data planes (`tc` and `cgroup`) and applies independently to TCP and
 UDP when those protocols are enabled by `network`. It matches the destination
-port only. FakeIP always forces interception. DNS handling also has precedence:
+port only. After the mandatory safety gates, FakeIP always forces interception.
+DNS handling also has precedence:
 `hijack` always intercepts port 53, `respect_policy` applies UID policy before
 DNS interception, and `off` already bypasses DNS. sing-box emits a startup
 warning when port 53 is listed.

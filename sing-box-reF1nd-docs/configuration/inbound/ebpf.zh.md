@@ -4,7 +4,7 @@ icon: material/lan-connect
 
 # eBPF
 
-!!! quote "sing-box 1.14.0 中的更改"
+!!! quote "sing-box 1.15.0 中的更改"
 
     eBPF 入站仍为实验功能，仅在带有 `with_ebpf` 编译标签的 Linux 和 Android
     构建中可用。
@@ -78,7 +78,9 @@ filter 协调顺序时修改。
 #### bypass_rule_set
 
 匹配这些规则集中目标 IP CIDR 的流量绕过此入站，非 IP 规则会被忽略。运行时更新只会
-在所有已启用数据面均接受新策略后生效；此前继续保留上一份已确认策略。
+在所有已启用数据面均接受新策略后生效；此前继续保留上一份已确认策略。若更新和补偿
+回滚均失败，`GET /ebpf` 会报告 `needs_attention`；此时应重启入站，使所有数据面按同一
+策略重新构建。
 
 #### fakeip_icmp
 
@@ -134,6 +136,13 @@ FakeIP 地址能够响应 `ping`，部分客户端以此判断目标是否可达
 路由已经将 FakeIP IPv6 前缀内的目标发送到本机 TC 接口。匹配该前缀的路由或经过
 该接口的默认路由均可；没有可用路由时 sing-box 会记录警告。
 
+### 策略优先级
+
+程序首先处理协议选择、分片、DHCP/服务流量、自身绕过和强制安全地址绕过。随后，
+FakeIP 目标会在 DNS、UID/来源、端口、主机地址、私网地址和规则集绕过策略之前被强制
+接管。对于其他目标，DNS `off` 先绕过，DNS `hijack` 在 UID 或 shared 来源策略之前
+接管；DNS `respect_policy` 先应用 UID/来源策略，再在端口和目标地址绕过策略之前接管。
+
 ### local
 
 #### local.enabled
@@ -155,6 +164,10 @@ FakeIP 地址能够响应 `ping`，部分客户端以此判断目标是否可达
 将 `data_plane: cgroup` 的接管范围限制到指定的绝对 cgroup v2 子树。省略时接管
 当前可见的 cgroup v2 根层级及其所有子 cgroup。它不是 sing-box 服务自身 cgroup
 的配置项，除非用户确实只希望接管该服务子树。
+
+在 Android 上，netd 可能在根 cgroup 使用独占 socket hook。sing-box 使用多程序
+挂载且不会替换已有的独占程序，但如果 sing-box 先挂载，netd 随后重新执行独占挂载，
+内核仍可能拒绝 netd。受影响的设备可改用 `local.data_plane: tc`。
 
 #### local.dns_mode
 
@@ -206,8 +219,8 @@ DoT 流量。
 #### local.bypass_port
 
 绕过本机接管的目标端口。local `tc` 和 `cgroup` 两种数据面均支持；启用的
-`network` 协议（TCP 和/或 UDP）分别适用。该选项只匹配目标端口。FakeIP 始终强制
-接管。DNS 处理也优先于此设置：`hijack` 始终接管 53 端口，`respect_policy` 先应用
+`network` 协议（TCP 和/或 UDP）分别适用。该选项只匹配目标端口。在强制安全门槛
+之后，FakeIP 始终强制接管。DNS 处理也优先于此设置：`hijack` 始终接管 53 端口，`respect_policy` 先应用
 UID 策略再处理 DNS，`off` 已经绕过 DNS。配置 53 端口时 sing-box 会在启动时告警。
 
 #### local.bypass_port_range
