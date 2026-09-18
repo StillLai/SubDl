@@ -25,15 +25,15 @@ sing-box tools ebpf status --shared-data-plane packet_rewrite --interface br-lan
 
 同时启用两条路径的配置可在同一条命令中传入两个 data-plane 参数。探测权限应与服务实际运行权限一致。
 
-7. 若配置了 Clash API 服务器，还请提供 `GET /ebpf` 的运行实例报告（参见
+7. 若配置了 sing-box API 服务，还请提供 `sing-box api ebpf` 的运行实例报告（参见
    [eBPF 配置](/zh/configuration/inbound/ebpf/#诊断)）：
 
 ```sh
-curl -H "Authorization: Bearer $SECRET" http://127.0.0.1:9090/ebpf
+sing-box api ebpf --url http://127.0.0.1:9090 --secret "$SECRET"
 ```
 
 这与第 6 项的能力探测不同：它报告的是运行中的入站实际在做什么（attachment、
-待处理的恢复、最近的错误、计数器），而不是内核理论上支持什么。当问题涉及
+活动 program、map 占用、待处理的恢复、最近的错误与计数器），而不是内核理论上支持什么。当问题涉及
 "是否真的在接管流量"而非"内核是否支持"时，请一并提供此报告。
 
 常用系统信息：

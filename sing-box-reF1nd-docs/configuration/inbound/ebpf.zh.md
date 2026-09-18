@@ -79,8 +79,8 @@ filter 协调顺序时修改。
 
 匹配这些规则集中目标 IP CIDR 的流量绕过此入站，非 IP 规则会被忽略。运行时更新只会
 在所有已启用数据面均接受新策略后生效；此前继续保留上一份已确认策略。若更新和补偿
-回滚均失败，`GET /ebpf` 会报告 `needs_attention`；此时应重启入站，使所有数据面按同一
-策略重新构建。
+回滚均失败，`sing-box api ebpf` 会报告 `needs_attention`；此时应重启入站，使所有
+数据面按同一策略重新构建。
 
 #### fakeip_icmp
 
@@ -165,9 +165,10 @@ FakeIP 目标会在 DNS、UID/来源、端口、主机地址、私网地址和�
 当前可见的 cgroup v2 根层级及其所有子 cgroup。它不是 sing-box 服务自身 cgroup
 的配置项，除非用户确实只希望接管该服务子树。
 
-在 Android 上，netd 可能在根 cgroup 使用独占 socket hook。sing-box 使用多程序
-挂载且不会替换已有的独占程序，但如果 sing-box 先挂载，netd 随后重新执行独占挂载，
-内核仍可能拒绝 netd。受影响的设备可改用 `local.data_plane: tc`。
+在 Android 上，netd 可能在根 cgroup 使用独占 socket hook。sing-box 会优先使用多程序
+挂载；但厂商内核以兼容性错误拒绝 multi 时，会重试旧式独占挂载。这个回退可能替换
+已有的单程序 hook，且 sing-box 挂载后，netd 随后重新执行独占挂载仍可能被内核拒绝。
+受影响的设备可改用 `local.data_plane: tc`。
 
 #### local.dns_mode
 
@@ -315,20 +316,32 @@ FakeIP 和 DNS 的优先级与 `local.bypass_port` 相同，配置 53 端口时�
 
 ### 诊断
 
-- `sing-box tools ebpf status` 探测当前内核所需的 eBPF 能力，不检查运行中的入站。
-- 启用 Clash API 且至少存在一个 eBPF 入站后，`GET /ebpf` 可查看运行中的
-  eBPF 入站、attachment、恢复状态、资源使用量与失败计数：
+- `sing-box tools ebpf status` 探测当前内核所需的 eBPF 能力，并验证所选对象能否在
+  不挂载的情况下完成加载。它只报告启动前能力，不读取运行实例状态。
+- 启用 [sing-box API 服务](/zh/configuration/service/api/) 且至少存在一个 eBPF
+  入站后，`sing-box api ebpf` 可查看运行中的 eBPF 入站、attachment、恢复状态、
+  活动 program、map 占用与容量、资源使用量及失败计数。UDP NAT 诊断包含活动会话、
+  当前缓存生命周期内的会话创建与容量淘汰、接收队列丢包及 cgroup socket-release
+  通知命中和丢失；LRU 派生的累计值会在用户态缓存清空时（例如网络切换后）重新计数。
+  这些数值复用现有 LRU 指标或仅在异常/关闭事件发生时更新，不引入周期扫描。shared
+  packet-rewrite 还会分别报告 ingress/egress 放行总数及 IPv4/IPv6 分片放行计数，
+  便于发现有意绕过或无法解析的流量：
 
+  ```bash
+  sing-box api ebpf --url http://127.0.0.1:9090 --secret "$SECRET"
   ```
-  curl -H "Authorization: Bearer $SECRET" http://127.0.0.1:9090/ebpf
-  ```
+
+  活动 program 与 map 仅在该 API 请求触发时枚举，并进行短时间缓存；不会增加运行时
+  watchdog、定时器或后台扫描。内核资源通过 sing-ebpf 的 `sb_` 命名约定筛选，因此同一
+  内核中其他可见的 sing-ebpf 进程也可能出现；每个入站的 attachment 与计数器仍是实例专属。
 
 ### 限制
 
 - 一个 sing-box 实例中只能有一个启用 local 接管的 eBPF 入站；其他 eBPF 入站必须
   仅启用 shared 接管。
-- 已分片的 IPv4 和 IPv6 数据报绕过接管；IPv6 atomic fragment 作为普通 IPv6
-  报文处理。
+- 已分片的 IPv4 和非 atomic IPv6 数据报绕过接管，因为 TC 挂载点上的分片不含
+  完整传输层五元组。ingress 与 egress 对此行为保持一致，并在 shared 分片放行
+  计数中体现。IPv6 atomic fragment 作为普通 IPv6 报文处理。
 - 网络变化后会自动恢复接管状态。
 
 在供应商内核或 Android 内核上启用前，请阅读

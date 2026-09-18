@@ -194,6 +194,17 @@ The `--mode local|shared|all` form selects the default local `cgroup`, shared
 `packet_rewrite`, or both. Use the explicit data-plane flags for the optional
 TC or `socket_assign` paths.
 
+For local TC, `--local-interface <name>` performs a read-only check of the
+interface and any existing clsact qdisc. For local cgroup, `--cgroup-path
+<path>` checks a selected cgroup v2 path; when omitted, the current process's
+cgroup is checked. These checks do not create qdiscs, attach hooks, or modify
+system state.
+
+The command also prints a one-shot occupancy diagnostic for visible `sb_` maps.
+Map types that cannot be safely iterated are marked `UNKNOWN`. This diagnostic
+never runs periodically while sing-box is active and does not modify maps or
+data paths.
+
 The probe uses the selected protocols, address families, data planes, and shared interface.
 For local TC mode it reports the required TC socket-cookie helper and the optional
 cgroup socket-cookie hooks. Add `--process-tracking` to inspect the optional

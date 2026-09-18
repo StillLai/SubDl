@@ -160,6 +160,13 @@ sing-box tools ebpf status --local-data-plane tc --shared-data-plane socket_assi
 `packet_rewrite` 以及两者同时启用；可使用显式 data-plane 参数探测可选的 TC 或
 `socket_assign` 路径。
 
+local TC 可使用 `--local-interface <name>` 只读检查接口状态和现有 clsact qdisc；local
+cgroup 可使用 `--cgroup-path <path>` 检查指定 cgroup v2 路径，省略时检查当前进程所在的路径。
+这些检查不会创建 qdisc、挂载 hook 或修改系统状态。
+
+命令末尾会显示 `sb_` map 的一次性 occupancy 诊断；不支持安全遍历的 map 会标为
+`UNKNOWN`。该诊断不会在 sing-box 运行期间周期执行，也不会改变 map 或数据面。
+
 探测会针对所选协议、地址族、数据面和 shared 接口。local TC 模式会报告必需的 TC socket-cookie
 helper 以及可选的 cgroup socket-cookie hook。添加 `--process-tracking` 可检查可选的
 socket-address 进程追踪和 socket-release 清理能力。启动时会判断进程 cgroup 是否独占，能挂载时使用内核登记，否则启用用户态

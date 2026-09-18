@@ -30,18 +30,18 @@ exits non-zero when a required capability is missing or cannot be verified.
 For a configuration that enables both paths, pass both data-plane flags in one
 command. Run probes with the same privileges as the service.
 
-7. If a Clash API server is configured, the running-instance report from
-   `GET /ebpf` (see [eBPF configuration](/configuration/inbound/ebpf/#diagnostics)):
+7. If the sing-box API service is configured, the running-instance report from
+   `sing-box api ebpf` (see [eBPF configuration](/configuration/inbound/ebpf/#diagnostics)):
 
 ```sh
-curl -H "Authorization: Bearer $SECRET" http://127.0.0.1:9090/ebpf
+sing-box api ebpf --url http://127.0.0.1:9090 --secret "$SECRET"
 ```
 
 This is distinct from item 6's capability probe: it reports what the running
-inbound is actually doing (attachments, pending recovery, recent errors,
-counters), not what the kernel could theoretically support. Include it
-whenever the report concerns whether interception is actually happening,
-rather than whether the kernel supports it.
+inbound is actually doing (attachments, active programs, map occupancy,
+pending recovery, recent errors and counters), not what the kernel could
+theoretically support. Include it whenever the report concerns whether
+interception is actually happening, rather than whether the kernel supports it.
 
 Useful platform information:
 

@@ -12,6 +12,8 @@
   ... // Listen Fields
 
   "system": false,
+  "gso": false,
+  "inner_domain_resolver": "", // or {}
   "name": "",
   "mtu": 1500,
   "mode": "tls",
@@ -115,6 +117,26 @@ The endpoint configures interface addresses and MTU but does not install
 operating-system routes or DNS settings.
 
 If disabled, sing-box uses the internal network stack.
+
+### gso
+
+!!! quote ""
+
+    Only supported on Linux.
+
+Attempt to enable generic segmentation offload for the system interface.
+
+Enabled by default when `system` is `true`. Set to `false` to disable.
+
+This option has no effect when `system` is `false`.
+
+### inner_domain_resolver
+
+Set the DNS resolver used for destination domain names when this endpoint is selected as an outbound. Applies to TCP and UDP.
+
+This option uses the same format as [domain_resolver](/configuration/shared/dial/#domain_resolver).
+
+When unset, existing DNS routing rules and the default DNS apply. IP destinations do not require domain resolution.
 
 ### name
 

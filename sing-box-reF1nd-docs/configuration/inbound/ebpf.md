@@ -81,8 +81,9 @@ keeps the traditional `clsact` attachment so its numeric ordering remains effect
 Traffic to destination IP CIDRs contained in these rule sets bypasses this
 inbound. Non-IP rules are ignored. Runtime updates keep the last confirmed
 policy until every active data plane accepts the replacement. If both an update
-and its compensating rollback fail, `GET /ebpf` reports `needs_attention`; restart
-the inbound to rebuild all data planes from one policy.
+and its compensating rollback fail, `sing-box api ebpf` reports
+`needs_attention`; restart the inbound to rebuild all data planes from one
+policy.
 
 #### fakeip_icmp
 
@@ -186,9 +187,11 @@ intercepted. This is not the path of the sing-box service unless only that
 service subtree should be intercepted.
 
 On Android, netd may use exclusive socket hooks on the root cgroup. sing-box
-uses multi-program attachment and never replaces an existing exclusive program,
-but a later exclusive netd reattachment can still be rejected after sing-box
-has attached first. On affected devices, use `local.data_plane: tc`.
+prefers multi-program attachment, but retries a legacy exclusive attachment when
+a vendor kernel rejects multi attachment with a compatibility error. This
+fallback can replace an existing single-program hook, and a later exclusive
+netd reattachment can still be rejected. On affected devices, use
+`local.data_plane: tc`.
 
 #### local.dns_mode
 
@@ -362,21 +365,40 @@ inclusive.
 ### Diagnostics
 
 - `sing-box tools ebpf status` probes the current kernel's required eBPF
-  capabilities. It does not inspect a running inbound.
-- When the Clash API and at least one eBPF inbound are enabled, `GET /ebpf`
-  reports the running eBPF inbounds, attachments, recovery state, resource
-  usage, and failure counters:
+  capabilities and verifies that the selected objects can be loaded without
+  attaching them. It reports preflight capability only, not a running instance.
+- When the [sing-box API service](/configuration/service/api/) and at least one
+  eBPF inbound are enabled, `sing-box api ebpf` reports the running eBPF
+  inbounds, attachments, recovery state, active programs, map occupancy and
+  capacity, resource usage, and failure counters. UDP NAT diagnostics include
+  active sessions, cache-lifetime session creation and capacity evictions,
+  receive-queue drops, and cgroup socket-release notification matches and
+  drops. The LRU-derived totals restart when the userspace cache is purged,
+  such as after a network change. These totals reuse existing LRU metrics or
+  update only on exceptional/close events; they do not add a periodic scan.
+  Shared packet-rewrite diagnostics also expose ingress/egress pass totals and
+  separate IPv4/IPv6 fragment-pass totals, so intentionally bypassed or
+  unsupported traffic is visible:
 
+  ```bash
+  sing-box api ebpf --url http://127.0.0.1:9090 --secret "$SECRET"
   ```
-  curl -H "Authorization: Bearer $SECRET" http://127.0.0.1:9090/ebpf
-  ```
+
+  Active program and map enumeration is performed only for this explicit API
+  request and is cached briefly. It does not add a runtime watchdog, timer, or
+  background scan. Kernel resources are selected by sing-ebpf's `sb_` naming
+  convention, so another visible sing-ebpf process in the same kernel may also
+  appear; per-inbound attachments and counters remain instance-specific.
 
 ### Limitations
 
 - A sing-box instance may contain only one eBPF inbound with local interception
   enabled. Additional eBPF inbounds must be shared-only.
-- Fragmented IPv4 and IPv6 datagrams bypass interception. IPv6 atomic fragments
-  are processed as ordinary IPv6 packets.
+- Fragmented IPv4 and non-atomic IPv6 datagrams bypass interception because
+  the packet does not contain a complete transport tuple at the TC hook. This
+  behavior is symmetric on ingress and egress and is counted in the shared
+  fragment-pass diagnostics. IPv6 atomic fragments are processed as ordinary
+  IPv6 packets.
 - Interception state is restored automatically after network changes.
 
 See [eBPF kernel requirements](/manual/misc/ebpf-kernel-requirements/) before

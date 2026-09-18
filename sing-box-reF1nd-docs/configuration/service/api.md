@@ -16,6 +16,13 @@ The server also accepts [gRPC-Web](https://github.com/grpc/grpc/blob/master/doc/
 including the WebSocket transport of [@improbable-eng/grpc-web](https://github.com/improbable-eng/grpc-web)
 for bidirectional streaming methods.
 
+The bundled `sing-box api` client can query this service. For a running eBPF
+inbound, `sing-box api ebpf` provides runtime diagnostics; this is separate
+from the kernel capability probe provided by `sing-box tools ebpf status`.
+Runtime results include attachments, recovery state, UDP NAT, active programs,
+map occupancy, and data-plane failure counters. Expensive program/map
+enumeration runs only for an explicit query.
+
 When [experimental observability](/configuration/experimental/observability/) is enabled,
 the dedicated `/observability/v1` HTTP API is also mounted on this listener and uses the
 same `secret` and TLS configuration.
@@ -96,20 +103,11 @@ Download URL of the dashboard archive (zip).
 
 ##### http_client
 
-HTTP client used to download the dashboard, with the same behavior as remote rule-sets.
+HTTP client used to download the dashboard.
 
 See [HTTP Client Fields](/configuration/shared/http-client/) for details.
 
-When empty, the default HTTP client is used: the one named by
-[`default_http_client`](/configuration/route/#default_http_client), or the first top-level
-`http_clients` entry when `default_http_client` is empty.
-
-!!! failure "Implicit default deprecated in sing-box 1.14.0"
-
-    When neither `http_clients` nor `default_http_client` is configured, an implicit HTTP
-    client connecting through the default outbound is used. This implicit default is
-    deprecated in sing-box 1.14.0 and will be removed in sing-box 1.16.0; define
-    `http_clients` instead.
+Not used when the dashboard directory contains user-provided files.
 
 ##### update_interval
 
