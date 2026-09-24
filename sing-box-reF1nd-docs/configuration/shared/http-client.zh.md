@@ -53,7 +53,9 @@ icon: material/new-box
 * `tls.insecure`
 * `tls.min_version` / `tls.max_version`
 * `tls.certificate` / `tls.certificate_path`
+* `tls.certificate_sha256`
 * `tls.certificate_public_key_sha256`
+* `tls.certificate_pin_sha256`
 * 拨号字段
 
 不支持的字段：

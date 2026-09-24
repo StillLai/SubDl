@@ -2,6 +2,11 @@
 icon: material/new-box
 ---
 
+!!! quote "sing-box 1.15.0 中的更改"
+
+    :material-plus: [certificate_sha256](#certificate_sha256)  
+    :material-plus: [client_certificate_sha256](#client_certificate_sha256)
+
 !!! quote "sing-box 1.14.0 中的更改"
 
     :material-plus: [certificate_provider](#certificate_provider)  
@@ -54,6 +59,7 @@ icon: material/new-box
   "client_authentication": "",
   "client_certificate": [],
   "client_certificate_path": [],
+  "client_certificate_sha256": [],
   "client_certificate_public_key_sha256": [],
   "key": [],
   "key_path": "",
@@ -124,7 +130,9 @@ icon: material/new-box
   "curve_preferences": [],
   "certificate": "",
   "certificate_path": "",
+  "certificate_sha256": [],
   "certificate_public_key_sha256": [],
+  "certificate_pin_sha256": "",
   "client_certificate": [],
   "client_certificate_path": "",
   "client_key": [],
@@ -219,7 +227,9 @@ TLS 版本值：
 * `min_version`
 * `max_version`
 * `certificate` / `certificate_path`
+* `certificate_sha256`
 * `certificate_public_key_sha256`
+* `certificate_pin_sha256`
 * `handshake_timeout`
 
 不支持的字段：
@@ -253,7 +263,9 @@ TLS 版本值：
 * `min_version`
 * `max_version`
 * `certificate` / `certificate_path`
+* `certificate_sha256`
 * `certificate_public_key_sha256`
+* `certificate_pin_sha256`
 * `handshake_timeout`
 
 不支持的字段：
@@ -350,6 +362,49 @@ TLS 版本值：
 
 服务器证书链路径，PEM 格式。
 
+#### certificate_sha256
+
+!!! question "自 sing-box 1.15.0 起"
+
+==仅客户端==
+
+服务器证书的 SHA-256 哈希列表，base64 格式。
+
+哈希基于整个 DER 编码的证书计算，因此即使密钥不变，证书续期后哈希也会改变。
+如果只需要固定密钥，请使用 `certificate_public_key_sha256`。
+
+要生成证书的 SHA-256 哈希，请使用以下命令：
+
+```bash
+# 对于证书文件
+openssl x509 -in certificate.pem -outform der | openssl dgst -sha256 -binary | openssl enc -base64
+
+# 对于远程服务器的证书
+echo | openssl s_client -servername example.com -connect example.com:443 2>/dev/null | openssl x509 -outform der | openssl dgst -sha256 -binary | openssl enc -base64
+```
+
+#### certificate_pin_sha256
+
+==仅客户端==
+
+单个证书的 SHA-256 指纹，基于整个 DER 编码的证书计算，使用十六进制格式。
+允许大小写、冒号分隔和首尾空白。
+
+固定叶证书时，只检查证书指纹，不检查域名、有效期或系统信任链。
+固定证书链中的 CA 证书时，将其作为信任锚，并检查叶证书的证书链、域名、有效期和服务器认证用途。
+CA 证书必须出现在引擎取得的证书链中；系统引擎可能提供由系统构建的证书链。
+
+与 `certificate_sha256`、`certificate_public_key_sha256`、`certificate`、`certificate_path` 及启用的 `reality` 互斥，同时配置会报错。
+允许与 `insecure: true` 共用，但不会跳过上述 pin 校验。
+支持 Go TLS、uTLS、Apple/Windows TLS 及 Apple HTTP 引擎。
+Go TLS 和 uTLS 允许同时设置 `disable_sni`，固定 CA 时仍校验目标域名。
+
+生成指纹：
+
+```bash
+sing-box generate pinsha256 certificate.crt
+```
+
 #### certificate_public_key_sha256
 
 !!! question "自 sing-box 1.13.0 起"
@@ -437,7 +492,7 @@ echo | openssl s_client -servername example.com -connect example.com:443 2>/dev/
 * `require-and-verify`
 
 如果此选项设置为 `verify-if-given` 或 `require-and-verify`，
-则需要 `client_certificate`、`client_certificate_path` 或 `client_certificate_public_key_sha256` 中的一个。
+则需要 `client_certificate`、`client_certificate_path`、`client_certificate_sha256` 或 `client_certificate_public_key_sha256` 中的一个。
 
 #### client_certificate
 
@@ -458,6 +513,16 @@ echo | openssl s_client -servername example.com -connect example.com:443 2>/dev/
     文件更改时将自动重新加载。
 
 客户端证书链路径列表，PEM 格式。
+
+#### client_certificate_sha256
+
+!!! question "自 sing-box 1.15.0 起"
+
+==仅服务器==
+
+客户端证书的 SHA-256 哈希列表，base64 格式。
+
+哈希基于整个 DER 编码的证书计算，参阅 [certificate_sha256](#certificate_sha256)。
 
 #### client_certificate_public_key_sha256
 
