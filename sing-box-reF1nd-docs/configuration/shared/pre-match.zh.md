@@ -54,7 +54,7 @@ WireGuard、Tailscale、OpenConnect、OpenVPN 和 MASQUE 使用 `inner_domain_re
 
 !!! question "自 sing-box 1.14.0 起"
 
-对于 UDP 连接，首个数据包在预匹配中可用，因此协议探测将直接在其上运行，随后规则匹配将携带探测结果继续。
+对于 UDP 连接，协议探测在首个数据包上运行，随后规则匹配将携带探测结果继续。
 
 当探测器需要更多数据时（如分片的 QUIC Client Hello），预匹配将在该规则处停止。
 

@@ -39,8 +39,10 @@ icon: material/chart-line
 
 #### recent_ttl
 
-近期连接和 Top-K 查询接受的最大连接年龄，默认值为 `30m`。这是内存查询
-窗口，不是磁盘 retention；sing-box 重启后数据全部消失。
+近期连接和 Top-K 查询接受的最大连接年龄，默认值为 `30m`。启用可观测性后，
+GC 只会从共用历史列表中清理超过该时长的关闭连接；达到 `recent_connections`
+容量上限时，仍可能提前淘汰尚未过期的连接。这是内存查询窗口，不是磁盘
+retention；sing-box 重启后数据全部消失。
 
 #### top_k_size
 

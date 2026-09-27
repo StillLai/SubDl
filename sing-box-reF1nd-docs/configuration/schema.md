@@ -22,7 +22,6 @@ Compatible editors can use it for completion and validation.
 #### $schema
 
 The schema URI used by compatible editors.
-This field does not affect sing-box runtime behavior.
 
 The schema published with this documentation is available at
 [raw.githubusercontent.com/reF1nd/sing-box/reF1nd-testing/docs/schema.json](https://raw.githubusercontent.com/reF1nd/sing-box/reF1nd-testing/docs/schema.json).

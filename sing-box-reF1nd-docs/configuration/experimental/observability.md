@@ -46,6 +46,9 @@ to the native sing-box API connection stream and OOM reports.
 #### recent_ttl
 
 Maximum age accepted by recent and Top-K queries. The default is `30m`.
+While observability is enabled, garbage collection only removes closed
+connections older than this duration from the shared history. The
+`recent_connections` capacity limit can still evict newer connections earlier.
 This is an in-memory query window, not a disk retention period. All values are
 lost when sing-box restarts.
 
