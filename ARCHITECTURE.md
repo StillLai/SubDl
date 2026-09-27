@@ -61,6 +61,12 @@ ruleset_convert.py     (独立入口，由 Ruleset Update workflow 调用)
 - 公共零件只读一次，与每个变体组装成完整配置
 - 新增平台变体只需在 `inbounds/` 目录下添加一个 JSONC 文件
 
+### 规则集下载的 tag 归组（route.jsonc rule_set）
+- `rule_set` 按「来源 + 更新周期」归组：tag 写成列表，一次定义多个共享 `url` / `update_interval` 的规则集，`url` 中的 `{tag}` 占位符逐个替换为每个 tag（sing-box 1.14.0+ 多标签特性）
+- tag 必须等于 `{tag}` 在 URL 中展开出的路径：StillLai 自托管规则集用文件名（如 `custom_whitelist`），MetaCubeX 用源站目录形式（`geosite/xxx`、`geoip/xxx`）
+- `ads` 的文件名（`AWAvenue-Ads-Rule-Singbox.srs`）与 tag 不一致，无法使用 `{tag}` 占位符，只能单独成条
+- 新增规则集时并入对应分组；tag 与 URL 文件名不一致时单独成条，不要破坏「tag == URL 路径」的约定
+
 ### 模板共享对象的防御性复制
 - `_load_templates()` 中多个模板共享同一个 `providers` 列表对象（仅读取一次）
 - 任何需要修改模板数据的函数（如 `generate_provider_configs()`）必须先 `copy.deepcopy()`

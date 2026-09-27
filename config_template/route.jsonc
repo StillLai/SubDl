@@ -6,48 +6,21 @@
     "auto_detect_interface": true,
     "find_process": true,
     "rule_set": [
+      // 自定义规则集（tag 即文件名，3h 更新）
       {
-        "tag": "custom_whitelist",
+        "tag": ["custom_whitelist", "custom_block", "custom_direct", "custom_proxy"],
         "type": "remote",
-        "url": "https://ghfast.top/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/custom_whitelist.srs",
+        "url": "https://ghfast.top/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/{tag}.srs",
         "update_interval": "3h"
       },
+      // 自托管规则集（tag 即文件名，6h 更新）
       {
-        "tag": "custom_block",
+        "tag": ["WebRTC", "BOCOM", "WeChat", "AliPay", "BiliBili", "Weibo", "Apple", "XiaoMi", "GeositeCN"],
         "type": "remote",
-        "url": "https://ghfast.top/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/custom_block.srs",
-        "update_interval": "3h"
-      },
-      {
-        "tag": "custom_direct",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/custom_direct.srs",
-        "update_interval": "3h"
-      },
-      {
-        "tag": "custom_proxy",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/custom_proxy.srs",
-        "update_interval": "3h"
-      },
-      {
-        "tag": "fakeip-filter",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/DustinWin/ruleset_geodata/raw/refs/heads/sing-box-ruleset/fakeip-filter.srs",
+        "url": "https://ghfast.top/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/{tag}.srs",
         "update_interval": "6h"
       },
-      {
-        "tag": "geosite-amazon",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/amazon.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geosite-amazon@ads",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/amazon@ads.srs",
-        "update_interval": "6h"
-      },
+      // AWAvenue 广告规则（文件名与 tag 不一致，不适用 {tag} 占位符）
       {
         "tag": "ads",
         "type": "remote",
@@ -55,288 +28,59 @@
         // "url": "https://anti-ad.net/anti-ad-sing-box.srs",
         "update_interval": "6h"
       },
+      // fakeip 过滤
       {
-        "tag": "WebRTC",
+        "tag": "fakeip-filter",
         "type": "remote",
-        "url": "https://ghfast.top/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/WebRTC.srs",
+        "url": "https://ghfast.top/https://github.com/DustinWin/ruleset_geodata/raw/refs/heads/sing-box-ruleset/fakeip-filter.srs",
         "update_interval": "6h"
       },
+      // MetaCubeX geosite / geoip（tag 即源站路径）
       {
-        "tag": "geosite-icbc",
+        "tag": [
+          "geosite/amazon",
+          "geosite/amazon@ads",
+          "geosite/icbc",
+          "geosite/ccb",
+          "geosite/abc",
+          "geosite/boc",
+          "geosite/cmb",
+          "geosite/douyin",
+          "geosite/xiaohongshu",
+          "geosite/category-game-accelerator-cn",
+          "geosite/steam",
+          "geosite/ubisoft",
+          "geosite/epicgames",
+          "geosite/tailscale",
+          "geosite/github",
+          "geosite/youtube",
+          "geosite/netflix",
+          "geoip/netflix",
+          "geosite/tiktok",
+          "geosite/spotify",
+          "geosite/telegram",
+          "geoip/telegram",
+          "geosite/twitter",
+          "geoip/twitter",
+          "geosite/facebook",
+          "geoip/facebook",
+          "geosite/discord",
+          "geosite/openai",
+          "geosite/cloudflare",
+          "geoip/cloudflare",
+          "geosite/google-play",
+          "geosite/google",
+          "geoip/google",
+          "geosite/microsoft",
+          "geosite/private",
+          "geoip/private",
+          "geosite/geolocation-!cn",
+          "geosite/geolocation-cn",
+          "geosite/tld-cn",
+          "geoip/cn"
+        ],
         "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/icbc.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geosite-ccb",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/ccb.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geosite-abc",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/abc.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geosite-boc",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/boc.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "BOCOM",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/BOCOM.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geosite-cmb",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/cmb.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "WeChat",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/WeChat.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "AliPay",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/AliPay.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "BiliBili",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/BiliBili.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geosite-douyin",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/douyin.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "Weibo",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/Weibo.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geosite-xiaohongshu",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/xiaohongshu.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geosite-category-game-accelerator-cn",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/category-game-accelerator-cn.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geosite-steam",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/steam.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geosite-ubisoft",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/ubisoft.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geosite-epicgames",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/epicgames.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geosite-tailscale",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/tailscale.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geosite-github",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/github.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geosite-youtube",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/youtube.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geosite-netflix",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/netflix.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geoip-netflix",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geoip/netflix.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geosite-tiktok",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/tiktok.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geosite-spotify",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/spotify.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geosite-telegram",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/telegram.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geoip-telegram",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geoip/telegram.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geosite-twitter",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/twitter.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geoip-twitter",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geoip/twitter.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geosite-facebook",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/facebook.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geoip-facebook",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geoip/facebook.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geosite-discord",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/discord.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geosite-openai",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/openai.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geosite-cloudflare",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/cloudflare.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geoip-cloudflare",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geoip/cloudflare.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geosite-google-play",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/google-play.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geosite-google",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/google.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geoip-google",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geoip/google.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "Apple",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/Apple.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geosite-microsoft",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/microsoft.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "XiaoMi",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/XiaoMi.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geosite-private",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/private.srs",
-        "format": "binary",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geoip-private",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geoip/private.srs",
-        "format": "binary",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geosite-geolocation-!cn",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/geolocation-!cn.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geosite-geolocation-cn",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/geolocation-cn.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geosite-tld-cn",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geosite/tld-cn.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "GeositeCN",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/StillLai/SubDl/releases/download/ruleset-srs/GeositeCN.srs",
-        "update_interval": "6h"
-      },
-      {
-        "tag": "geoip-cn",
-        "type": "remote",
-        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/geoip/cn.srs",
+        "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/sing/geo/{tag}.srs",
         "update_interval": "6h"
       }
     ],
@@ -367,7 +111,7 @@
         "mode": "or",
         "rules": [
           {"ip_is_private": true},
-          {"rule_set": ["geosite-private", "geoip-private"]},
+          {"rule_set": ["geosite/private", "geoip/private"]},
           {"port": 3389}
         ],
         "outbound": "🎯 全球直连"
@@ -400,7 +144,7 @@
         "mode": "and",
         "rules": [
           {"clash_mode": "AlwAds", "invert": true},
-          {"rule_set": ["custom_whitelist", "geosite-amazon", "geosite-amazon@ads"], "invert": true},
+          {"rule_set": ["custom_whitelist", "geosite/amazon", "geosite/amazon@ads"], "invert": true},
           {"rule_set": ["ads", "custom_block", "WebRTC"]}
         ],
         "action": "reject"
@@ -409,7 +153,7 @@
         "type": "logical",
         "mode": "or",
         "rules": [
-          {"rule_set": ["geosite-icbc", "geosite-ccb", "geosite-abc", "geosite-boc", "BOCOM", "geosite-cmb"]},
+          {"rule_set": ["geosite/icbc", "geosite/ccb", "geosite/abc", "geosite/boc", "BOCOM", "geosite/cmb"]},
           {"package_name": ["com.icbc", "com.chinamworld.main", "com.android.bankabc", "com.chinamworld.bocmbci", "com.bankcomm.Bankcomm", "com.cmbchina.ccd.pluto.cmbActivity", "cmb.pb", "com.yadea.smartmoto"]},
           {"domain_suffix": ["yadeaiot.com.cn"]}
         ],
@@ -428,7 +172,7 @@
         "type": "logical",
         "mode": "or",
         "rules": [
-          {"rule_set": ["geosite-category-game-accelerator-cn"]},
+          {"rule_set": ["geosite/category-game-accelerator-cn"]},
           {"process_name": ["Steamcommunity_302.exe"]}
         ],
         "outbound": "🎯 全球直连"
@@ -437,21 +181,21 @@
         "type": "logical",
         "mode": "or",
         "rules": [
-          {"rule_set": ["geosite-steam"]},
+          {"rule_set": ["geosite/steam"]},
           {"package_name": ["com.valvesoftware.android.steam.community"]},
           {"process_path_regex": [".+?\\\\Steam(?:\\\\[^\\\\]+)*\\\\[^\\\\]*[Ss]team[^\\\\]*\\.exe"]}
         ],
         "outbound": "🎮 Steam"
       },
       { // Epic Games
-        "rule_set": ["geosite-epicgames"],
+        "rule_set": ["geosite/epicgames"],
         "outbound": "🎁 Epic"
       },
       { // 育碧
         "type": "logical",
         "mode": "or",
         "rules": [
-          {"rule_set": ["geosite-ubisoft"]},
+          {"rule_set": ["geosite/ubisoft"]},
           {"process_path_regex": [".+?\\\\Ubisoft\\\\Ubisoft Game Launcher(?: Core)?(?:\\\\[^\\\\]+)*\\\\[^\\\\]+\\.exe"]}
         ],
         "outbound": "🌀 育碧"
@@ -461,7 +205,7 @@
         "outbound": "🔍 DNS测试"
       },
       { // 亚马逊
-        "rule_set": ["geosite-amazon", "geosite-amazon@ads"],
+        "rule_set": ["geosite/amazon", "geosite/amazon@ads"],
         "outbound": "🅰️ 亚马逊"
       },
       { // Jav
@@ -475,7 +219,7 @@
         "outbound": "🔞 版权内容"
       },
       { // Tailscale
-        "rule_set": ["geosite-tailscale"],
+        "rule_set": ["geosite/tailscale"],
         "outbound": "🔗 Tailscale"
       },
       { // 微信
@@ -509,7 +253,7 @@
         "type": "logical",
         "mode": "or",
         "rules": [
-          {"rule_set": ["geosite-douyin"]},
+          {"rule_set": ["geosite/douyin"]},
           {"package_name": ["com.ss.android.ugc.aweme"]}
         ],
         "outbound": "🎵 抖音"
@@ -522,24 +266,24 @@
         "type": "logical",
         "mode": "or",
         "rules": [
-          {"rule_set": ["geosite-xiaohongshu"]},
+          {"rule_set": ["geosite/xiaohongshu"]},
           {"package_name": ["com.xingin.xhs"]}
         ],
         "outbound": "🍠 小红书"
       },
       { // GitHub
-        "rule_set": ["geosite-github"],
+        "rule_set": ["geosite/github"],
         "outbound": "🐱 GitHub"
       },
       { // YouTube
-        "rule_set": ["geosite-youtube"],
+        "rule_set": ["geosite/youtube"],
         "outbound": "📹 YouTube"
       },
       { // Netflix
         "type": "logical",
         "mode": "or",
         "rules": [
-          {"rule_set": ["geosite-netflix", "geoip-netflix"]},
+          {"rule_set": ["geosite/netflix", "geoip/netflix"]},
           {"package_name": ["com.netflix.mediaclient"]}
         ],
         "outbound": "🎥 Netflix"
@@ -548,7 +292,7 @@
         "type": "logical",
         "mode": "or",
         "rules": [
-          {"rule_set": ["geosite-tiktok"]},
+          {"rule_set": ["geosite/tiktok"]},
           {"package_name": ["com.zhiliaoapp.musically"]}
         ],
         "outbound": "🎶 TikTok"
@@ -557,7 +301,7 @@
         "type": "logical",
         "mode": "or",
         "rules": [
-          {"rule_set": ["geosite-spotify"]},
+          {"rule_set": ["geosite/spotify"]},
           {"package_name": ["com.spotify.music"]}
         ],
         "outbound": "💚 Spotify"
@@ -566,25 +310,25 @@
         "type": "logical",
         "mode": "or",
         "rules": [
-          {"rule_set": ["geosite-telegram", "geoip-telegram"]},
+          {"rule_set": ["geosite/telegram", "geoip/telegram"]},
           {"package_name": ["nekox.messenger", "org.telegram.messenger", "tw.nekomimi.nekogram", "xyz.nextalone.nagram"]}
         ],
         "outbound": "✈️ Telegram"
       },
       { // Twitter(X)
-        "rule_set": ["geosite-twitter", "geoip-twitter"],
+        "rule_set": ["geosite/twitter", "geoip/twitter"],
         "outbound": "🐦 Twitter(X)"
       },
       { // Facebook
-        "rule_set": ["geosite-facebook", "geoip-facebook"],
+        "rule_set": ["geosite/facebook", "geoip/facebook"],
         "outbound": "👍 Facebook"
       },
       { // Discord
-        "rule_set": ["geosite-discord"],
+        "rule_set": ["geosite/discord"],
         "outbound": "💬 Discord"
       },
       { // OpenAI
-        "rule_set": ["geosite-openai"],
+        "rule_set": ["geosite/openai"],
         "outbound": "🤖 OpenAI"
       },
       { // 小米
@@ -601,41 +345,41 @@
         "outbound": "🍎 Apple"
       },
       { // Microsoft
-        "rule_set": ["geosite-microsoft"],
+        "rule_set": ["geosite/microsoft"],
         "outbound": "🪟 Microsoft"
       },
       { // Cloudflare
-        "rule_set": ["geosite-cloudflare", "geoip-cloudflare"],
+        "rule_set": ["geosite/cloudflare", "geoip/cloudflare"],
         "outbound": "☁️ Cloudflare"
       },
       { // Google 服务
         "type": "logical",
         "mode": "or",
         "rules": [
-          {"rule_set": ["geosite-google", "geoip-google", "geosite-google-play"]},
+          {"rule_set": ["geosite/google", "geoip/google", "geosite/google-play"]},
           {"package_name": ["com.android.vending", "com.google.android.gms", "com.google.android.gsf", "com.google.android.onetimeinitializer"]}
         ],
         "outbound": "🇬 Google"
       },
       { // 国内网站
-        "rule_set": ["geosite-geolocation-cn", "custom_direct"],
+        "rule_set": ["geosite/geolocation-cn", "custom_direct"],
         "outbound": "🎯 全球直连"
       },
       { // 国内IP（排除海外）
         "type": "logical",
         "mode": "and",
         "rules": [
-          {"rule_set": ["geosite-geolocation-!cn", "custom_proxy"], "invert": true},
-          {"rule_set": "geoip-cn"}
+          {"rule_set": ["geosite/geolocation-!cn", "custom_proxy"], "invert": true},
+          {"rule_set": ["geoip/cn"]}
         ],
         "outbound": "🎯 全球直连"
       },
       { // 海外网站
-        "rule_set": ["geosite-geolocation-!cn", "custom_proxy"],
+        "rule_set": ["geosite/geolocation-!cn", "custom_proxy"],
         "outbound": "🚀 节点选择"
       },
       { // CN域名/IP
-        "rule_set": ["geosite-tld-cn", "GeositeCN", "geoip-cn"],
+        "rule_set": ["geosite/tld-cn", "GeositeCN", "geoip/cn"],
         "outbound": "🎯 全球直连"
       }
     ],
