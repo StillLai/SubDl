@@ -110,7 +110,16 @@ HTTP Client for downloading external UI.
 
 See [HTTP Client Fields](/configuration/shared/http-client/) for details.
 
-Default transport will be used if empty.
+If empty, the default HTTP client is used: the client selected by
+[`route.default_http_client`](/configuration/route/#default_http_client), or the first top-level `http_clients` entry if no default tag is specified.
+
+When external UI downloading is enabled, the client configuration is validated at startup, even if UI files already exist.
+This field cannot be combined with `external_ui_download_detour`.
+
+!!! failure "Implicit default deprecated in sing-box 1.14.0"
+
+    If neither a client nor the legacy download detour is configured, downloads fall back to the implicit HTTP client using the default outbound.
+    This fallback is deprecated in sing-box 1.14.0 and will be removed in sing-box 1.16.0. Define `http_clients` or configure this field explicitly.
 
 #### external_ui_download_detour
 

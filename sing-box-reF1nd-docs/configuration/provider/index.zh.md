@@ -165,6 +165,9 @@
 
 用于下载订阅内容的 User-Agent。
 
+不能与此 provider 上的非空 `http_client` 同时配置。请改为通过 `http_client.headers` 设置 `User-Agent`。
+默认 HTTP 客户端中配置的 `User-Agent` 标头也会覆盖此字段。
+
 #### http_client
 
 !!! question "自 sing-box 1.14.0 起"
@@ -173,7 +176,15 @@
 
 参阅 [HTTP 客户端字段](/zh/configuration/shared/http-client/) 了解详情。
 
-如果为空，将使用默认传输。
+留空时使用默认 HTTP 客户端：即由 [`route.default_http_client`](/zh/configuration/route/#default_http_client)
+指定的客户端，或未指定默认标签时使用顶层 `http_clients` 的第一项。
+
+此字段不能与 `download_detour` 同时配置。
+
+!!! failure "隐式默认已在 sing-box 1.14.0 废弃"
+
+    如果既未配置客户端，也未配置旧下载 detour，将回退到通过默认出站连接的隐式 HTTP 客户端。
+    此回退已在 sing-box 1.14.0 废弃，将在 sing-box 1.16.0 移除。请定义 `http_clients` 或显式配置此字段。
 
 #### download_detour
 

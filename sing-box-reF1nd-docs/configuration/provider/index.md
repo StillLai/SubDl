@@ -165,6 +165,9 @@ Include regular expression to filter nodes.
 
 User agent used to download the provider.
 
+Cannot be combined with a non-empty `http_client` on this provider. Configure `User-Agent` via `http_client.headers` instead.
+A `User-Agent` header configured on the default HTTP client also takes precedence over this field.
+
 #### http_client
 
 !!! question "Since sing-box 1.14.0"
@@ -173,7 +176,15 @@ HTTP Client for downloading provider.
 
 See [HTTP Client Fields](/configuration/shared/http-client/) for details.
 
-Default transport will be used if empty.
+If empty, the default HTTP client is used: the client selected by
+[`route.default_http_client`](/configuration/route/#default_http_client), or the first top-level `http_clients` entry if no default tag is specified.
+
+This field cannot be combined with `download_detour`.
+
+!!! failure "Implicit default deprecated in sing-box 1.14.0"
+
+    If neither a client nor the legacy download detour is configured, downloads fall back to the implicit HTTP client using the default outbound.
+    This fallback is deprecated in sing-box 1.14.0 and will be removed in sing-box 1.16.0. Define `http_clients` or configure this field explicitly.
 
 #### download_detour
 
