@@ -43,6 +43,7 @@ icon: material/new-box
   "listen_port": 0,
   "relay_server_port": 0,
   "relay_server_static_endpoints": [],
+  // "tcp_congestion_control": "bbr",
   "system_interface": false,
   "system_interface_name": "",
   "system_interface_gso": false,
@@ -152,6 +153,18 @@ The port to listen on for incoming relay connections from other Tailscale nodes.
 
 Static endpoints to advertise for the relay server.
 
+#### tcp_congestion_control
+
+Selects the congestion controller for the local sender in this endpoint's internal Go TCP stack.
+
+Available values: `reno`, `cubic`, `bbr`. Omitting the field preserves the default, CUBIC. Empty values and `none` are not supported.
+
+Only affects TCP connections terminated or initiated by this endpoint's internal Go TCP stack. It does not affect kernel TCP, TCP forwarded at L3, UDP, or inner QUIC. Peers may select different algorithms. The setting affects only data sent by this endpoint; for example, when this endpoint serves as an exit node or subnet router, it controls TCP data sent by its internal stack back to tailnet peers.
+
+Allowed with either `system_interface: false` or `system_interface: true`, but only applies to connections handled by the internal Go TCP stack. Enabling the system interface does not make this setting affect kernel TCP.
+
+Changing algorithms does not guarantee higher throughput; test on the actual network path.
+
 #### system_interface
 
 !!! question "Since sing-box 1.13.0"
@@ -173,6 +186,8 @@ Custom TUN interface name. By default, `tailscale` (or `utun` on macOS) will be 
 Try to enable generic segmentation offload.
 
 Enabled by default when `system_interface` is true.
+
+This controls the system interface. For the UDP sockets used to reach peers, see `udp_gso` in [Dial Fields](/configuration/shared/dial/#udp_gso).
 
 #### system_interface_mtu
 
@@ -261,7 +276,7 @@ When not set, the default DNS is used.
 
 !!! note
 
-    Dial Fields in Tailscale endpoints only control how it connects to the control plane and have nothing to do with actual connections.
+    Dial Fields in Tailscale endpoints only control how it connects to the control plane and have nothing to do with actual connections, except `udp_gso`, which also controls the magicsock and peer relay UDP sockets.
 
 See [Dial Fields](/configuration/shared/dial/) for details.
 

@@ -155,8 +155,8 @@ TCP keep-alive 探测次数。
 不填写或设为 `true` 时保留自动检测；设为 `false` 时禁止发送分段，普通 UDP 仍保留批量发送和接收。
 此选项不控制接收侧 GRO，也不影响 TUN 的 `gso` 设置；使用其他网络引擎的协议不受此选项控制。
 
-`SING_BOX_DISABLE_GSO=true` 在进程启动时全局禁止 sing UDP 和 quic-go 使用 GSO。
-`QUIC_GO_DISABLE_GSO=true` 继续仅禁止 quic-go 的 GSO。`udp_gso: true` 不能覆盖这些禁用或系统能力限制。
+`SING_BOX_DISABLE_GSO=true` 在进程启动时全局禁止 sing UDP、quic-go、WireGuard 和 Tailscale 使用 GSO。
+`QUIC_GO_DISABLE_GSO=true` 继续仅禁止 quic-go 的 GSO，`TS_DEBUG_DISABLE_UDP_GSO=true` 仅禁止 Tailscale 的 GSO。`udp_gso: true` 不能覆盖这些禁用或系统能力限制。
 
 #### udp_fragment
 

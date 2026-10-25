@@ -155,8 +155,8 @@ Allow Generic Segmentation Offload for UDP replies to clients on this inbound, i
 Omitting this field or setting it to `true` retains automatic detection. Setting it to `false` disables send segmentation while preserving ordinary UDP batch sends and receives.
 This does not control receive-side GRO or the TUN `gso` option. Protocols using other networking engines are not controlled by this option.
 
-`SING_BOX_DISABLE_GSO=true`, read at process startup, disables GSO globally for sing UDP and quic-go.
-`QUIC_GO_DISABLE_GSO=true` continues to disable GSO only in quic-go. `udp_gso: true` cannot override these prohibitions or platform limitations.
+`SING_BOX_DISABLE_GSO=true`, read at process startup, disables GSO globally for sing UDP, quic-go, WireGuard and Tailscale.
+`QUIC_GO_DISABLE_GSO=true` continues to disable GSO only in quic-go, and `TS_DEBUG_DISABLE_UDP_GSO=true` only in Tailscale. `udp_gso: true` cannot override these prohibitions or platform limitations.
 
 #### udp_fragment
 
