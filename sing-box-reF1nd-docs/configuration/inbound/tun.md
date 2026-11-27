@@ -7,6 +7,7 @@ icon: material/new-box
     :material-plus: [auto_redirect_disable_mark_mode](#auto_redirect_disable_mark_mode)
     :material-plus: [auto_redirect_tproxy_mark](#auto_redirect_tproxy_mark)  
     :material-plus: [multi_queue](#multi_queue)  
+    :material-alert: [route_address_set](#route_address_set)  
     :material-delete-clock: [stack](#stack)
 
 !!! quote "Changes in sing-box 1.14.0"
@@ -96,10 +97,10 @@ icon: material/new-box
   "iproute2_rule_index": 9000,
   "auto_redirect": true,
   "auto_redirect_disable_mark_mode": false,
-  "auto_redirect_input_mark": "0x2023",
-  "auto_redirect_output_mark": "0x2024",
-  "auto_redirect_reset_mark": "0x2025",
-  "auto_redirect_tproxy_mark": "0x2026",
+  "auto_redirect_input_mark": "0x04000000",
+  "auto_redirect_output_mark": "0x08000000",
+  "auto_redirect_reset_mark": "0x10000000",
+  "auto_redirect_tproxy_mark": "0x0c000000",
   "auto_redirect_nfqueue": 100,
   "auto_redirect_iproute2_fallback_rule_index": 32768,
   "exclude_mptcp": false,
@@ -193,9 +194,7 @@ icon: material/new-box
   ],
   "inet6_route_exclude_address": [
     "fc00::/7"
-  ],
-  ...
-  // Listen Fields
+  ]
 }
 ```
 
@@ -384,7 +383,7 @@ Conflict with `route_address_set` and `route_exclude_address_set`.
 
 Connection input mark used by `auto_redirect`.
 
-`0x2023` is used by default (`0x400000` on Android).
+`0x04000000` is used by default.
 
 #### auto_redirect_output_mark
 
@@ -392,7 +391,7 @@ Connection input mark used by `auto_redirect`.
 
 Connection output mark used by `auto_redirect`.
 
-`0x2024` is used by default (`0x200000` on Android).
+`0x08000000` is used by default.
 
 #### auto_redirect_reset_mark
 
@@ -400,7 +399,7 @@ Connection output mark used by `auto_redirect`.
 
 Connection reset mark used by `auto_redirect` pre-matching.
 
-`0x2025` is used by default (`0x600000` on Android).
+`0x10000000` is used by default.
 
 #### auto_redirect_tproxy_mark
 
@@ -408,7 +407,7 @@ Connection reset mark used by `auto_redirect` pre-matching.
 
 Connection TPROXY mark used by the `auto_redirect` iptables backend for IPv6 TCP.
 
-`0x2026` is used by default (`0x800000` on Android).
+`0x0c000000` is used by default.
 
 #### auto_redirect_nfqueue
 
@@ -531,7 +530,7 @@ Exclude custom routes when `auto_route` is enabled.
     
         Only supported on Linux and requires `auto_route` and `auto_redirect` enabled.
     
-    Match the destination IP CIDR rules in the specified rule-sets during pre-matching.
+    Match the destination IP CIDR rules in the specified rule-sets and `route_address` during pre-matching.
     Unmatched traffic will bypass the sing-box routes.
     
     Conflict with `route.default_mark` and `[dialOptions].routing_mark`.
@@ -590,6 +589,9 @@ to customize the mapping and filtering behavior.
 
     Since 1.15.0, sing-tun uses its own TCP/IP stack, with substantial improvements over all previous
     implementations in peak performance, energy efficiency, and memory usage.
+
+    :material-delete-alert: The `gvisor` and `mixed` stacks require the `with_gvisor` [build tag](/installation/build-from-source/#build-tags),
+    which is no longer included by default.
 
 !!! quote "Changes in sing-box 1.8.0"
 
@@ -739,7 +741,3 @@ Hostnames that use the HTTP proxy.
 ### UDP NAT Fields
 
 See [UDP NAT Fields](/configuration/shared/udp-nat/) for details.
-
-### Listen Fields
-
-See [Listen Fields](/configuration/shared/listen/) for details.

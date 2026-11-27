@@ -52,6 +52,7 @@ The current binary rule-set format cannot preserve an explicit strategy. Compili
       "domain_regex": [
         "^stun\\..+"
       ],
+      "domain_is_ech": true,
       "source_ip_cidr": [
         "10.0.0.0/24",
         "192.168.0.1"
@@ -172,6 +173,10 @@ Match domain using keyword.
 #### domain_regex
 
 Match domain using regular expression.
+
+#### domain_is_ech
+
+Match a sniffed [ECH public name](../route/rule.md#domain_is_ech) in route rules. Available in source rule-sets only.
 
 #### source_ip_cidr
 

@@ -13,8 +13,8 @@ icon: material/alert-decagram
 !!! quote "sing-box 1.12.0 中的更改"
 
     :material-plus: [default_domain_resolver](#default_domain_resolver)  
-    :material-note-remove: [geoip](#geoip)  
-    :material-note-remove: [geosite](#geosite)
+    :material-note-remove: [geoip](./geoip/)  
+    :material-note-remove: [geosite](./geosite/)
 
 !!! quote "sing-box 1.11.0 中的更改"
 
@@ -26,8 +26,8 @@ icon: material/alert-decagram
 !!! quote "sing-box 1.8.0 中的更改"
 
     :material-plus: [rule_set](#rule_set)  
-    :material-delete-clock: [geoip](#geoip)  
-    :material-delete-clock: [geosite](#geosite)
+    :material-delete-clock: [geoip](./geoip/)  
+    :material-delete-clock: [geosite](./geosite/)
 
 ### 结构
 
@@ -169,7 +169,7 @@ Android 命令行模式优先通过 socket UID 识别应用包名。仅为日志
 
 可以被 `outbound.domain_resolver` 覆盖。
 
-#### network_strategy
+#### default_network_strategy
 
 !!! question "自 sing-box 1.11.0 起"
 
@@ -185,13 +185,13 @@ Android 命令行模式优先通过 socket UID 识别应用包名。仅为日志
 
 !!! question "自 sing-box 1.11.0 起"
 
-详情参阅 [拨号字段](/zh/configuration/shared/dial/#default_network_type)。
+详情参阅 [拨号字段](/zh/configuration/shared/dial/#network_type)。
 
 #### default_fallback_network_type
 
 !!! question "自 sing-box 1.11.0 起"
 
-详情参阅 [拨号字段](/zh/configuration/shared/dial/#default_fallback_network_type)。
+详情参阅 [拨号字段](/zh/configuration/shared/dial/#fallback_network_type)。
 
 #### default_fallback_delay
 

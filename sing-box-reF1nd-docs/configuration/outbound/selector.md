@@ -12,7 +12,7 @@
   ],
   "providers": [
     "provider-a",
-    "provider-b",
+    "provider-b"
   ],
   "exclude": "",
   "include": "",
@@ -24,7 +24,7 @@
 
 !!! quote ""
 
-    The selector can only be controlled through the [Clash API](/configuration/experimental#clash-api-fields) currently.
+    The selector can only be controlled through the [Clash API](/configuration/experimental/clash-api/) currently.
 
 ### Fields
 
@@ -38,7 +38,7 @@ List of [Provider](/configuration/provider) tags to select.
 
 #### use_all_providers
 
-Use all [Provider](/configuration/provider) to fill `outbounds`.
+Include outbounds from all providers. Defaults to `false`.
 
 #### exclude
 
@@ -50,11 +50,11 @@ Include regular expression to filter `providers` nodes.
 
 #### default
 
-The default outbound tag. The first outbound will be used if empty.
+The outbound to select at startup. For a provider member, use its full tag, such as `provider-a/node-1`. The provider must belong to the group and the member must pass the `include` and `exclude` filters.
 
-#### use_all_providers
+A member selected through the API or restored from the [cache file](/configuration/experimental/cache-file/) takes precedence when available. Otherwise the selector uses `default`, or the first member if `default` is empty. If the configured provider member is still missing after all providers load, the selector logs a warning and applies the same fallback. A group with no available members uses `Compatible`.
 
-Whether to use all providers for testing. `false` will be used if empty.
+After startup, a provider update preserves the current selection while it is available. An explicit selection takes effect again if its member returns.
 
 #### interrupt_exist_connections
 

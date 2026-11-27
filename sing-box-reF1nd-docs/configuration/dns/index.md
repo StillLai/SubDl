@@ -10,7 +10,7 @@ icon: material/alert-decagram
 
 !!! quote "Changes in sing-box 1.12.0"
 
-    :material-decagram: [servers](#servers)
+    :material-decagram: [servers](./server/)
 
 !!! quote "Changes in sing-box 1.11.0"
 
@@ -47,11 +47,11 @@ icon: material/alert-decagram
 
 ### Fields
 
-| Key      | Format                          |
-|----------|---------------------------------|
-| `server` | List of [DNS Server](./server/) |
-| `rules`  | List of [DNS Rule](./rule/)     |
-| `fakeip` | :material-note-remove: [FakeIP](./fakeip/) |
+| Key       | Format                          |
+|-----------|---------------------------------|
+| `servers` | List of [DNS Server](./server/) |
+| `rules`   | List of [DNS Rule](./rule/)     |
+| `fakeip`  | :material-note-remove: [FakeIP](./fakeip/) |
 
 #### final
 
@@ -153,7 +153,7 @@ Default timeout for each DNS query.
 
 `10s` is used by default.
 
-Can be overridden by `rules.[].timeout` (DNS rule action) or `domain_resolver.timeout`.
+Can be overridden by `rules.[].timeout` (DNS rule action), `resolve.timeout` (route rule action) or `domain_resolver.timeout`.
 
 #### reverse_mapping
 
@@ -181,4 +181,4 @@ Append a `edns0-subnet` OPT extra record with the specified IP prefix to every q
 
 If value is an IP address instead of prefix, `/32` or `/128` will be appended automatically.
 
-Can be overridden by `servers.[].client_subnet` or `rules.[].client_subnet`.
+Can be overridden by `rules.[].client_subnet` (DNS rule action), `resolve.client_subnet` (route rule action) or `domain_resolver.client_subnet`.

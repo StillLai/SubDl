@@ -104,7 +104,7 @@ HTTP/3 连接的本端发送拥塞控制算法。仅在 HTTP/3 生效。
 
 ### tls
 
-TLS 配置，参阅 [TLS](/zh/configuration/shared/tls/#outbound)。
+TLS 配置，参阅 [TLS](/zh/configuration/shared/tls/#出站)。
 
 HTTP/3 需要 TLS。
 

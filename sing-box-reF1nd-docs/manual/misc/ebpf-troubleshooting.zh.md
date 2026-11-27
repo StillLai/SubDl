@@ -106,9 +106,22 @@ handoff 异常会输出限频后的 Warn 或 Error 日志；BPF 报文返回路�
 如果日志报告 assignment 或 UDP 原目标读取失败，请保留首次错误前后的完整日志，
 并同时采集下文的 TC attachment 信息。
 
+### UDP assignment 与 listener 错误
+
+`lookup TC eBPF UDP assignment: no such file or directory` 表示用户态查询时已经找不到仍然有效的
+assignment 记录。记录可能已被另一个 reader 消费、在网络切换期间过期，或属于旧的 generation/实例；
+这条日志本身不能证明内核 map 失效。请在一次受控 UDP 流量前后比较 assignment 发布、查询、旧 generation
+和返程路由计数，并保留 attachment 的 network generation 与首次告警。
+
+`bind ...: address already in use` 表示 listener 或 socket 命名空间发生端口冲突。对 `socket_assign`，
+确认启动事件中的 `tc_namespace` 是 owned，并确认 TCP/UDP listener 确实创建在该命名空间；同时检查是否
+存在第二个 sing-box 实例或残留进程占用相同 listener。不要刷新系统 conntrack，也不要删除无关宿主 socket。
+优先正常停止旧实例，确认它拥有的 link/map/route 已清理，再重试。正常停止会执行用户态清理；
+`SIGKILL` 会跳过这一步，下一次启动应让 runtime 自己协调并只清理能够确认属于 sing-box 的状态。
+
 ### 解读 `sing-box api ebpf`
 
-Schema 18 将轻量状态与深度检查分开。用 `sing-box api ebpf --deep` 或 dashboard
+Schema 21 将轻量状态与深度检查分开。用 `sing-box api ebpf --deep` 或 dashboard
 的“深度检查所属 Map”枚举内核资源。每个 inbound 有自己的 `kernelRuntime`，
 顶层仅为去重汇总，不能把它的压力归到所有 inbound。深度快照按需读取，最多缓存 5 秒。
 
@@ -129,11 +142,19 @@ assignment 与返程 map 占用分别报告；未知/未完成扫描不等于零
 attachment 列表是实际运行机制的准确信息。已配置路径没有对应 attachment 时，可能只是
 等待接口；cgroup attachment 本来就不存在网络接口 filter。
 
+对于 local `cgroup`，如果 `local_cgroup_attach_mode` 为空且状态为
+`needs_attention`，表示 cgroup backend 缺失或已关闭，不是等待网络接口。只有 local
+`socket_assign` 在没有可用默认接口时才应报告 `waiting_for_interface`。
+
 local cgroup 还应记录 API 返回的实际运行字段：`local_cgroup_attach_mode`
 （`link_create`、`legacy_multi`、`legacy_exclusive` 或 `mixed`）、
 `local_udp_cleanup_mode`、`local_udp_userspace_cleanup_mode`、
 `local_udp_storage_mode` 和 `local_udp_time_mode`。这些字段表示厂商内核或安全策略
 触发回退后真正选中的路径，不是能力猜测。
+
+当内核同时支持 `BPF_MAP_TYPE_SK_STORAGE` 和 socket-release hook 时，
+`local_udp_storage_mode` 会显示为 `socket_storage`，连接 TCP/UDP 的 peer
+状态随 socket 生命周期保存；不具备这两项能力时显示 `lru`，使用受配置容量限制的兼容路径。
 
 local socket assignment 或 shared `socket_assign` 启用时，API 还会返回 `tc_*` 运行态字段：实际
 `tcx`/`clsact`/`mixed` 挂载机制、TCP listener 的 `sockmap`/`direct` 查找方式、delivery
@@ -154,16 +175,22 @@ health check/reconcile 时间以及网络代数。它们来自运行中的资源
 - fragment-pass 增加表示 IPv4 分片或非 atomic IPv6 分片按设计放行，并非 parser
   静默漏流量；
 - shared ingress/egress pass 覆盖所有显式放行出口，可用于识别不对称绕过或回复路径；
-- UDP `capacity_evictions`、`queue_drops`、pending-release 拒绝和 release 通知丢失是
-  不同压力信号，并不都代表 BPF assignment map 缺项；
+- UDP `capacity_evictions`、`queue_drops` 和 pending-release 拒绝是不同压力信号。
+  对于 cgroup UDP recovery，`cgroup_recovery_ringbuf_drops` 表示内核 ring buffer
+  拒绝了 release 事件；`cgroup_recovery_queue_overflows` 表示 sing-box 已从内核读到
+  事件，但有界用户空间调度队列已满。两者都有有界 recovery sweep 兜底，单独出现均不
+  代表 BPF assignment map 缺项；
 - map occupancy 只在显式请求诊断时采集。map 的 `pressure: not_applicable` 表示其布局固定，
   不能安全遍历；`category: configured_policy` 表示容量来自已编译的策略，填满是预期状态，
-  `pressure: configured` 只是对应的中性结果；
-  `recovery_failed` 表示键遍历本身失败。上述状态都不表示占用为零。顶层 `error` 表示在
-  完成所有 map 检查前，map 枚举或检查权限被拒绝。
+  `pressure: configured` 只是对应的中性结果；`occupancy_mode` 表示占用统计方式，
+  `eviction_mode` 与 `admission_critical` 表示条目能否被回收以及满表是否会拒绝新流量。
+  `pressure: managed` 表示 LRU 缓存接近满容量可以是正常状态，不构成准入压力；
+  `category: unknown` 与 `pressure: unknown` 表示资源 owner 未提供足够的语义元数据，
+  无法解释容量；键遍历失败使用 `unavailable`。上述状态都不表示占用为零。顶层 `error`
+  表示在完成所有 map 检查前，owner 快照或检查失败。
 
-program/map 枚举按 `sb_` 命名约定筛选，同一内核中其他可见的 sing-ebpf 进程也可能
-出现；每个入站自身的 attachment、策略状态、用户态会话和计数才是实例级证据。
+每个入站的诊断使用运行中 sing-ebpf owner 提供的资源 ID 与语义元数据；map 名称只是标签，
+不再作为分类依据。主机级探测仍按 `sb_` 命名约定筛选，因此可能看到同一内核中的其他实例。
 
 ## 启动与挂载失败
 
@@ -281,6 +308,10 @@ qdisc/filter 位于同一接口就删除它们。
 
 清理报错时，保留准确对象/接口标识；在人工删除前，优先尝试使用同一构建重新启动并
 正常停止。人工清理只能针对已明确确认由 sing-box 创建的状态。
+
+`SIGTERM` 是首选停止信号，因为 runtime 可以按顺序禁用接管并恢复 route、sysctl、veth 和锁。
+`SIGKILL` 无法执行 `Close`；进程退出后由文件描述符持有的 BPF link/map 通常会释放，但对外可见的
+route、link 或 sysctl 可能要等下一次 runtime reconciliation 才能恢复。任何手动删除前都必须先确认资源所有权。
 
 ## 隐私
 

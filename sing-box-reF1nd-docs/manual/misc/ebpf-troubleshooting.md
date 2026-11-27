@@ -122,9 +122,29 @@ If the log reports an assignment or UDP original-destination failure, retain
 the complete log around the first error and collect the TC attachment state
 described below.
 
+### UDP assignment and listener errors
+
+`lookup TC eBPF UDP assignment: no such file or directory` means that the
+userspace lookup did not find a still-live assignment record. The record may
+have been consumed by another reader, expired during a network handover, or
+belonged to an older generation/instance; the message alone does not prove a
+kernel map failure. Compare assignment publication, lookup, stale-generation,
+and return-route counters before and after one controlled UDP flow, and include
+the attachment network generation and first warning.
+
+`bind ...: address already in use` is a listener/socket namespace collision.
+For `socket_assign`, verify that the startup event reports an owned
+`tc_namespace` and that the TCP/UDP listeners were created in that namespace;
+also check for a second sing-box instance or a stale process using the same
+listener. Do not flush system conntrack or delete unrelated host sockets.
+Stop the old instance gracefully, confirm its owned links/maps/routes are
+gone, and retry. A graceful stop runs userspace cleanup; `SIGKILL` skips that
+cleanup, so the next start must be allowed to reconcile and remove only
+positively identified sing-box state.
+
 ### Interpreting `sing-box api ebpf`
 
-Schema 18 separates lightweight status from deep inspection. Use
+Schema 21 separates lightweight status from deep inspection. Use
 `sing-box api ebpf --deep` or the dashboard's **Inspect owned maps** action.
 Each inbound has its own `kernelRuntime`; the top-level section is a
 de-duplicated union, not an inbound's health. Deep snapshots are request-driven
@@ -150,12 +170,23 @@ Read attachment entries as the source of truth for the mechanism actually in
 use. A configured path without a corresponding attachment may legitimately be
 waiting for an interface; a cgroup attachment has no network-interface filter.
 
+For local `cgroup`, an empty `local_cgroup_attach_mode` with state
+`needs_attention` means that the cgroup backend is absent or closed; it is not
+a request to wait for a network interface. For local `socket_assign`,
+`waiting_for_interface` still means that no eligible default interface is
+currently attached.
+
 For local cgroup, also record the effective runtime fields returned by the API:
 `local_cgroup_attach_mode` (`link_create`, `legacy_multi`,
 `legacy_exclusive`, or `mixed`), `local_udp_cleanup_mode`,
 `local_udp_userspace_cleanup_mode`, `local_udp_storage_mode`, and
 `local_udp_time_mode`. These describe the path actually selected after vendor
 kernel and security-policy fallbacks; they are not capability guesses.
+
+`local_udp_storage_mode` is `socket_storage` when the cgroup backend can bind
+connected TCP/UDP peer state to `BPF_MAP_TYPE_SK_STORAGE` and the socket-release
+hook is active. On kernels without both capabilities it is `lru`; this is the
+bounded compatibility path.
 
 When local socket assignment or shared `socket_assign` is enabled, the API also reports `tc_*`
 runtime fields: the effective `tcx`/`clsact`/`mixed` attachment mechanism,
@@ -183,22 +214,31 @@ interpreting a single large number:
   intentionally allowed through, not that the parser silently lost it;
 - shared ingress/egress pass counters cover all explicit pass exits and help
   reveal asymmetric bypass or reply-path behavior;
-- UDP `capacity_evictions`, `queue_drops`, pending-release rejection, and
-  release-notification drops are distinct pressure signals. They do not all
-  mean that the BPF assignment map is missing;
+- UDP `capacity_evictions`, `queue_drops`, and pending-release rejection are
+  distinct pressure signals. For cgroup UDP recovery,
+  `cgroup_recovery_ringbuf_drops` means the kernel ring buffer rejected a
+  release event, while `cgroup_recovery_queue_overflows` means sing-box read
+  the event but its bounded userspace scheduler queue was full. Both paths are
+  covered by a bounded recovery sweep; neither alone means that the BPF
+  assignment map is missing;
 - map occupancy is collected only on an explicit diagnostic request. A map with
   `pressure: not_applicable` has a fixed layout that is not safely iterable;
   `category: configured_policy` identifies a policy-sized map whose capacity
   comes from the compiled policy; `pressure: configured` is retained as the
-  corresponding neutral result. `recovery_failed` means key iteration itself
-  failed. Do not
-  interpret any of these states as zero occupancy. A top-level `error` means
-  map enumeration or inspection was denied before all maps could be observed.
+  corresponding neutral result. `occupancy_mode` describes how the count was
+  obtained, while `eviction_mode` and `admission_critical` describe whether
+  entries may be reclaimed and whether full capacity can reject new flows.
+  `pressure: managed` means an LRU cache may normally remain near capacity and
+  is not admission pressure. `category: unknown` and `pressure: unknown` mean
+  the resource owner did not provide enough metadata to interpret capacity;
+  an iteration failure uses `unavailable`. Do not interpret any of these
+  states as zero occupancy. A top-level `error` means owner snapshot or
+  inspection failed before all maps could be observed.
 
-Program/map enumeration uses the `sb_` naming convention and can see another
-visible sing-ebpf process in the same kernel. Per-inbound attachments, policy
-state, userspace sessions, and counters remain the correct instance-specific
-evidence.
+Per-inbound diagnostics use resource IDs and semantic metadata supplied by the
+running sing-ebpf owners; map names are labels, not classification keys. The
+host-wide probe still uses the `sb_` naming convention and can see another
+visible sing-ebpf process in the same kernel.
 
 ## Startup and attachment failures
 
@@ -340,6 +380,13 @@ If cleanup reports an error, preserve the exact object/interface identifiers
 and retry by starting then gracefully stopping the same build before manual
 removal. Manual cleanup should be the last step and must target only positively
 identified sing-box-owned state.
+
+`SIGTERM` is the preferred shutdown signal because it lets the runtime disable
+interception and restore routes, sysctls, veths, and locks in order. `SIGKILL`
+cannot run `Close`; file-descriptor-backed BPF links/maps normally disappear
+when the process exits, but externally visible routes, links, or sysctls can
+require the next runtime reconciliation. Always inspect ownership before
+removing anything manually.
 
 ## Privacy
 

@@ -90,7 +90,7 @@ This field does not change version fallback. Client fallback remains controlled 
 
 Send UDP packets over `connect-udp` without waiting for the proxy's response. Disabled by default.
 
-The tunnel is ready once the request is sent; the response is checked on the first read. A rejected request (for example `407` or `405`) is reported as a connection error instead of a dial error. Version fallback is unaffected.
+The tunnel is ready once the request is sent; the response is verified asynchronously in the background under the handshake timeout. A rejected or timed-out request (for example `407` or `405`) closes the stream and is reported as a connection error on subsequent reads or writes instead of a dial error. Version fallback is unaffected.
 
 For HTTP/3, the client still waits for the server's SETTINGS so it knows whether QUIC datagrams can be used. Early QUIC datagrams may be dropped by servers that do not buffer datagrams for request streams they have not accepted yet.
 

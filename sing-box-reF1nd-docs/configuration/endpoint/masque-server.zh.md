@@ -81,7 +81,7 @@ HTTP/3 连接的本端发送拥塞控制算法。仅在 HTTP/3 生效。
 
 ### tls
 
-TLS 配置，参阅 [TLS](/zh/configuration/shared/tls/#inbound)。
+TLS 配置，参阅 [TLS](/zh/configuration/shared/tls/#入站)。
 
 IP 代理必须运行在 TLS 或 QUIC 之上。仅当服务器位于终止 TLS 的 HTTP 中间层之后时才可以不启用。
 

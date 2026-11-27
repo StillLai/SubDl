@@ -12,7 +12,7 @@
   ],
   "providers": [
     "provider-a",
-    "provider-b",
+    "provider-b"
   ],
   "exclude": "",
   "include": "",
@@ -46,7 +46,11 @@
 
 #### default
 
-默认的出站标签。默认使用第一个出站。
+启动时选择的出站。订阅节点使用完整标签，例如 `provider-a/node-1`。该订阅必须已加入选择器，且节点须通过 `include` 和 `exclude` 过滤。
+
+通过 API 选择或从[缓存文件](/zh/configuration/experimental/cache-file/)恢复的节点可用时，优先使用该节点。否则使用 `default`，未设置时使用第一个成员。如果所有订阅加载完成后仍找不到指定的默认节点，选择器会记录警告，并按未设置 `default` 处理。组内没有可用成员时使用 `Compatible`。
+
+启动后的订阅更新会保留仍然可用的当前节点。如果之前手动选择的节点重新出现，选择器会切回该节点。
 
 #### use_all_providers
 
